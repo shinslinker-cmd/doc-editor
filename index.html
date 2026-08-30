@@ -699,9 +699,13 @@ function renderPages(doc, pagesEl, gaugeEl) {
 
 /* edit.js */
 // 여러 편집 칸(문단·목록 항목)에 걸친 선택을 지우는 순수 로직. DOM 을 모른다.
-// targets: 문서 순서의 [{ id, item|null, from, to }] — 화면의 targetsIn() 이 만든 좌표.
-// 워드와 같은 규칙: 첫 칸의 남는 머리 + 끝 칸의 남는 꼬리를 첫 칸에 합치고,
-// 사이의 칸(문단 통째·목록 항목)은 없앤다. 끝 칸이 목록이면 안 고른 항목은 남는다.
+// targets: 문서 순서의 [{ id, item|null, from, to }] — 화면의 crossTargets() 가 만든 좌표.
+//
+// 워드의 실제 규칙(2026-08-30 이 PC 워드 실측 — 4가지 변형):
+// · 양쪽 끝이 모두 «글자 중간»이면: 지우고 머리와 꼬리를 **딴 문단으로 남긴다** (안 합친다)
+// · 한쪽이라도 경계(머리를 하나도 안 물었거나, 꼬리를 하나도 안 문 경우)면: **합친다**
+// · 엔터는 항상 가른다 → opt.break 로 강제 가르기
+// 반환: { blocks, caret(머리 끝 — 지우기의 커서), caretTail(꼬리 시작 — 엔터의 커서), split }
 // ⛔ 선택 밖 글자는 하나도 사라지지 않는다 — 시험(test/edit.test.js)이 이것을 못 박는다.
 
 
@@ -710,23 +714,30 @@ function runsAt(b, t) {
   return Array.isArray(b.items) && Array.isArray(b.items[t.item]) ? b.items[t.item] : null;
 }
 
-function deleteAcross(blocks, targets) {
+function deleteAcross(blocks, targets, opt) {
   if (!Array.isArray(targets) || targets.length < 2) return null;
   const first = targets[0];
-  const firstItem = first.item === null || first.item === undefined ? null : first.item;
   const last = targets[targets.length - 1];
+  const fi = first.item === null || first.item === undefined ? null : first.item;
+  const li = last.item === null || last.item === undefined ? null : last.item;
   const firstB = blocks.find(b => b.id === first.id);
   const lastB = blocks.find(b => b.id === last.id);
   const srcA = firstB ? runsAt(firstB, first) : null;
   const srcZ = lastB ? runsAt(lastB, last) : null;
   if (!srcA || !srcZ) return null;
 
-  const merged = normalizeRuns(
-    sliceRuns(srcA, 0, first.from).concat(sliceRuns(srcZ, last.to, runsLength(srcZ))));
+  const headLen = runsLength(srcA);
+  const tailLen = runsLength(srcZ);
+  const head = sliceRuns(srcA, 0, first.from);
+  const tail = sliceRuns(srcZ, last.to, tailLen);
+  const split = !!(opt && opt.break)
+    || (first.from > 0 && first.from < headLen && last.to > 0 && last.to < tailLen);
+  const merged = normalizeRuns(head.concat(tail));
 
-  // 첫 칸을 뺀 나머지 대상은 통째로 없어진다 (끝 칸의 꼬리는 이미 첫 칸으로 옮겼다)
+  // 첫 대상을 뺀 나머지는 통째로 없어진다. 갈라 두기(split)면 끝 대상도 남긴다.
   const gone = new Map();   // 블록 id -> 'block'(문단 통째) 또는 Set(목록 항목 번호들)
   for (let i = 1; i < targets.length; i++) {
+    if (split && i === targets.length - 1) continue;
     const t = targets[i];
     if (t.item === null || t.item === undefined) gone.set(t.id, 'block');
     else {
@@ -737,17 +748,41 @@ function deleteAcross(blocks, targets) {
   }
 
   const out = [];
+  let caretTail = null;
   for (const b of blocks) {
     if (b.id === first.id) {
-      if (firstItem === null) {
-        out.push(Object.assign({}, b, { runs: merged }));
+      if (fi === null) {
+        out.push(Object.assign({}, b, { runs: split ? head : merged }));
+      } else {
+        // 첫 칸이 목록 항목 — 같은 블록에 끝 항목·지워질 항목이 함께 있을 수 있다
+        const doomed = gone.get(b.id);
+        const items = [];
+        b.items.forEach((it, i) => {
+          if (i === fi) items.push(split ? head : merged);
+          else if (split && b.id === last.id && i === li) {
+            caretTail = { id: b.id, item: items.length, pos: 0 };
+            items.push(tail);
+          } else if (doomed instanceof Set && doomed.has(i)) return;
+          else items.push(it);
+        });
+        out.push(Object.assign({}, b, { items }));
+      }
+      continue;
+    }
+    if (split && b.id === last.id) {
+      // 끝 칸을 꼬리만 남겨 딴 블록으로 둔다
+      if (li === null) {
+        caretTail = { id: b.id, item: null, pos: 0 };
+        out.push(Object.assign({}, b, { runs: tail }));
       } else {
         const doomed = gone.get(b.id);
         const items = [];
         b.items.forEach((it, i) => {
-          if (i === firstItem) items.push(merged);
-          else if (doomed instanceof Set && doomed.has(i)) return;
-          else items.push(it);
+          if (doomed instanceof Set && doomed.has(i)) return;
+          if (i === li) {
+            caretTail = { id: b.id, item: items.length, pos: 0 };
+            items.push(tail);
+          } else items.push(it);
         });
         out.push(Object.assign({}, b, { items }));
       }
@@ -763,7 +798,9 @@ function deleteAcross(blocks, targets) {
     }
     out.push(b);
   }
-  return { blocks: out, caret: { id: first.id, item: firstItem, pos: first.from } };
+  const caret = { id: first.id, item: fi, pos: first.from };
+  if (!caretTail) caretTail = caret;   // 합쳐졌으면 이음매가 곧 꼬리 시작이다
+  return { blocks: out, caret, caretTail, split };
 }
 
 /* editor-ops.js */
@@ -1055,12 +1092,12 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
       .map(el => ({ id: el.dataset.id, item: null, from: 0, to: 0 }));
   }
 
-  function deleteTargets(targets) {
+  function deleteTargets(targets, opt) {
     const doc = getDoc();
-    const r = deleteAcross(doc.blocks, targets);
+    const r = deleteAcross(doc.blocks, targets, opt);
     if (!r) return null;
     setDoc(Object.assign({}, doc, { blocks: r.blocks }));
-    return r.caret;
+    return r;
   }
 
   // 걸침 선택을 화면 전체를 다시 그리지 않고 지운다(조합 직전용 — §12-12).
@@ -1070,21 +1107,32 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const targets = crossTargets();
     if (targets.length < 2) return;
     const first = targets[0];
+    const last = targets[targets.length - 1];
     const firstItem = first.item === null || first.item === undefined ? null : first.item;
-    const firstHost = firstItem === null
-      ? pagesEl.querySelector('.blk[data-id="' + first.id + '"]')
-      : pagesEl.querySelector('.blk[data-id="' + first.id + '"] .lst li[data-i="' + firstItem + '"]');
+    const hostEl = (t) => (t.item === null || t.item === undefined)
+      ? pagesEl.querySelector('.blk[data-id="' + t.id + '"]')
+      : pagesEl.querySelector('.blk[data-id="' + t.id + '"] .lst li[data-i="' + t.item + '"]');
+    const firstHost = hostEl(first);
     if (!firstHost) return;
-    const caret = deleteTargets(targets);
-    if (!caret) return;
+    const lastHost = hostEl(last);
+    const r = deleteTargets(targets);
+    if (!r) return;
     const doc = getDoc();
-    const mergedB = doc.blocks.find(b => b.id === first.id);
-    const runs = firstItem === null ? mergedB.runs : mergedB.items[firstItem];
-    firstHost.textContent = '';
-    for (const n of runsToNodes(runs)) firstHost.appendChild(n);
+    const refill = (el, runs) => {
+      el.textContent = '';
+      for (const n of runsToNodes(runs || [])) el.appendChild(n);
+    };
+    const firstB = doc.blocks.find(b => b.id === first.id);
+    refill(firstHost, firstItem === null ? firstB.runs : firstB.items[firstItem]);
+    if (r.split && lastHost && lastHost !== firstHost) {
+      // 갈라 두기 — 끝 칸을 지우지 않고 꼬리로 갈아 끼운다
+      const lastB = doc.blocks.find(b => b.id === r.caretTail.id);
+      refill(lastHost, r.caretTail.item === null ? lastB.runs : lastB.items[r.caretTail.item]);
+    }
     const alive = new Set(doc.blocks.map(b => b.id));
     for (let i = 1; i < targets.length; i++) {
       const t = targets[i];
+      if (r.split && i === targets.length - 1) continue;   // 끝 칸은 남는다
       if (!alive.has(t.id)) {
         const el = pagesEl.querySelector('.blk[data-id="' + t.id + '"]');
         if (el) el.remove();
@@ -1100,7 +1148,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
         .forEach((li, i) => { li.dataset.i = String(i); });
     }
     cancelIdle();
-    caretTo(firstHost, caret.pos);
+    caretTo(firstHost, r.caret.pos);
   }
 
   // ── 구조 지킴이 ──
@@ -1112,21 +1160,23 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
 
     const targets = crossTargets();
     if (targets.length > 1) {
-      // 여러 칸에 걸친 편집 — 브라우저가 블록을 제멋대로 병합하기 전에 우리가 지운다
+      // 여러 칸에 걸친 편집 — 브라우저가 블록을 제멋대로 병합하기 전에 우리가 지운다.
+      // 워드 규칙(실측 2026-08-30): 엔터는 항상 가르고, 지우기·타자는 deleteAcross 의
+      // 자동 규칙(양쪽 다 글자를 물었으면 가르고, 경계만 물렸으면 합친다)을 따른다.
       e.preventDefault();
-      const caret = deleteTargets(targets);
-      if (!caret) return;
+      const r = deleteTargets(targets, t === 'insertParagraph' ? { break: true } : null);
+      if (!r) return;
       if (t === 'insertParagraph') {
-        // 워드와 같다: 고른 것을 지우고 그 자리에서 두 문단으로 가른다 (실기기 2026-08-30)
-        splitAtCaret(caret);
+        cancelIdle();
+        redraw({ caret: r.caretTail });
         return;
       }
       let text = '';
       if (t === 'insertText' && e.data) text = e.data;
       if (t === 'insertFromPaste' && e.dataTransfer) text = e.dataTransfer.getData('text/plain') || '';
-      if (text) insertAtCaret(caret, text);
+      if (text) insertAtCaret(r.caret, text);
       cancelIdle();
-      redraw({ caret: { id: caret.id, item: caret.item, pos: caret.pos + text.length } });
+      redraw({ caret: { id: r.caret.id, item: r.caret.item, pos: r.caret.pos + text.length } });
       return;
     }
 
@@ -1167,30 +1217,6 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
       patch = { items };
     }
     setDoc(Object.assign({}, getDoc(), { blocks: replaceBlock(getDoc().blocks, b.id, patch) }));
-  }
-
-  // 모델 좌표(caret)에서 블록/항목을 가른다 — 걸침 엔터가 지운 «뒤»에 쓴다
-  function splitAtCaret(caret) {
-    const doc = getDoc();
-    const b = doc.blocks.find(x => x.id === caret.id);
-    if (!b) return;
-    if (caret.item !== null && caret.item !== undefined && Array.isArray(b.items)) {
-      const item = b.items[caret.item] || [];
-      const items = b.items.slice();
-      items[caret.item] = sliceRuns(item, 0, caret.pos);
-      items.splice(caret.item + 1, 0, sliceRuns(item, caret.pos, runsLength(item)));
-      setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id, { items }) }));
-      cancelIdle();
-      redraw({ caret: { id: b.id, item: caret.item + 1, pos: 0 } });
-      return;
-    }
-    if (!Array.isArray(b.runs)) return;
-    const fresh = createBlock('para', { runs: sliceRuns(b.runs, caret.pos, runsLength(b.runs)) });
-    const blocks = insertAfter(
-      replaceBlock(doc.blocks, b.id, { runs: sliceRuns(b.runs, 0, caret.pos) }), b.id, fresh);
-    setDoc(Object.assign({}, doc, { blocks }));
-    cancelIdle();
-    redraw({ caret: { id: fresh.id, item: null, pos: 0 } });
   }
 
   // 엔터 — 커서 자리에서 가른다 (뒷부분이 새 문단/항목이 된다. 워드와 같다)
@@ -1285,10 +1311,10 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
       return { id: bk.dataset.id, item: l ? Number(l.dataset.i) : null, from: p, to: p };
     };
     const pair = dir < 0 ? [at(other, true), at(host, false)] : [at(host, true), at(other, false)];
-    const caret = deleteTargets(pair);
-    if (!caret) return false;
+    const r = deleteTargets(pair);   // 경계만 문 대상 — 자동 규칙이 합친다
+    if (!r) return false;
     cancelIdle();
-    redraw({ caret });
+    redraw({ caret: r.caret });
     return true;
   }
 
