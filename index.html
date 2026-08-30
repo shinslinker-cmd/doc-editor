@@ -99,8 +99,19 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .blk-table td:empty::before { content:'\200B'; }
 /* 열 경계 손잡이 — 평소엔 투명, 올리면 §8 헤어라인보다 살짝 진하게 */
 .colgrip { position:absolute; top:0; bottom:0; width:7px; cursor:col-resize; z-index:3; }
+.colgrip-fixed { cursor:default; pointer-events:none; }   /* 이어진 장의 것은 보기 전용 */
 .colgrip:hover, .colgrip.on { background:rgba(84,144,255,.35); }
-@media print { .colgrip { display:none !important; } }
+/* 표에 마우스를 올리면 열 경계가 세로 눈금으로 보인다 — 세로선이 없어 열 구분이 안 되던 것.
+   ⚠ var(--line)(#e4e5e9)로는 흰 종이에서도 칸 선택(연파랑) 위에서도 안 보였다(캡처 실측) —
+   반투명 먹으로 둬야 두 바탕 모두에서 읽힌다. 인쇄에는 안 나온다. */
+.blk-table:hover .colgrip::after { content:''; position:absolute; left:3px; top:0; bottom:0;
+                                   width:1px; background:rgba(28,30,36,.22); }
+/* 여러 칸에 걸쳐 고르면 «칸 통째»로 칠한다 — 워드처럼 칸이 선택된 것이 보인다.
+   반쪽만 파랗다가 칸 통째로 지워지면 놀라므로, 칠하는 범위와 지워지는 범위를 같게 뒀다. */
+.blk-table td.cellsel { background:rgba(84,144,255,.25); }
+.blk-table td.cellsel::selection, .blk-table td.cellsel *::selection { background:transparent; }
+@media print { .colgrip { display:none !important; }
+               .blk-table td.cellsel { background:transparent; } }
 .blk-heading { font-size:27px; font-weight:900; line-height:1.2; margin:0 0 5px; letter-spacing:-.4px; }
 .blk-section { display:flex; align-items:center; gap:9px; margin:22px 0 9px; }
 .blk-section .n { font:600 11.5px 'IBM Plex Mono',Consolas,monospace;
@@ -1249,14 +1260,17 @@ function tableEl(block, part) {
   }
   tbl.appendChild(tbody);
   el.appendChild(tbl);
-  // 열 경계 손잡이 — 첫 조각에만(이어진 조각에서 끌면 헷갈린다). 편집 불가 섬.
-  if (!part || !part.cont) {
+  // 열 경계 표시 — 표에 마우스를 올리면 세로 눈금이 보인다(세로선이 없어 열이 안 보이던 것).
+  // 첫 조각의 것만 «끌 수 있는 손잡이»고, 이어진 조각의 것은 보기 전용이다
+  // (이어진 조각에서 끌면 헷갈린다 — R13). 둘 다 편집 불가 섬이라 타자에 안 잡힌다.
+  {
+    const fixed = !!(part && part.cont);
     let x = 0;
     (block.cols || []).forEach((c, i) => {
       if (i === block.cols.length - 1) return;            // 마지막 경계는 없다(합 고정 — R13)
       x += c.w || 0;
       const grip = document.createElement('div');
-      grip.className = 'colgrip';
+      grip.className = fixed ? 'colgrip colgrip-fixed' : 'colgrip';
       grip.setAttribute('contenteditable', 'false');
       grip.dataset.col = String(i);
       grip.style.left = (x - 3) + 'px';
@@ -1588,14 +1602,33 @@ function rangesIn(pagesEl) {
   if (!s || s.rangeCount === 0) return [];
   const r = s.getRangeAt(0);
   if (r.collapsed) return [];
-  return editableEls(pagesEl)
-    .filter(el => r.intersectsNode(el))
-    .map(el => ({
-      el,
-      from: el.contains(r.startContainer) ? offsetIn(el, r.startContainer, r.startOffset) : 0,
-      to: el.contains(r.endContainer) ? offsetIn(el, r.endContainer, r.endOffset) : textLen(el),
-    }))
+  const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
+  // ⭐ 표 칸이 다른 칸·문단과 «함께» 걸리면 그 칸은 통째로 고른 것으로 본다(워드와 같다).
+  //    반쪽만 문 칸이 남으면 화면(칸이 통째로 파랗다)과 실제 지워지는 범위가 어긋난다.
+  //    한 칸 «안»에서만 끈 것은 그대로 글자 단위다.
+  const wholeCells = hit.length > 1;
+  return hit
+    .map(el => {
+      if (wholeCells && el.matches('td[data-r]')) return { el, from: 0, to: textLen(el), whole: 1 };
+      return {
+        el,
+        from: el.contains(r.startContainer) ? offsetIn(el, r.startContainer, r.startOffset) : 0,
+        to: el.contains(r.endContainer) ? offsetIn(el, r.endContainer, r.endOffset) : textLen(el),
+      };
+    })
     .filter(x => x.to > x.from);
+}
+
+// 지금 선택이 «칸 통째»로 무는 표 칸들 — 화면을 칠하는 쪽이 쓴다.
+// rangesIn 과 달리 빈 칸(글자 0)도 준다: 비어 있어도 «골라졌다»는 보여야 한다.
+function wholeCellsIn(pagesEl) {
+  const s = window.getSelection();
+  if (!s || s.rangeCount === 0) return [];
+  const r = s.getRangeAt(0);
+  if (r.collapsed) return [];
+  const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
+  if (hit.length < 2) return [];
+  return hit.filter(el => el.matches('td[data-r]'));
 }
 
 // rangesIn 의 화면 요소를 모델 좌표 [{id, item|null, from, to}] 로 바꾼다.
@@ -2162,6 +2195,15 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     cancelIdle();
     redraw({ keepCaret: true });
   });
+
+  // ── 칸이 골라진 것을 «보이게» 칠한다 (2026-08-30 SKY: "셀이 선택 되게 해줘") ──
+  // 브라우저의 글자 선택 파란색만으로는 «칸이 골라졌다»가 안 보인다. 칸 통째로 무는
+  // 선택이면 그 td 에 표시를 달고, CSS 가 칸 전체를 칠한다.
+  function paintCells() {
+    for (const td of pagesEl.querySelectorAll('td.cellsel')) td.classList.remove('cellsel');
+    for (const td of wholeCellsIn(pagesEl)) td.classList.add('cellsel');
+  }
+  document.addEventListener('selectionchange', paintCells);
 
   // 잘라내기(Ctrl+X)의 걸침판은 아직 없다 — 반쪽 지움을 막기 위해 계속 막는다
   pagesEl.addEventListener('cut', (e) => {
@@ -2759,6 +2801,11 @@ state.name = null;
 
 function msg(t) { document.getElementById('folder-msg').textContent = t; }
 
+// 문서를 어디에 담을지는 «사람이 폴더를 골라야» 정해진다(브라우저 보안 — 프로그램이 마음대로 못 연다).
+// 고른 폴더 «안»에 서류 폴더가 생기고 .sdoc 문서가 거기 쌓인다(io/folder.js SUB).
+// ⚠ 브라우저는 그 선택을 새로고침 뒤까지 기억하지 못한다 — 그래서 열 때마다 한 번 골라야 한다.
+const NEED_DIR = '먼저 왼쪽 위 「📁 문서 폴더 열기」를 눌러 폴더를 고르세요 — 그 안에 「서류」 폴더가 생기고 문서가 거기 저장됩니다';
+
 async function refreshList() {
   const box = document.getElementById('doclist');
   box.textContent = '';
@@ -2790,7 +2837,7 @@ document.getElementById('btn-folder').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-save').addEventListener('click', async () => {
-  if (!state.dir) { msg('먼저 문서 폴더를 여세요'); return; }
+  if (!state.dir) { msg(NEED_DIR); return; }
   const name = state.name || ((state.doc.meta.title || '새 문서') + DOC_EXT);
   try {
     await writeDoc(state.dir, name, serialize(state.doc));
@@ -2813,7 +2860,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
 // 다른 이름으로 저장 — 지금 열린 폴더에 새 파일을 만든다(R15).
 // 같은 이름이 이미 있으면 물어본다 — 다른 문서가 조용히 사라지면 안 된다(데이터 안전).
 document.getElementById('btn-saveas').addEventListener('click', async () => {
-  if (!state.dir) { msg('먼저 문서 폴더를 여세요'); return; }
+  if (!state.dir) { msg(NEED_DIR); return; }
   const cur = (state.name || ((state.doc.meta.title || '새 문서') + DOC_EXT)).replace(DOC_EXT, '');
   const input = window.prompt('다른 이름으로 저장 — 새 파일 이름:', cur);
   if (input === null) return;                                    // 사람이 취소한 것
