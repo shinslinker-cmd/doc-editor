@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<!-- 태블릿 전용 화면은 없다 — PC 화면(1100px)을 그대로 축소해 보인다 (2026-08-30 SKY) -->
+<meta name="viewport" content="width=1100">
+<title>문서 편집기</title>
+<style>
+:root {
+  --point:#e5231b; --ink:#1c1e24; --sub:#5a5e6a; --dim:#8a8e98;
+  --line:#e4e5e9; --line-soft:#eef0f4; --paper:#fff; --desk:#e8e9ec;
+  --page-w:794px; --page-h:1123px;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--desk); color:var(--ink);
+       font-family:'Noto Sans KR','맑은 고딕','Malgun Gothic',sans-serif; }
+#app { display:flex; min-height:100vh; }
+/* 사이드바 — B안 「목록이 주인공」 (2026-08-30 SKY 확정): 종이처럼 흰 바탕에
+   표처럼 헤어라인 구획. 머리는 문서 머리글 모티프(굵은 아래 경계 + 왼쪽 끝 64px만 빨강).
+   화면을 내려도 왼쪽에 붙어 있는다 — 높이는 화면만큼, 넘치면 저 혼자 스크롤 */
+#side { width:250px; flex:none; background:#fff; color:var(--ink);
+        border-right:1px solid var(--line); padding:0;
+        position:sticky; top:0; height:100vh; overflow-y:auto; }
+#side .side-ttl { padding:24px 18px 16px; border-bottom:1.5px solid var(--ink); position:relative; }
+#side .side-ttl::after { content:''; position:absolute; left:0; bottom:-1.5px;
+                         width:64px; height:3px; background:var(--point); }
+.s-name { font-size:19px; font-weight:900; letter-spacing:-.3px; }
+.s-eyebrow { font:600 9px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8;
+             letter-spacing:1.4px; margin-top:6px; }
+#main { flex:1; padding:0 0 60px; }
+#pages { display:flex; flex-direction:column; align-items:center; gap:28px; padding-top:28px; }
+
+/* 위쪽 도구모음 — 화면에 붙어 있고 문서와 함께 스크롤되지 않는다 */
+#bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:6px;
+       align-items:center; padding:8px 16px; background:#fff;
+       border-bottom:1px solid var(--line); box-shadow:0 1px 6px rgba(20,22,30,.06); }
+/* ⛔ 버튼 글자는 꺾지 않는다(white-space) · 버튼도 줄이지 않는다(flex:none) —
+   자리가 모자라면 글자가 두 줄이 되는 게 아니라 버튼 줄이 다음 줄로 내려간다 */
+.tb { min-width:56px; height:42px; padding:0 12px; border:1px solid var(--line);
+      border-radius:6px; background:#fff; color:var(--ink); cursor:pointer;
+      white-space:nowrap; flex:none;
+      font:600 12.5px 'Noto Sans KR','맑은 고딕',sans-serif;
+      transition:transform .12s, box-shadow .12s, background .12s; }
+.tb:hover { transform:translateY(-2px); box-shadow:0 3px 10px rgba(20,22,30,.12); }
+/* 눌린 상태 — 검은 배경은 너무 튀어서(SKY 2026-08-28) 살짝 눌린 회색으로 */
+.tb.on { background:var(--line-soft); border-color:#9aa0ae;
+         box-shadow:inset 0 1px 3px rgba(20,22,30,.18); }
+.tb:disabled { opacity:.4; cursor:default; transform:none; box-shadow:none; }
+.blk-list { margin:0 0 6px; }
+.lst { margin:0; padding-left:22px; font-size:12.5px; line-height:1.85; color:#2b2f3a; }
+.lst li { outline:none; margin:0 0 2px; }
+/* 빈 항목: 속 빈 상자(inline-block)는 기준선 위에 얹혀 줄이 6px 커지고 커서가 떠 보였다(실측).
+   폭 0짜리 보이지 않는 글자를 놓으면 기준선이 정상이라 커서가 번호와 나란히 선다. */
+.lst li:empty::before { content:'\200B'; }
+
+/* 같은 기능 묶음 — 줄바꿈될 때 묶음째 다음 줄로 내려간다 (2026-08-30 SKY) */
+.tbg { display:flex; gap:6px; align-items:center; flex:none; }
+.tb-sep { width:1px; height:26px; background:var(--line); margin:0 4px; }
+.tb-sel { min-width:96px; padding:0 8px; }
+.tb-c { min-width:42px; font-size:15px; line-height:1; }
+.tb-ic { min-width:42px; }
+.tb-ic svg { display:block; margin:0 auto; }
+@media print { #bar { display:none !important; } }
+/* 높이를 재는 숨은 상자 — 화면 밖에 두되 크기는 진짜 페이지와 같아야 한다 */
+#gauge { position:absolute; left:-10000px; top:0; width:674px; visibility:hidden; }
+
+.page { width:var(--page-w); height:var(--page-h); background:var(--paper);
+        box-shadow:0 2px 14px rgba(20,22,30,.12); padding:46px 60px 34px;
+        position:relative; overflow:hidden; }
+.page-body { display:flex; flex-direction:column; gap:0; }
+.pgno { position:absolute; right:60px; bottom:14px;
+        font:600 10px 'IBM Plex Mono',Consolas,monospace; color:var(--ink); }
+
+/* 고른 범위 표시 — 브라우저 기본(진한 파랑)은 글자 색을 덮어, 색을 바꿔도 바뀌었는지
+   안 보였다(실기기 지적 3). 연한 파랑이면 선택된 채로도 빨강·회색이 그대로 읽힌다.
+   글자 색은 건드리지 않는다(background 만 지정하면 글자는 제 색을 지킨다). */
+.page ::selection { background:rgba(84,144,255,.25); }
+
+/* 연속 공백과 Shift+Enter 줄바꿈을 그대로 살린다 */
+.blk { outline:none; white-space:pre-wrap; }
+.blk .mono { font-family:'IBM Plex Mono',Consolas,monospace; }
+.blk-heading { font-size:27px; font-weight:900; line-height:1.2; margin:0 0 5px; letter-spacing:-.4px; }
+.blk-section { display:flex; align-items:center; gap:9px; margin:22px 0 9px; }
+.blk-section .n { font:600 11.5px 'IBM Plex Mono',Consolas,monospace;
+                  color:var(--point); letter-spacing:1px; }
+.blk-section .t { font-size:13px; font-weight:700; letter-spacing:-.2px; white-space:nowrap; }
+.blk-section .rule { flex:1; height:1px; background:#e8eaef; }
+.blk-para { font-size:12.5px; line-height:1.85; color:#2b2f3a; margin:0 0 6px; min-height:1.85em; }
+.blk.sel { box-shadow:0 0 0 2px rgba(229,35,27,.25); border-radius:3px; }
+#gauge .blk { margin-left:0; margin-right:0; }
+
+.side-btns { display:flex; flex-direction:column; gap:6px; margin:14px 12px; }
+.side-btns button { border:1px solid var(--line); border-radius:6px; padding:11px 14px;
+                    cursor:pointer; font:600 13px 'Noto Sans KR',sans-serif;
+                    background:#fff; color:#454a58; }
+.side-btns button:hover { background:#f6f7fa; }
+.side-btns button.pri { border:1.5px solid var(--point); color:var(--point); font-weight:800; }
+.side-btns button.pri:hover { background:var(--point); color:#fff; }
+#folder-msg { padding:2px 18px 6px; color:var(--dim); line-height:1.7; word-break:break-all;
+              font:500 10px 'IBM Plex Mono',Consolas,monospace; letter-spacing:.4px; }
+/* 문서 목록 — §8 표의 행과 같은 문법: 아래선 헤어라인 · 모노 번호 · 고른 것은 기준 행(옅은 빨강) */
+#doclist { counter-reset:doc; }
+#doclist a { display:flex; gap:10px; align-items:baseline; counter-increment:doc;
+             color:#454a58; text-decoration:none; font-size:12.5px;
+             padding:11px 18px; border-bottom:1px solid var(--line-soft); cursor:pointer; }
+#doclist a:first-child { border-top:1px solid var(--line-soft); }
+#doclist a::before { content:counter(doc, decimal-leading-zero);
+                     font:600 10.5px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8; }
+#doclist a:hover { background:#f6f7fa; color:var(--ink); }
+#doclist a.on { background:#fdf5f4; color:var(--ink); font-weight:700; }
+#doclist a.on::before { color:var(--point); font-weight:700; }
+
+/* 스크립트가 막힌 곳(구글드라이브 미리보기 등)에서만 보이는 안내 */
+.nojs { background:var(--point); color:#fff; font-size:14px; font-weight:700;
+        line-height:1.7; padding:14px 18px; }
+
+@page { size: A4 portrait; margin: 0; }
+@media print {
+  #side, #gauge, #folder-msg { display:none !important; }
+  body { background:#fff; }
+  /* ⛔ 확대/축소가 인쇄에 남으면 A4 밖으로 잘린다 (설계서 §12-10) */
+  #main { padding:0 !important; transform:none !important; zoom:1 !important; }
+  #pages { gap:0 !important; }
+  .nojs { display:none !important; }
+  .page { box-shadow:none !important; margin:0 !important;
+          page-break-after:always; break-after:page; }
+  .page:last-child { page-break-after:auto; break-after:auto; }
+  .blk { outline:none !important; box-shadow:none !important; }
+}
+
+</style>
+</head>
+<body>
+<noscript><div class="nojs">⚠ 여기서는 이 프로그램이 동작하지 않습니다 (구글드라이브 미리보기는 스크립트를 막습니다).
+파일을 기기에 내려받은 뒤 Chrome 이나 삼성인터넷으로 열어 주세요.</div></noscript>
+<div id="app">
+  <aside id="side"><div class="side-ttl"><div class="s-name">문서 편집기</div>
+    <div class="s-eyebrow">SAMIL ELTEC CO., LTD.</div></div>
+  <div class="side-btns">
+    <button id="btn-folder">📁 문서 폴더 열기</button>
+    <button id="btn-save">저장</button>
+    <button id="btn-pdf" class="pri">PDF 저장</button>
+  </div>
+  <div id="folder-msg"></div>
+<div id="doclist"></div></aside>
+  <main id="main">
+    <div id="bar">
+      <!-- 같은 기능은 한 묶음(tbg) — 좁은 화면에서 줄바꿈될 때 묶음째 내려간다 (2026-08-30 SKY) -->
+      <span class="tbg">
+      <button class="tb" data-mark="b" title="굵게 (Ctrl+B)"><b>굵게</b></button>
+      <button class="tb" data-mark="i" title="기울임 (Ctrl+I)"><i>기울임</i></button>
+      <button class="tb" data-mark="u" title="밑줄 (Ctrl+U)"><u>밑줄</u></button>
+      </span>
+      <span class="tb-sep"></span>
+      <span class="tbg">
+      <select id="tb-size" class="tb tb-sel" title="글자 크기">
+        <option value="">크기</option>
+        <option value="8.5">8.5 단위</option>
+        <option value="9">9</option>
+        <option value="10">10</option>
+        <option value="10.5">10.5 작게</option>
+        <option value="11">11</option>
+        <option value="11.5">11.5 표</option>
+        <option value="12">12</option>
+        <option value="12.5">12.5 본문</option>
+        <option value="13">13 소제목</option>
+        <option value="14">14</option>
+        <option value="15">15</option>
+        <option value="16">16</option>
+        <option value="18">18</option>
+        <option value="20">20</option>
+        <option value="24">24</option>
+        <option value="27">27 제목</option>
+        <option value="30">30</option>
+        <option value="36">36</option>
+      </select>
+      <button class="tb" data-szstep="1" title="글자 크게">A＋</button>
+      <button class="tb" data-szstep="-1" title="글자 작게">A−</button>
+      </span>
+      <span class="tbg">
+      <button class="tb tb-c" data-color="#1c1e24" title="본문색" style="color:#1c1e24">■</button>
+      <button class="tb tb-c" data-color="#5a5e6a" title="보조색" style="color:#5a5e6a">■</button>
+      <button class="tb tb-c" data-color="#e5231b" title="포인트색" style="color:#e5231b">■</button>
+      <button class="tb tb-c" data-color="" title="색 지우기">✕</button>
+      </span>
+      <span class="tb-sep"></span>
+      <span class="tbg">
+      <button class="tb tb-ic" data-align="left" title="왼쪽 정렬"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 5h10M1 8.5h16M1 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="tb tb-ic" data-align="center" title="가운데 정렬"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M4 5h10M1 8.5h16M4 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="tb tb-ic" data-align="right" title="오른쪽 정렬"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M7 5h10M1 8.5h16M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      </span>
+      <span class="tb-sep"></span>
+      <span class="tbg">
+      <button class="tb" data-list="0" title="글머리표 목록">• 목록</button>
+      <button class="tb" data-list="1" title="번호 목록">1. 목록</button>
+      </span>
+    </div>
+    <div id="pages"></div>
+  </main>
+</div>
+<div id="gauge" aria-hidden="true"></div>
+<script>
+(function(){
+/* runs.js */
+// 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
+// ⛔ 이 파일은 DOM 을 모른다. 토막을 제자리에서 고치지 않고 항상 새 배열·새 객체를 만든다.
+const MARK_KEYS = ['b', 'i', 'u', 's', 'sz', 'c', 'mono'];
+
+function markOf(run) {
+  const m = {};
+  for (const k of MARK_KEYS) {
+    if (run && run[k] !== undefined && run[k] !== null && run[k] !== false) m[k] = run[k];
+  }
+  return m;
+}
+
+function sameMark(a, b) {
+  for (const k of MARK_KEYS) {
+    const x = a && a[k] !== undefined && a[k] !== null ? a[k] : null;
+    const y = b && b[k] !== undefined && b[k] !== null ? b[k] : null;
+    if (x !== y) return false;
+  }
+  return true;
+}
+
+function runsFromText(text) { return text ? [{ t: String(text) }] : []; }
+
+function runsText(runs) {
+  let out = '';
+  for (const r of runs || []) out += (r && r.t) || '';
+  return out;
+}
+
+function runsLength(runs) { return runsText(runs).length; }
+
+// ⛔ 빈 토막을 버리고 서식이 같은 이웃을 합친다. 안 하면 타자할수록 토막이 무한히 늘어난다.
+function normalizeRuns(runs) {
+  const out = [];
+  for (const r of runs || []) {
+    if (!r || !r.t) continue;
+    const last = out[out.length - 1];
+    if (last && sameMark(last, r)) out[out.length - 1] = Object.assign({}, last, { t: last.t + r.t });
+    else out.push(Object.assign({ t: r.t }, markOf(r)));
+  }
+  return out;
+}
+
+function sliceRuns(runs, from, to) {
+  const out = [];
+  let pos = 0;
+  for (const r of runs || []) {
+    const t = (r && r.t) || '';
+    const start = pos;
+    const end = pos + t.length;
+    pos = end;
+    if (!t || end <= from || start >= to) continue;
+    const a = Math.max(from, start) - start;
+    const b = Math.min(to, end) - start;
+    out.push(Object.assign({ t: t.slice(a, b) }, markOf(r)));
+  }
+  return normalizeRuns(out);
+}
+
+// value 가 null 이면 그 서식을 뗀다.
+function applyMark(runs, from, to, key, value) {
+  if (!MARK_KEYS.includes(key)) throw new Error('알 수 없는 서식: ' + key);
+  const len = runsLength(runs);
+  const a = Math.max(0, Math.min(from, to));
+  const b = Math.min(len, Math.max(from, to));
+  if (a >= b) return normalizeRuns(runs);
+  const out = [];
+  let pos = 0;
+  for (const r of runs || []) {
+    const t = (r && r.t) || '';
+    const start = pos;
+    const end = pos + t.length;
+    pos = end;
+    if (!t) continue;
+    if (end <= a || start >= b) { out.push(Object.assign({ t }, markOf(r))); continue; }
+    if (start < a) out.push(Object.assign({ t: t.slice(0, a - start) }, markOf(r)));
+    const m = markOf(r);
+    if (value === null || value === undefined || value === false) delete m[key];
+    else m[key] = value;
+    out.push(Object.assign({ t: t.slice(Math.max(0, a - start), Math.min(t.length, b - start)) }, m));
+    if (end > b) out.push(Object.assign({ t: t.slice(b - start) }, markOf(r)));
+  }
+  return normalizeRuns(out);
+}
+
+// 그 자리 "앞" 글자의 서식 — 워드와 같다(버튼 눌린 모양 표시에 쓴다).
+function markAt(runs, pos) {
+  const rs = normalizeRuns(runs);
+  if (!rs.length) return {};
+  if (pos <= 0) return markOf(rs[0]);
+  let p = 0;
+  for (const r of rs) {
+    p += r.t.length;
+    if (pos <= p) return markOf(r);
+  }
+  return markOf(rs[rs.length - 1]);
+}
+
+function insertText(runs, pos, text, mark) {
+  if (!text) return normalizeRuns(runs);
+  const len = runsLength(runs);
+  const p = Math.max(0, Math.min(pos, len));
+  const m = mark === undefined || mark === null ? markAt(runs, p) : mark;
+  return normalizeRuns(sliceRuns(runs, 0, p)
+    .concat([Object.assign({ t: text }, m)])
+    .concat(sliceRuns(runs, p, len)));
+}
+
+/* blocks.js */
+
+
+const BLOCK_TYPES = ['heading', 'section', 'para', 'list'];
+
+let seq = 0;
+function resetIds(n = 0) { seq = n; }
+function newId() { seq += 1; return 'b' + seq; }
+function adoptIds(blocks) {
+  for (const b of blocks || []) {
+    const m = /^b(\d+)$/.exec(b && b.id ? String(b.id) : '');
+    if (m) seq = Math.max(seq, Number(m[1]));
+  }
+}
+
+function createBlock(type, props = {}) {
+  if (!BLOCK_TYPES.includes(type)) throw new Error('알 수 없는 블록 종류: ' + type);
+  const base = { id: newId(), type, variants: null };
+  if (type === 'section') return Object.assign(base, { no: props.no || '', title: props.title || '' });
+  if (type === 'list') {
+    const items = Array.isArray(props.items) && props.items.length
+      ? props.items.map(normalizeRuns)
+      : [[]];
+    return Object.assign(base, { ordered: props.ordered ? 1 : 0, items, align: null });
+  }
+  const runs = props.runs ? normalizeRuns(props.runs) : runsFromText(props.text || '');
+  const common = { runs, align: props.align || null };
+  if (type === 'heading') return Object.assign(base, common, { level: props.level || 1 });
+  return Object.assign(base, common);
+}
+
+function blockText(b) {
+  if (!b) return '';
+  if (b.type === 'section') return [b.no, b.title].filter(Boolean).join(' ');
+  if (b.type === 'list') return (b.items || []).map(runsText).join('\n');
+  if (Array.isArray(b.runs)) return runsText(b.runs);
+  return b.text || '';
+}
+
+/* document.js */
+
+
+
+const DOC_VERSION = 2;
+
+const DEFAULT_PAGE = {
+  width: 794, height: 1123,
+  margin: { top: 46, right: 60, bottom: 34, left: 60 },
+};
+
+function createDocument(meta = {}) {
+  return {
+    version: DOC_VERSION,
+    meta: Object.assign({ title: '', subtitle: '', category: '', doc: '', rev: '', date: '' }, meta),
+    variants: [],
+    page: JSON.parse(JSON.stringify(DEFAULT_PAGE)),
+    blocks: [createBlock('para')],
+  };
+}
+
+function serialize(doc) { return JSON.stringify(doc, null, 1); }
+
+// 1단계 파일은 글자를 통짜(text)로 갖고 있다. 토막(runs)으로 바꿔 읽는다.
+// ⛔ text 를 남겨 두지 않는다 — 둘이 남으면 어느 쪽이 참인지 알 수 없어진다.
+function migrateBlock(b) {
+  if (!b || typeof b !== 'object') return b;
+  if (b.type === 'section' || Array.isArray(b.runs)) return b;
+  const next = Object.assign({}, b, { runs: runsFromText(b.text || '') });
+  delete next.text;
+  return next;
+}
+
+function deserialize(text) {
+  let o;
+  try { o = JSON.parse(text); }
+  catch (e) { throw new Error('문서 파일을 읽을 수 없다 — JSON 이 아니다: ' + e.message); }
+  if (!o || typeof o !== 'object') throw new Error('문서 파일을 읽을 수 없다 — 내용이 비었다');
+  if (typeof o.version !== 'number') throw new Error('문서 파일을 읽을 수 없다 — version 이 없다');
+  if (o.version > DOC_VERSION) throw new Error('이 파일은 더 새로운 판(version ' + o.version + ')이다. 프로그램을 새로 받아야 한다');
+  if (!Array.isArray(o.blocks)) throw new Error('문서 파일을 읽을 수 없다 — blocks 가 배열이 아니다');
+  const blocks = o.blocks.map(migrateBlock);
+  adoptIds(blocks);
+  return {
+    version: DOC_VERSION,
+    meta: Object.assign({ title: '', subtitle: '', category: '', doc: '', rev: '', date: '' }, o.meta || {}),
+    variants: Array.isArray(o.variants) ? o.variants : [],
+    page: Object.assign(JSON.parse(JSON.stringify(DEFAULT_PAGE)), o.page || {}),
+    blocks,
+  };
+}
+
+/* folder.js */
+const SUB = '서류';
+const DOC_EXT = '.sdoc';
+
+function isSupported() {
+  return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
+}
+
+async function pickFolder() {
+  if (!isSupported()) {
+    throw new Error('이 브라우저는 폴더 열기를 지원하지 않는다. 크롬이나 엣지로 열어야 한다');
+  }
+  return window.showDirectoryPicker({ id: 'doc-editor', mode: 'readwrite' });
+}
+
+async function docsDir(dirHandle) {
+  return dirHandle.getDirectoryHandle(SUB, { create: true });
+}
+
+async function listDocs(dirHandle) {
+  const dir = await docsDir(dirHandle);
+  const names = [];
+  for await (const [name, h] of dir.entries()) {
+    if (h.kind === 'file' && name.endsWith(DOC_EXT)) names.push(name);
+  }
+  names.sort();
+  return names;
+}
+
+async function readDoc(dirHandle, name) {
+  const dir = await docsDir(dirHandle);
+  const fh = await dir.getFileHandle(name);
+  return (await fh.getFile()).text();
+}
+
+async function writeDoc(dirHandle, name, text) {
+  const dir = await docsDir(dirHandle);
+  const fh = await dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
+  await w.write(text);
+  await w.close();
+}
+
+/* autosave.js */
+const DB = 'doc-editor';
+const STORE = 'snapshots';
+const KEEP = 20;
+
+function openStore() {
+  return new Promise((resolve, reject) => {
+    const rq = indexedDB.open(DB, 1);
+    rq.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 't' });
+    };
+    rq.onsuccess = (e) => resolve(e.target.result);
+    rq.onerror = () => reject(new Error('자동 보관 저장소를 열지 못했다'));
+  });
+}
+
+function tx(db, mode) { return db.transaction(STORE, mode).objectStore(STORE); }
+
+async function saveSnapshot(text, label) {
+  const db = await openStore();
+  const t = Date.now();
+  await new Promise((res, rej) => {
+    const r = tx(db, 'readwrite').put({ t, label: label || '', size: text.length, text });
+    r.onsuccess = res; r.onerror = () => rej(new Error('자동 보관에 실패했다'));
+  });
+  const all = await listSnapshots();
+  const extra = all.slice(0, Math.max(0, all.length - KEEP));
+  for (const s of extra) {
+    await new Promise((res) => { tx(db, 'readwrite').delete(s.t).onsuccess = res; });
+  }
+}
+
+async function listSnapshots() {
+  const db = await openStore();
+  return new Promise((res, rej) => {
+    const r = tx(db, 'readonly').getAll();
+    r.onsuccess = () => res(r.result
+      .map(x => ({ t: x.t, label: x.label, size: x.size }))
+      .sort((a, b) => a.t - b.t));
+    r.onerror = () => rej(new Error('자동 보관 목록을 읽지 못했다'));
+  });
+}
+
+async function readSnapshot(t) {
+  const db = await openStore();
+  return new Promise((res, rej) => {
+    const r = tx(db, 'readonly').get(t);
+    r.onsuccess = () => res(r.result ? r.result.text : null);
+    r.onerror = () => rej(new Error('자동 보관본을 읽지 못했다'));
+  });
+}
+
+/* print.js */
+// ⛔ 확대 상태를 반드시 되돌린 뒤 인쇄한다 (옛 프로그램은 130%면 PDF 도 1.3배가 됐다).
+// ⛔ 인쇄 대상은 지금 열려 있는 문서 하나뿐이다 (옛 프로그램은 안 고른 것이 딸려 나왔다).
+function printDoc(mainEl) {
+  const saved = mainEl.style.transform;
+  mainEl.style.transform = 'none';
+  const restore = () => { mainEl.style.transform = saved; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  window.print();
+  setTimeout(restore, 3000);   // afterprint 가 안 오는 브라우저 대비
+}
+
+/* paginate.js */
+// ⛔ 이 함수는 blocks 를 읽기만 한다. 절대 고치지 않는다.
+// ⛔ 블록을 버리거나 쪼개지 않는다. 한 장보다 큰 블록은 그 장에 혼자 둔다.
+function paginate(blocks, heights, opts) {
+  const limit = opts && opts.contentHeight;
+  if (!(typeof limit === 'number' && limit > 0)) {
+    throw new Error('paginate: contentHeight 는 0보다 큰 숫자여야 한다 (받은 값: ' + limit + ')');
+  }
+  const gap = (opts && opts.gap) || 0;
+  const pages = [];
+  let cur = [];
+  let used = 0;
+  for (const b of blocks || []) {
+    const h = Number(heights && heights[b.id]) || 0;
+    const need = cur.length === 0 ? h : gap + h;
+    if (cur.length > 0 && used + need > limit) {
+      pages.push(cur);
+      cur = [];
+      used = 0;
+      cur.push(b.id);
+      used = h;
+      continue;
+    }
+    cur.push(b.id);
+    used += need;
+  }
+  pages.push(cur);
+  return pages;
+}
+
+/* measure.js */
+
+
+function contentHeightOf(page) {
+  const p = page || DEFAULT_PAGE;
+  const m = p.margin || DEFAULT_PAGE.margin;
+  return p.height - m.top - m.bottom;
+}
+
+// 숨은 상자(#gauge)에 블록을 그려 실제 높이를 잰다. 화면에 보이는 것은 건드리지 않는다.
+function measureAll(blocks, gaugeEl, makeEl) {
+  gaugeEl.textContent = '';
+  const els = [];
+  for (const b of blocks) {
+    const el = makeEl(b);
+    gaugeEl.appendChild(el);
+    els.push([b.id, el]);
+  }
+  const out = {};
+  for (const [id, el] of els) {
+    const r = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    out[id] = r.height + parseFloat(cs.marginTop || 0) + parseFloat(cs.marginBottom || 0);
+  }
+  gaugeEl.textContent = '';
+  return out;
+}
+
+/* runs-dom.js */
+
+
+// ⛔ 여기 적힌 태그·속성만 인정한다. 나머지는 껍데기를 버리고 글자만 가져온다.
+//    웹에서 복사해 붙여넣은 이상한 서식이 문서에 들어오지 못하게 하는 문이다.
+const WRAP = [['s', 'S'], ['u', 'U'], ['i', 'I'], ['b', 'B']];
+
+function runsToNodes(runs) {
+  const out = [];
+  for (const r of runs || []) {
+    if (!r || !r.t) continue;
+    let node = document.createTextNode(r.t);
+    for (const pair of WRAP) {
+      if (r[pair[0]]) { const e = document.createElement(pair[1]); e.appendChild(node); node = e; }
+    }
+    if (r.sz || r.c || r.mono) {
+      const sp = document.createElement('span');
+      if (r.sz) sp.style.fontSize = r.sz + 'px';
+      if (r.c) sp.style.color = r.c;
+      if (r.mono) sp.className = 'mono';
+      sp.appendChild(node);
+      node = sp;
+    }
+    out.push(node);
+  }
+  return out;
+}
+
+function rgbToHex(v) {
+  const m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(v || '');
+  if (!m) return v || null;
+  const h = (n) => Number(n).toString(16).padStart(2, '0');
+  return '#' + h(m[1]) + h(m[2]) + h(m[3]);
+}
+
+function walk(node, mark, out) {
+  for (const child of node.childNodes) {
+    if (child.nodeType === 3) {
+      if (child.nodeValue) out.push(Object.assign({ t: child.nodeValue }, mark));
+      continue;
+    }
+    if (child.nodeType !== 1) continue;          // 주석 따위는 버린다
+    const tag = child.tagName;
+    if (tag === 'BR') { out.push(Object.assign({ t: '\n' }, mark)); continue; }
+    const next = Object.assign({}, mark);
+    if (tag === 'B' || tag === 'STRONG') next.b = 1;
+    else if (tag === 'I' || tag === 'EM') next.i = 1;
+    else if (tag === 'U') next.u = 1;
+    else if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') next.s = 1;
+    else if (tag === 'SPAN') {
+      const st = child.style;
+      if (st && st.fontSize) next.sz = parseFloat(st.fontSize);
+      if (st && st.color) next.c = rgbToHex(st.color);
+      if (child.classList && child.classList.contains('mono')) next.mono = 1;
+    }
+    walk(child, next, out);                      // 그 밖의 태그는 껍데기만 버리고 안으로 들어간다
+  }
+}
+
+function domToRuns(el) {
+  const out = [];
+  if (el) walk(el, {}, out);
+  return normalizeRuns(out);
+}
+
+/* render.js */
+
+
+
+
+function blockEl(block) {
+  const el = document.createElement('div');
+  el.className = 'blk blk-' + block.type;
+  el.dataset.id = block.id;
+  if (block.type === 'section') {
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = block.no || '';
+    const t = document.createElement('span'); t.className = 't'; t.textContent = block.title || '';
+    const r = document.createElement('span'); r.className = 'rule';
+    el.append(n, t, r);
+  } else if (block.type === 'list') {
+    const box = document.createElement(block.ordered ? 'ol' : 'ul');
+    box.className = 'lst';
+    (block.items || [[]]).forEach((item, i) => {
+      const li = document.createElement('li');
+      li.dataset.i = String(i);
+      li.setAttribute('contenteditable', 'true');
+      li.setAttribute('spellcheck', 'false');
+      for (const n of runsToNodes(item)) li.appendChild(n);
+      box.appendChild(li);
+    });
+    el.appendChild(box);
+  } else {
+    el.setAttribute('contenteditable', 'true');
+    el.setAttribute('spellcheck', 'false');
+    if (block.align) el.style.textAlign = block.align;
+    for (const n of runsToNodes(block.runs || [])) el.appendChild(n);
+  }
+  return el;
+}
+
+function renderPages(doc, pagesEl, gaugeEl) {
+  const heights = measureAll(doc.blocks, gaugeEl, blockEl);
+  const pages = paginate(doc.blocks, heights, { contentHeight: contentHeightOf(doc.page) });
+  const byId = new Map(doc.blocks.map(b => [b.id, b]));
+
+  pagesEl.textContent = '';
+  pages.forEach((ids, i) => {
+    const pg = document.createElement('div');
+    pg.className = 'page';
+    const body = document.createElement('div');
+    body.className = 'page-body';
+    for (const id of ids) {
+      const b = byId.get(id);
+      if (b) body.appendChild(blockEl(b));
+    }
+    const no = document.createElement('div');
+    no.className = 'pgno';
+    no.textContent = (i + 1) + ' / ' + pages.length;
+    pg.append(body, no);
+    pagesEl.appendChild(pg);
+  });
+  return { pages };
+}
+
+/* edit.js */
+// 여러 편집 칸(문단·목록 항목)에 걸친 선택을 지우는 순수 로직. DOM 을 모른다.
+// targets: 문서 순서의 [{ id, item|null, from, to }] — 화면의 targetsIn() 이 만든 좌표.
+// 워드와 같은 규칙: 첫 칸의 남는 머리 + 끝 칸의 남는 꼬리를 첫 칸에 합치고,
+// 사이의 칸(문단 통째·목록 항목)은 없앤다. 끝 칸이 목록이면 안 고른 항목은 남는다.
+// ⛔ 선택 밖 글자는 하나도 사라지지 않는다 — 시험(test/edit.test.js)이 이것을 못 박는다.
+
+
+function runsAt(b, t) {
+  if (t.item === null || t.item === undefined) return Array.isArray(b.runs) ? b.runs : null;
+  return Array.isArray(b.items) && Array.isArray(b.items[t.item]) ? b.items[t.item] : null;
+}
+
+function deleteAcross(blocks, targets) {
+  if (!Array.isArray(targets) || targets.length < 2) return null;
+  const first = targets[0];
+  const firstItem = first.item === null || first.item === undefined ? null : first.item;
+  const last = targets[targets.length - 1];
+  const firstB = blocks.find(b => b.id === first.id);
+  const lastB = blocks.find(b => b.id === last.id);
+  const srcA = firstB ? runsAt(firstB, first) : null;
+  const srcZ = lastB ? runsAt(lastB, last) : null;
+  if (!srcA || !srcZ) return null;
+
+  const merged = normalizeRuns(
+    sliceRuns(srcA, 0, first.from).concat(sliceRuns(srcZ, last.to, runsLength(srcZ))));
+
+  // 첫 칸을 뺀 나머지 대상은 통째로 없어진다 (끝 칸의 꼬리는 이미 첫 칸으로 옮겼다)
+  const gone = new Map();   // 블록 id -> 'block'(문단 통째) 또는 Set(목록 항목 번호들)
+  for (let i = 1; i < targets.length; i++) {
+    const t = targets[i];
+    if (t.item === null || t.item === undefined) gone.set(t.id, 'block');
+    else {
+      const set = gone.get(t.id) instanceof Set ? gone.get(t.id) : new Set();
+      set.add(t.item);
+      gone.set(t.id, set);
+    }
+  }
+
+  const out = [];
+  for (const b of blocks) {
+    if (b.id === first.id) {
+      if (firstItem === null) {
+        out.push(Object.assign({}, b, { runs: merged }));
+      } else {
+        const doomed = gone.get(b.id);
+        const items = [];
+        b.items.forEach((it, i) => {
+          if (i === firstItem) items.push(merged);
+          else if (doomed instanceof Set && doomed.has(i)) return;
+          else items.push(it);
+        });
+        out.push(Object.assign({}, b, { items }));
+      }
+      continue;
+    }
+    const g = gone.get(b.id);
+    if (g === 'block') continue;
+    if (g instanceof Set) {
+      const items = b.items.filter((x, i) => !g.has(i));
+      if (!items.length) continue;   // 항목이 다 없어진 목록은 블록째 없앤다
+      out.push(Object.assign({}, b, { items }));
+      continue;
+    }
+    out.push(b);
+  }
+  return { blocks: out, caret: { id: first.id, item: firstItem, pos: first.from } };
+}
+
+/* editor-ops.js */
+// ⛔ 블록을 제자리에서 고치지 않는다. 항상 새 배열·새 객체를 만든다(되돌리기가 여기 기댄다).
+function indexOf(blocks, id) {
+  const i = blocks.findIndex(b => b.id === id);
+  if (i < 0) throw new Error('블록을 찾을 수 없다: ' + id);
+  return i;
+}
+
+function replaceBlock(blocks, id, patch) {
+  const i = indexOf(blocks, id);
+  const next = blocks.slice();
+  next[i] = Object.assign({}, blocks[i], patch);
+  return next;
+}
+
+function insertAfter(blocks, id, block) {
+  const i = indexOf(blocks, id);
+  const next = blocks.slice();
+  next.splice(i + 1, 0, block);
+  return next;
+}
+
+function removeBlock(blocks, id) {
+  const i = indexOf(blocks, id);
+  if (blocks.length <= 1) return blocks.slice();
+  const next = blocks.slice();
+  next.splice(i, 1);
+  return next;
+}
+
+/* selection.js */
+// 커서 자리를 "블록 처음부터 센 글자 번호"로 다룬다.
+// 서식이 들어가면 DOM 자식이 여러 개로 갈리므로, 몇 번째 자식인지로 세면 깨진다.
+function textLen(node) {
+  if (!node) return 0;
+  if (node.nodeType === 3) return (node.nodeValue || '').length;
+  if (node.nodeType === 1 && node.tagName === 'BR') return 1;
+  let n = 0;
+  for (const c of node.childNodes || []) n += textLen(c);
+  return n;
+}
+
+function offsetIn(el, node, offset) {
+  if (!el || !node) return 0;
+  if (el.contains && !el.contains(node)) return 0;
+  let count = 0;
+  let done = false;
+  const scan = (cur) => {
+    if (done || !cur) return;
+    if (cur === node) {
+      if (cur.nodeType === 3) count += Math.min(offset, (cur.nodeValue || '').length);
+      else for (let i = 0; i < offset && i < (cur.childNodes || []).length; i++) count += textLen(cur.childNodes[i]);
+      done = true;
+      return;
+    }
+    if (cur.nodeType === 3) { count += (cur.nodeValue || '').length; return; }
+    if (cur.nodeType !== 1) return;
+    if (cur.tagName === 'BR') { count += 1; return; }
+    for (const c of cur.childNodes || []) { scan(c); if (done) return; }
+  };
+  scan(el);
+  return count;
+}
+
+function nodeAt(el, pos) {
+  let left = Math.max(0, pos);
+  let last = { node: el, offset: 0 };
+  let done = false;
+  const scan = (cur) => {
+    if (done || !cur) return;
+    if (cur.nodeType === 3) {
+      const len = (cur.nodeValue || '').length;
+      if (left <= len) { last = { node: cur, offset: left }; done = true; return; }
+      left -= len;
+      last = { node: cur, offset: len };
+      return;
+    }
+    if (cur.nodeType !== 1) return;
+    if (cur.tagName === 'BR') { left = Math.max(0, left - 1); return; }
+    for (const c of cur.childNodes || []) { scan(c); if (done) return; }
+  };
+  scan(el);
+  return last;
+}
+
+// 커서가 놓일 자리에서 실제로 타자를 받는 편집 칸을 찾는다.
+// 목록 블록은 겉 상자(.blk)가 아니라 안쪽 항목(li)이 편집 칸이라, 겉 상자에 focus() 를 해도
+// 조용히 무시된다 — 커서가 안 보이고 타자도 안 들어간다(실기기 지적 5).
+function editableHostOf(el, at, pos) {
+  const base = at.node.nodeType === 1 ? at.node : at.node.parentElement;
+  const host = base && base.closest ? base.closest('[contenteditable="true"]') : null;
+  if (host) return { host, at };
+  // 글자가 하나도 없는 항목은 글자 세기로 못 들어간다 — 편집 칸을 직접 찾아 그 안에 놓는다
+  const inner = el.querySelectorAll('[contenteditable="true"]');
+  if (inner.length) {
+    const li = pos <= 0 ? inner[0] : inner[inner.length - 1];
+    return { host: li, at: { node: li, offset: 0 } };
+  }
+  return { host: el, at };
+}
+
+function caretTo(el, pos) {
+  const found = editableHostOf(el, nodeAt(el, pos), pos);
+  const r = document.createRange();
+  r.setStart(found.at.node, found.at.offset);
+  r.collapse(true);
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+  found.host.focus();
+}
+
+function selectRange(el, from, to) {
+  const a = editableHostOf(el, nodeAt(el, from), from);
+  const b = nodeAt(el, to);
+  const r = document.createRange();
+  r.setStart(a.at.node, a.at.offset);
+  r.setEnd(b.node, b.offset);
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+  a.host.focus();
+}
+
+function rangeIn(el) {
+  const s = window.getSelection();
+  if (!el || !s || s.rangeCount === 0) return null;
+  const r = s.getRangeAt(0);
+  if (!el.contains(r.startContainer) || !el.contains(r.endContainer)) return null;
+  const a = offsetIn(el, r.startContainer, r.startOffset);
+  const b = offsetIn(el, r.endContainer, r.endOffset);
+  return { from: Math.min(a, b), to: Math.max(a, b) };
+}
+
+function activeBlockEl(pagesEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !pagesEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const blk = e.closest('.blk[data-id]');
+  return blk && pagesEl.contains(blk) ? blk : null;
+}
+
+// 화면의 편집 칸(문단·제목 블록, 목록 항목)을 문서 순서대로 — 커서·선택이 블록을
+// 넘나들 때의 디딤돌이다. 섹션 줄처럼 편집이 아닌 블록은 자연히 건너뛴다.
+function editableEls(pagesEl) {
+  return Array.from(pagesEl.querySelectorAll('.blk[contenteditable="true"], .lst li[data-i]'));
+}
+
+// 지금 선택이 걸쳐 있는 편집 칸들을 문서 순서대로 [{el, from, to}] 로 준다.
+// 한 칸 안의 선택이면 1개, 여러 블록에 걸친 선택이면 여러 개가 나온다.
+function rangesIn(pagesEl) {
+  const s = window.getSelection();
+  if (!s || s.rangeCount === 0) return [];
+  const r = s.getRangeAt(0);
+  if (r.collapsed) return [];
+  return editableEls(pagesEl)
+    .filter(el => r.intersectsNode(el))
+    .map(el => ({
+      el,
+      from: el.contains(r.startContainer) ? offsetIn(el, r.startContainer, r.startOffset) : 0,
+      to: el.contains(r.endContainer) ? offsetIn(el, r.endContainer, r.endOffset) : textLen(el),
+    }))
+    .filter(x => x.to > x.from);
+}
+
+// rangesIn 의 화면 요소를 모델 좌표 [{id, item|null, from, to}] 로 바꾼다.
+// 도구모음(걸침 서식)과 편집기(걸침 지우기)가 같은 좌표를 쓴다.
+function targetsIn(pagesEl) {
+  return rangesIn(pagesEl).map(p => {
+    const li = p.el.matches('.lst li[data-i]') ? p.el : null;
+    const blk = li ? li.closest('.blk[data-id]') : p.el;
+    return { id: blk.dataset.id, item: li ? Number(li.dataset.i) : null, from: p.from, to: p.to };
+  });
+}
+
+// 선택이 목록 항목(li) 안이면 그 li 를 준다. 목록은 항목마다 편집 칸이 따로라,
+// 글자 번호를 블록이 아니라 "그 항목 안"에서 세야 어긋나지 않는다.
+function activeItemEl(blkEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !blkEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const li = e.closest('.lst li[data-i]');
+  return li && blkEl.contains(li) ? li : null;
+}
+
+/* editor.js */
+
+
+
+
+
+
+
+// 한글 입력: 조합 중에는 모델을 건드리지 않는다. 조합이 끝난 뒤에만 반영한다.
+function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
+  let composing = false;
+  let pending = null;   // { id, runs } 또는 목록 항목이면 { id, itemIndex, runs }
+
+  function flush(redrawAfter) {
+    if (!pending) return;
+    const p = pending;
+    pending = null;
+    const doc = getDoc();
+    let patch;
+    if (p.itemIndex === undefined) {
+      patch = { runs: p.runs };
+    } else {
+      const b = doc.blocks.find(x => x.id === p.id);
+      if (!b || !Array.isArray(b.items)) return;
+      const items = b.items.slice();
+      items[p.itemIndex] = p.runs;
+      patch = { items };
+    }
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, p.id, patch) }));
+    if (redrawAfter) redraw({ caretId: p.id, caretEnd: true });
+  }
+
+  // 걸침 선택의 «지우기용» 대상들. targetsIn(글자가 실제로 고른 칸들)에 두 가지를 더한다:
+  // ① 경계만 문 칸 — 줄 끝 빈 곳에서 시작한 드래그는 첫 칸의 글자를 0개 골라 targetsIn
+  //    에서 빠지는데, 워드처럼 그 경계를 지우면 두 블록이 한 블록으로 합쳐져야 한다.
+  // ② 사이에 통째로 낀 섹션 줄 — 편집 칸이 아니라 targetsIn 에 안 잡히지만 화면에는
+  //    선택으로 칠해진다. 안 지우면 "선택했는데 남는" 사고(실기기 2026-08-30).
+  function crossTargets() {
+    const s = window.getSelection();
+    if (!s.rangeCount || s.getRangeAt(0).collapsed) return [];
+    const r = s.getRangeAt(0);
+    const targets = targetsIn(pagesEl);
+    const edge = (node, offset, atStart) => {
+      const e = node.nodeType === 1 ? node : node.parentElement;
+      const host = e && e.closest ? e.closest('[contenteditable="true"]') : null;
+      if (!host) return;
+      const li = host.matches('.lst li[data-i]') ? host : null;
+      const blk = li ? li.closest('.blk[data-id]') : host;
+      const item = li ? Number(li.dataset.i) : null;
+      if (targets.some(t => t.id === blk.dataset.id && t.item === item)) return;
+      const pos = offsetIn(host, node, offset);
+      const t = { id: blk.dataset.id, item, from: pos, to: pos };
+      if (atStart) targets.unshift(t);
+      else targets.push(t);
+    };
+    edge(r.startContainer, r.startOffset, true);
+    edge(r.endContainer, r.endOffset, false);
+    if (targets.length < 2) return targets;
+    const covered = Array.from(pagesEl.querySelectorAll('.blk-section[data-id]'))
+      .filter(el => r.intersectsNode(el) && !el.contains(r.startContainer) && !el.contains(r.endContainer))
+      .map(el => ({ id: el.dataset.id, item: null, from: 0, to: 0 }));
+    // 첫·끝 대상만 아니면 자리는 상관없다 — deleteAcross 가 통째로 지운다
+    targets.splice(1, 0, ...covered);
+    return targets;
+  }
+
+  // 한글 조합이 걸침 선택 위에서 시작되면: ⛔ 조합 중에는 화면을 못 갈아엎으므로(§12-12)
+  // 선택만 접어 조합이 제자리에서 이어지게 하고, 조합이 끝난 뒤에 지운다.
+  // (처음에는 조합 직전에 지우고 다시 그렸는데, 조합이 붙을 곳이 사라져
+  //  한글이 "될 때가 있고 안 될 때가 있는" 경합이 났다 — 실기기 2026-08-30)
+  // ⚠ 걸침 위 한글은 조합 시작(compositionstart)보다 «앞»인 키 신호(Process)에서
+  //   즉시 지운다. 조합 «중»에는 화면을 못 바꾸고(§12-12), 조합이 끝나기를 기다리면
+  //   입력기가 마지막 글자의 조합을 열어 둬서 "다른 곳을 클릭해야 지워지는" 증상이
+  //   났다(실기기 2026-08-30). 다만 전체 다시 그리기는 조합이 붙을 곳을 부수므로
+  //   (그게 "한글이 될 때 안 될 때"의 원인이었다) — deleteCrossInPlace() 가
+  //   첫 칸(조합이 붙을 요소)을 살려 둔 채 필요한 DOM 만 수술한다.
+  pagesEl.addEventListener('compositionstart', () => { composing = true; });
+  pagesEl.addEventListener('compositionend', () => {
+    composing = false;
+    flush(false);   // 조합 중 미뤄 둔 마지막 글자를 모델로 — 브라우저의 이벤트 순서에 맡기지 않는다
+  });
+
+  // 걸침 선택을 화면 전체를 다시 그리지 않고 지운다. 모델을 먼저 고치고,
+  // 첫 칸의 «속»만 합쳐진 토막으로 갈아 끼운 뒤(요소는 그대로 — 조합이 안전),
+  // 없어진 블록·목록 항목의 DOM 을 떼고, 커서를 이음매에 놓는다.
+  // 쪽 나눔은 잠시 어긋나지만 다음 다시 그리기(타자 멈춤 0.35초 뒤)가 바로잡는다.
+  function deleteCrossInPlace() {
+    const targets = crossTargets();
+    if (targets.length < 2) return;
+    const doc = getDoc();
+    const r = deleteAcross(doc.blocks, targets);
+    if (!r) return;
+    const first = targets[0];
+    const firstItem = first.item === null || first.item === undefined ? null : first.item;
+    const firstHost = firstItem === null
+      ? pagesEl.querySelector('.blk[data-id="' + first.id + '"]')
+      : pagesEl.querySelector('.blk[data-id="' + first.id + '"] .lst li[data-i="' + firstItem + '"]');
+    if (!firstHost) return;
+    setDoc(Object.assign({}, doc, { blocks: r.blocks }));
+    const mergedB = r.blocks.find(b => b.id === first.id);
+    const runs = firstItem === null ? mergedB.runs : mergedB.items[firstItem];
+    firstHost.textContent = '';
+    for (const n of runsToNodes(runs)) firstHost.appendChild(n);
+    const alive = new Set(r.blocks.map(b => b.id));
+    for (let i = 1; i < targets.length; i++) {
+      const t = targets[i];
+      if (!alive.has(t.id)) {
+        const el = pagesEl.querySelector('.blk[data-id="' + t.id + '"]');
+        if (el) el.remove();
+      } else if (t.item !== null && t.item !== undefined) {
+        const li = pagesEl.querySelector('.blk[data-id="' + t.id + '"] .lst li[data-i="' + t.item + '"]');
+        if (li) li.remove();
+      }
+    }
+    // 남은 목록 항목의 번호를 모델과 다시 맞춘다 (안 맞으면 다음 타자가 엉뚱한 항목에 붙는다)
+    for (const id of new Set(targets.map(t => t.id))) {
+      if (!alive.has(id)) continue;
+      pagesEl.querySelectorAll('.blk[data-id="' + id + '"] .lst li')
+        .forEach((li, i) => { li.dataset.i = String(i); });
+    }
+    cancelIdle();
+    caretTo(firstHost, r.caret.pos);
+  }
+
+  // 예약된 자동 다시 그리기를 지운다. Enter·Backspace 가 제 손으로 다시 그린 뒤에도
+  // 타자 때 예약된 것이 0.35초 뒤 발사되면, 방금 놓은 커서를 옛 자리로 되돌린다(실기기 지적 1).
+  let idle = null;
+  function cancelIdle() { clearTimeout(idle); idle = null; }
+
+  pagesEl.addEventListener('input', (e) => {
+    const el = e.target.closest && e.target.closest('.blk[data-id]');
+    if (el) {
+      const li = e.target.closest && e.target.closest('.lst li[data-i]');
+      if (li) pending = { id: el.dataset.id, itemIndex: Number(li.dataset.i), runs: domToRuns(li) };
+      else pending = { id: el.dataset.id, runs: domToRuns(el) };
+      if (!composing) flush(false);  // 모델만 갱신, 다시 그리지 않는다(커서가 튄다)
+    }
+    // 다시 그리기는 "다 치고 잠깐 멈췄을 때" 만 한다
+    clearTimeout(idle);
+    idle = setTimeout(() => { if (!composing) redraw({ keepCaret: true }); }, 350);
+  });
+
+  // ── 화살표가 블록 경계를 넘는다 ──
+  // 블록마다 편집 칸이 따로라 브라우저는 커서를 칸 밖으로 못 내보낸다(실측: 상·하·경계
+  // 좌우 모두 제자리). 그래서 커서가 칸의 끝 줄(↓)·첫 줄(↑)에 있을 때만 우리가 옆 칸으로
+  // 잇는다 — 칸 안에 줄이 더 있으면 브라우저가 잘 움직이므로 손대지 않는다.
+  // ⚠ "안 움직였으면 잇기" 방식은 안 된다: 브라우저가 끝 줄에서 ↓를 "줄 끝으로 이동"으로
+  //   처리해 커서가 움직인 것으로 보인다(실측 — 두 번 눌러야 넘어갔다).
+  function hostAround(cur, dir) {
+    const els = editableEls(pagesEl);
+    const i = els.indexOf(cur);
+    return i < 0 ? null : els[i + dir] || null;
+  }
+
+  // 칸의 첫/끝 줄이 화면에서 어느 높이인지 — 커서가 그 줄에 있는지 비교하는 데 쓴다
+  function edgeLineTop(host, dir) {
+    const len = textLen(host);
+    if (!len) return null;               // 빈 칸 — 줄이 하나뿐이니 항상 경계다
+    const at = nodeAt(host, dir > 0 ? len : 0);
+    const r = document.createRange();
+    r.setStart(at.node, at.offset);
+    r.collapse(true);
+    const rect = r.getBoundingClientRect();
+    return rect.height ? rect.top : null;
+  }
+
+  // 옆 칸의 첫/끝 줄, 지금 커서와 같은 가로 위치로 들어간다. 화면 밖이면 먼저
+  // 조금 스크롤한다 (⛔ scrollIntoView 금지 — 설계서 §12-9).
+  function jumpInto(target, dir, x) {
+    let rect = target.getBoundingClientRect();
+    if (dir > 0 && rect.top > window.innerHeight - 40) window.scrollBy(0, rect.top - (window.innerHeight - 80));
+    if (dir < 0 && rect.bottom < 40) window.scrollBy(0, 80 - rect.bottom);
+    rect = target.getBoundingClientRect();
+    const cx = Math.min(Math.max(x, rect.left + 1), rect.right - 1);
+    const cy = dir > 0 ? rect.top + Math.min(12, rect.height / 2)
+                       : rect.bottom - Math.min(12, rect.height / 2);
+    const r = document.caretRangeFromPoint(cx, cy);
+    if (r && target.contains(r.startContainer)) {
+      const rr = document.createRange();
+      rr.setStart(r.startContainer, r.startOffset);
+      rr.collapse(true);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(rr);
+      target.focus();
+    } else {
+      caretTo(target, dir > 0 ? 0 : Number.MAX_SAFE_INTEGER);
+    }
+  }
+
+  // ── 걸침 선택(여러 블록)의 지우기·타자 덮어쓰기 ──
+  // 브라우저에 맡기면 첫 블록만 반쪽 지운다(실측 2026-08-30) — 모델에서 직접 지운다.
+  // 순수 로직은 core/edit.js 의 deleteAcross, 시험은 test/edit.test.js.
+  // 한글 조합은 여기가 아니라 위의 compositionstart/end 경로가 맡는다.
+  function deleteTargets(targets) {
+    const doc = getDoc();
+    const r = deleteAcross(doc.blocks, targets);
+    if (!r) return null;
+    setDoc(Object.assign({}, doc, { blocks: r.blocks }));
+    return r.caret;
+  }
+
+  pagesEl.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || composing) return;
+    if (e.key === 'Process') {
+      // 한글 조합이 시작되기 직전 — 걸침 선택을 지금 즉시, 화면을 부수지 않고 지운다
+      deleteCrossInPlace();
+      return;
+    }
+    const kind = (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter') ? 'del'
+      : (e.key.length === 1 ? 'char' : null);
+    if (!kind) return;
+    const targets = crossTargets();
+    if (targets.length < 2) return;              // 걸침이 아니면 기존 흐름에 맡긴다
+    e.stopImmediatePropagation();                // 아래 Enter·Backspace 처리로 안 흘린다
+    const caret = deleteTargets(targets);
+    if (!caret) { e.preventDefault(); return; }
+    if (kind === 'char') {
+      // 지운 자리에 그 글자를 우리 손으로 넣는다 — 기본 입력은 어디로 갈지 보장이 없다
+      e.preventDefault();
+      const doc = getDoc();
+      const b = doc.blocks.find(x => x.id === caret.id);
+      if (b) {
+        let patch;
+        if (caret.item === null) {
+          patch = { runs: insertText(b.runs, caret.pos, e.key) };
+        } else {
+          const items = b.items.slice();
+          items[caret.item] = insertText(items[caret.item], caret.pos, e.key);
+          patch = { items };
+        }
+        setDoc(Object.assign({}, getDoc(), { blocks: replaceBlock(getDoc().blocks, b.id, patch) }));
+      }
+      cancelIdle();
+      redraw({ caret: { id: caret.id, item: caret.item, pos: caret.pos + 1 } });
+      return;
+    }
+    // Backspace·Delete·Enter: 지우기까지만 한다 (Enter 로 갈라 넣기는 다음에)
+    e.preventDefault();
+    cancelIdle();
+    redraw({ caret });
+  });
+  // 잘라내기(Ctrl+X)의 걸침판은 아직 없다 — 반쪽 지움을 막기 위해 계속 막는다
+  pagesEl.addEventListener('cut', (e) => {
+    if (targetsIn(pagesEl).length > 1) e.preventDefault();
+  });
+
+  const hostOfNode = (n) => {
+    const el = n && (n.nodeType === 1 ? n : n.parentElement);
+    return el && el.closest ? el.closest('[contenteditable="true"]') : null;
+  };
+
+  pagesEl.addEventListener('keydown', (e) => {
+    const el = e.target.closest && e.target.closest('.blk[data-id]');
+    if (!el) return;
+    if (composing) return;
+
+    // Shift+화살표 — 선택을 블록 경계 너머로 늘린다 (늘어나는 쪽은 초점 focus 끝이다)
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.shiftKey
+        && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      const s = window.getSelection();
+      if (!s.rangeCount) return;
+      const fhost = hostOfNode(s.focusNode);
+      if (!fhost) return;
+      const fr = document.createRange();
+      fr.setStart(s.focusNode, s.focusOffset);
+      fr.collapse(true);
+      const rect = fr.getBoundingClientRect();
+      const edgeTop = edgeLineTop(fhost, dir);
+      const onEdge = edgeTop === null || rect.height === 0 || Math.abs(rect.top - edgeTop) < 2;
+      if (!onEdge) return;                 // 칸 안에 줄이 더 있다 — 브라우저가 늘린다
+      const next = hostAround(fhost, dir);
+      if (!next) return;
+      e.preventDefault();
+      let nr = next.getBoundingClientRect();
+      if (dir > 0 && nr.top > window.innerHeight - 40) window.scrollBy(0, nr.top - (window.innerHeight - 80));
+      if (dir < 0 && nr.bottom < 40) window.scrollBy(0, 80 - nr.bottom);
+      nr = next.getBoundingClientRect();
+      const cx = Math.min(Math.max(rect.left || nr.left + 1, nr.left + 1), nr.right - 1);
+      const cy = dir > 0 ? nr.top + Math.min(12, nr.height / 2)
+                         : nr.bottom - Math.min(12, nr.height / 2);
+      const cr = document.caretRangeFromPoint(cx, cy);
+      if (cr && next.contains(cr.startContainer)) s.extend(cr.startContainer, cr.startOffset);
+      else {
+        const at = nodeAt(next, dir > 0 ? textLen(next) : 0);
+        s.extend(at.node, at.offset);
+      }
+      return;
+    }
+
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && e.shiftKey
+        && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const s = window.getSelection();
+      if (!s.rangeCount) return;
+      const fhost = hostOfNode(s.focusNode);
+      if (!fhost) return;
+      const pos = offsetIn(fhost, s.focusNode, s.focusOffset);
+      if (e.key === 'ArrowLeft' && pos === 0) {
+        const prev = hostAround(fhost, -1);
+        if (prev) {
+          e.preventDefault();
+          const at = nodeAt(prev, textLen(prev));
+          s.extend(at.node, at.offset);
+        }
+      } else if (e.key === 'ArrowRight' && pos >= textLen(fhost)) {
+        const next = hostAround(fhost, 1);
+        if (next) {
+          e.preventDefault();
+          const at = nodeAt(next, 0);
+          s.extend(at.node, at.offset);
+        }
+      }
+      return;
+    }
+
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown')
+        && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const dir = e.key === 'ArrowDown' ? 1 : -1;
+      const s = window.getSelection();
+      if (!s.rangeCount || !s.getRangeAt(0).collapsed) return;  // 선택 중이면 기본 동작
+      const cur = e.target.closest('[contenteditable="true"]') || el;
+      const rect = s.getRangeAt(0).getBoundingClientRect();
+      const edgeTop = edgeLineTop(cur, dir);
+      const onEdge = edgeTop === null || rect.height === 0
+        || Math.abs(rect.top - edgeTop) < 2;
+      if (!onEdge) return;                 // 칸 안에 줄이 더 있다 — 브라우저가 처리
+      const next = hostAround(cur, dir);
+      if (!next) return;                   // 문서의 처음/끝
+      e.preventDefault();
+      jumpInto(next, dir, rect.left || cur.getBoundingClientRect().left + 1);
+      return;
+    }
+
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+        && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const s = window.getSelection();
+      if (!s.rangeCount || !s.getRangeAt(0).collapsed) return;
+      const cur = e.target.closest('[contenteditable="true"]') || el;
+      const pos = offsetIn(cur, s.anchorNode, s.anchorOffset);
+      if (e.key === 'ArrowLeft' && pos === 0) {
+        const prev = hostAround(cur, -1);
+        if (prev) { e.preventDefault(); caretTo(prev, Number.MAX_SAFE_INTEGER); }
+      } else if (e.key === 'ArrowRight' && pos >= textLen(cur)) {
+        const next = hostAround(cur, 1);
+        if (next) { e.preventDefault(); caretTo(next, 0); }
+      }
+      return;
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      const li = e.target.closest && e.target.closest('.lst li[data-i]');
+      if (li) {
+        e.preventDefault();
+        flush(false);
+        const doc = getDoc();
+        const b = doc.blocks.find(x => x.id === el.dataset.id);
+        if (!b) return;
+        const i = Number(li.dataset.i);
+        const items = b.items.slice();
+
+        // 글이 있는 항목에서 Enter → 아래에 빈 항목을 하나 더하고 커서를 그 안에 둔다
+        if (items[i] && items[i].length) {
+          items.splice(i + 1, 0, []);
+          setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id, { items }) }));
+          cancelIdle();
+          redraw({});
+          const nli = pagesEl.querySelector('.blk[data-id="' + b.id + '"] .lst li[data-i="' + (i + 1) + '"]');
+          if (nli) {
+            const r2 = document.createRange();
+            r2.setStart(nli, 0);
+            r2.collapse(true);
+            const s2 = window.getSelection();
+            s2.removeAllRanges();
+            s2.addRange(r2);
+            nli.focus();
+          }
+          return;
+        }
+
+        // 빈 항목에서 Enter → 그 항목을 빼고 목록을 벗어나 문단이 된다
+        items.splice(i, 1);
+        const fresh = createBlock('para');
+        let blocks;
+        if (items.length) {
+          // 목록이 남았다 → 목록 바로 뒤에 새 문단을 넣는다
+          blocks = insertAfter(replaceBlock(doc.blocks, b.id, { items }), b.id, fresh);
+        } else {
+          // 항목이 하나도 안 남았다 → 목록 블록 자리를 새 문단으로 갈아 끼운다
+          // ⛔ removeBlock 뒤에 insertAfter 를 쓰면 기준 id 가 이미 없어 오류가 난다
+          blocks = doc.blocks.slice();
+          blocks[blocks.findIndex(x => x.id === b.id)] = fresh;
+        }
+        setDoc(Object.assign({}, doc, { blocks }));
+        cancelIdle();
+        redraw({ caretId: fresh.id, caretEnd: false });
+        return;
+      }
+
+      e.preventDefault();
+      flush(false);
+      const doc = getDoc();
+      const fresh = createBlock('para');
+      setDoc(Object.assign({}, doc, { blocks: insertAfter(doc.blocks, el.dataset.id, fresh) }));
+      cancelIdle();
+      redraw({ caretId: fresh.id, caretEnd: false });
+      return;
+    }
+
+    if (e.key === 'Backspace' && el.textContent === '') {
+      e.preventDefault();
+      const doc = getDoc();
+      const i = doc.blocks.findIndex(b => b.id === el.dataset.id);
+      const prev = i > 0 ? doc.blocks[i - 1] : null;
+      if (!prev) return;
+      setDoc(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, el.dataset.id) }));
+      cancelIdle();
+      redraw({ caretId: prev.id, caretEnd: true });
+    }
+  });
+}
+
+/* history.js */
+// 블록 배열 자체를 쌓는다. 블록은 제자리에서 안 고치므로(immutable)
+// 안 바뀐 블록은 여러 상태가 같은 객체를 가리킨다 — 그래서 가볍다.
+function createHistory(limit = 200) {
+  const past = [];
+  const future = [];
+  return {
+    push(blocks) {
+      if (past.length && past[past.length - 1] === blocks) return;
+      past.push(blocks);
+      while (past.length > limit) past.shift();
+      future.length = 0;
+    },
+    undo() {
+      if (past.length < 2) return null;
+      future.push(past.pop());
+      return past[past.length - 1];
+    },
+    redo() {
+      if (!future.length) return null;
+      const next = future.pop();
+      past.push(next);
+      return next;
+    },
+    canUndo() { return past.length >= 2; },
+    canRedo() { return future.length > 0; },
+    size() { return past.length; },
+  };
+}
+
+/* toolbar.js */
+
+
+
+
+
+// 고른 구간이 통째로 그 서식이면 끄고, 아니면 켠다 (워드와 같다)
+function allMarked(runs, from, to, key) {
+  const part = sliceRuns(runs, from, to);
+  return part.length > 0 && part.every(r => !!r[key]);
+}
+
+function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
+  const buttons = Array.from(barEl.querySelectorAll('.tb[data-mark]'));
+  let lastSels = null;  // [{ id, item, from, to }, …] — 도구모음을 누르면 선택이 풀리므로 기억해 둔다
+
+  // 지금 고른 범위(여러 블록에 걸쳤으면 전부)를, 없으면 직전에 고른 범위를 쓴다
+  function targetRanges() {
+    const parts = targetsIn(pagesEl);
+    if (parts.length) return parts;
+    return lastSels;
+  }
+
+  // 서식을 입힐 토막 목록 — 문단은 블록의 runs, 목록은 그 항목(items[i])
+  function runsOf(b, at) {
+    if (at.item === null || at.item === undefined) return Array.isArray(b.runs) ? b.runs : null;
+    return Array.isArray(b.items) && Array.isArray(b.items[at.item]) ? b.items[at.item] : null;
+  }
+  function patchOf(b, at, runs) {
+    if (at.item === null || at.item === undefined) return { runs };
+    const items = b.items.slice();
+    items[at.item] = runs;
+    return { items };
+  }
+
+  // 대상들(걸침 선택이면 여러 개)에 서식 계산을 한 번의 문서 갱신으로 입힌다 —
+  // 되돌리기(Ctrl+Z) 한 번에 통째로 돌아오게 하기 위해서다.
+  function applyAll(targets, fn) {
+    const doc = getDoc();
+    let blocks = doc.blocks;
+    let touched = false;
+    for (const t of targets) {
+      const b = blocks.find(x => x.id === t.id);
+      const src = b ? runsOf(b, t) : null;
+      if (!src) continue;
+      blocks = replaceBlock(blocks, t.id, patchOf(b, t, fn(src, t)));
+      touched = true;
+    }
+    if (!touched) return;
+    setDoc(Object.assign({}, doc, { blocks }));
+    redraw({ sel: selOf(targets) });
+  }
+
+  // 다시 그린 뒤 선택을 되살릴 좌표 — 하나면 그대로, 걸침이면 양 끝만
+  function selOf(targets) {
+    if (targets.length === 1) return targets[0];
+    const a = targets[0];
+    const b = targets[targets.length - 1];
+    return { multi: 1, a: { id: a.id, item: a.item, pos: a.from }, b: { id: b.id, item: b.item, pos: b.to } };
+  }
+
+  function toggle(key) {
+    const targets = targetRanges();
+    if (!targets || !targets.length) return;
+    const doc = getDoc();
+    // 고른 곳 전부가 이미 그 서식이면 끄고, 아니면 켠다 (워드와 같다)
+    const on = targets.every(t => {
+      const b = doc.blocks.find(x => x.id === t.id);
+      const src = b ? runsOf(b, t) : null;
+      return src && allMarked(src, t.from, t.to, key);
+    });
+    applyAll(targets, (src, t) => applyMark(src, t.from, t.to, key, on ? null : 1));
+  }
+
+  // 커서가 어디 있는지에 따라 버튼이 눌린 모양으로 보인다
+  function refresh() {
+    const doc = getDoc();
+    const parts = targetsIn(pagesEl);
+    const targets = parts.length ? parts : null;
+    const el = activeBlockEl(pagesEl);
+    const b = el ? doc.blocks.find(x => x.id === el.dataset.id) : null;
+    const srcOf = (t) => {
+      const bb = doc.blocks.find(x => x.id === t.id);
+      return bb ? runsOf(bb, t) : null;
+    };
+    for (const btn of buttons) {
+      const key = btn.dataset.mark;
+      let on = false;
+      if (targets) {
+        on = targets.every(t => {
+          const src = srcOf(t);
+          return src && allMarked(src, t.from, t.to, key);
+        });
+      } else if (b && el) {
+        const li = activeItemEl(el);
+        const src = runsOf(b, { item: li ? Number(li.dataset.i) : null });
+        const r = src ? rangeIn(li || el) : null;
+        if (src && r) on = !!markAt(src, r.from)[key];
+      }
+      btn.classList.toggle('on', on);
+      btn.disabled = !b && !targets;
+    }
+    if (targets && targets.some(t => srcOf(t))) lastSels = targets;
+  }
+
+  // 값이 있는 서식(크기·색)은 켜고 끄는 게 아니라 값을 넣거나 뺀다
+  function setValue(key, value) {
+    const targets = targetRanges();
+    if (!targets || !targets.length) return;
+    applyAll(targets, (src, t) => applyMark(src, t.from, t.to, key, value === '' ? null : value));
+  }
+
+  // 정렬은 토막이 아니라 블록 전체에 붙는다 — 걸침 선택이면 걸친 블록 전부에
+  function setAlign(align) {
+    const targets = targetRanges();
+    const doc = getDoc();
+    let ids = [];
+    if (targets && targets.length) ids = Array.from(new Set(targets.map(t => t.id)));
+    else {
+      const el = activeBlockEl(pagesEl);
+      if (el) ids = [el.dataset.id];
+    }
+    if (!ids.length) return;
+    let blocks = doc.blocks;
+    for (const id of ids) {
+      if (blocks.some(x => x.id === id)) blocks = replaceBlock(blocks, id, { align });
+    }
+    setDoc(Object.assign({}, doc, { blocks }));
+    if (targets && targets.length) redraw({ sel: selOf(targets) });
+    else redraw({ caretId: ids[0], caretEnd: true });
+  }
+
+  const sizeEl = barEl.querySelector('#tb-size');
+  if (sizeEl) {
+    sizeEl.addEventListener('change', () => {
+      const v = sizeEl.value;
+      sizeEl.value = '';
+      if (v) setValue('sz', Number(v));
+    });
+  }
+
+  // A− / A+ — 크기 사다리를 한 칸씩 오르내린다. 크기가 안 정해진 글은 본문 12.5 로 본다
+  const SIZES = [8, 8.5, 9, 9.5, 10, 10.5, 11, 11.5, 12, 12.5, 13, 14, 15, 16, 18, 20, 22, 24, 27, 30, 36];
+  function stepSize(dir) {
+    const targets = targetRanges();
+    if (!targets || !targets.length) return;
+    const doc = getDoc();
+    const at = targets[0];   // 지금 크기는 맨 앞 대상에서 읽는다
+    const b = doc.blocks.find(x => x.id === at.id);
+    const src = b ? runsOf(b, at) : null;
+    if (!src) return;
+    const part = sliceRuns(src, at.from, at.to);
+    const cur = (part.find(r => r.sz) || {}).sz || 12.5;
+    let i = 0;
+    for (let k = 1; k < SIZES.length; k++) {
+      if (Math.abs(SIZES[k] - cur) < Math.abs(SIZES[i] - cur)) i = k;
+    }
+    const next = SIZES[Math.max(0, Math.min(SIZES.length - 1, i + dir))];
+    if (next !== cur) setValue('sz', next);
+  }
+  for (const btn of barEl.querySelectorAll('.tb[data-szstep]')) {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => stepSize(Number(btn.dataset.szstep)));
+  }
+  for (const btn of barEl.querySelectorAll('.tb-c[data-color]')) {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => setValue('c', btn.dataset.color));
+  }
+  for (const btn of barEl.querySelectorAll('.tb[data-align]')) {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => setAlign(btn.dataset.align));
+  }
+
+  // 문단 ↔ 목록 서로 바꾸기. 글자(토막)는 그대로 가져간다
+  for (const btn of barEl.querySelectorAll('.tb[data-list]')) {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const el = activeBlockEl(pagesEl);
+      const id = el ? el.dataset.id : (lastSels && lastSels.length ? lastSels[0].id : null);
+      if (!id) return;
+      const doc = getDoc();
+      const b = doc.blocks.find(x => x.id === id);
+      if (!b) return;
+      const ordered = btn.dataset.list === '1' ? 1 : 0;
+      const blocks = doc.blocks.slice();
+      const at = blocks.findIndex(x => x.id === id);
+      if (b.type === 'list') {
+        // ⛔ 항목이 여러 개여도 하나도 버리지 않는다 — 항목마다 문단이 된다
+        const paras = (b.items.length ? b.items : [[]]).map(item => createBlock('para', { runs: item }));
+        blocks.splice(at, 1, ...paras);
+        setDoc(Object.assign({}, doc, { blocks }));
+        redraw({ caretId: paras[0].id, caretEnd: true });
+        return;
+      }
+      if (!Array.isArray(b.runs)) return;   // 섹션 줄은 목록으로 바꾸지 않는다
+      const next = createBlock('list', { ordered, items: [b.runs] });
+      blocks[at] = next;
+      setDoc(Object.assign({}, doc, { blocks }));
+      redraw({ caretId: next.id, caretEnd: true });
+    });
+  }
+
+  for (const btn of buttons) {
+    // ⛔ mousedown 에서 막지 않으면 버튼을 누르는 순간 글에서 선택이 풀린다
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => toggle(btn.dataset.mark));
+  }
+
+  document.addEventListener('selectionchange', refresh);
+  pagesEl.addEventListener('keyup', refresh);
+
+  document.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+    const key = e.key === 'b' ? 'b' : e.key === 'i' ? 'i' : e.key === 'u' ? 'u' : null;
+    if (!key) return;
+    e.preventDefault();
+    toggle(key);
+  });
+
+  refresh();
+}
+
+/* drag.js */
+// 여러 블록에 걸친 드래그 선택 (실기기 지적 2 — 2026-08-30 SKY, A안 확정).
+// 블록마다 편집 칸이 따로라 브라우저는 드래그 선택을 그 칸 안에서 끊는다.
+// 그래서 포인터가 시작 칸을 벗어난 동안만 우리가 선택을 대신 잇는다 —
+// 같은 칸 안의 드래그는 브라우저가 잘하므로 손대지 않는다.
+//
+// ⚠ 시작점은 브라우저의 선택(anchor)을 그대로 쓴다. 처음에는 mousedown 좌표로
+//   시작점을 추측했는데, 줄 끝 빈 곳처럼 글자가 없는 곳에서 시작하면 실제 시작점과
+//   어긋나 "드래그 시작 위치에 따라 지워지는 범위가 다른" 사고가 났다(실기기 2026-08-30).
+// ⚠ 브라우저의 자체 갱신(첫 칸으로 좁힘)이 mousemove 기본 동작으로 «나중에» 실행되어
+//   우리 선택을 되덮는다(실측). 매 프레임 그리기 직전(requestAnimationFrame)에
+//   원하는 선택으로 되돌린다 — 좁혀진 상태가 화면에 나갈 틈이 없다.
+function attachDragSelect({ pagesEl }) {
+  let anchor = null;   // 걸침이 시작된 순간의 선택 시작점 { node, offset, host }
+  let cross = null;    // 시작 칸 밖의 마지막 지점 { node, offset } — 안 벗어났으면 null
+  let raf = 0;
+
+  const caretAt = (x, y) => {
+    const r = document.caretRangeFromPoint(x, y);
+    return r ? { node: r.startContainer, offset: r.startOffset } : null;
+  };
+  const hostOf = (node) => {
+    const e = node && (node.nodeType === 1 ? node : node.parentElement);
+    return e && e.closest ? e.closest('[contenteditable="true"]') : null;
+  };
+  const alive = (p) => p && p.node && p.node.isConnected;
+  const assert = (a, b) => {
+    if (!alive(a) || !alive(b)) return;
+    const s = window.getSelection();
+    if (s.anchorNode === a.node && s.anchorOffset === a.offset
+        && s.focusNode === b.node && s.focusOffset === b.offset) return;
+    s.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
+  };
+  const stop = () => {
+    anchor = null;
+    cross = null;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+  };
+  const tick = () => {
+    raf = 0;
+    if (!anchor || !cross) return;
+    assert(anchor, cross);
+    raf = requestAnimationFrame(tick);
+  };
+
+  pagesEl.addEventListener('mousedown', stop);
+
+  pagesEl.addEventListener('mousemove', (e) => {
+    if (e.buttons !== 1) return;
+    const at = caretAt(e.clientX, e.clientY);
+    const host = at && hostOf(at.node);
+    if (!host) return;                    // 종이 여백 위 — 마지막 상태 유지
+    if (!anchor) {
+      // 아직 걸침 전 — 브라우저 선택의 시작점을 본다. 편집 칸 밖에서 시작한
+      // 드래그(종이 여백 등)는 브라우저가 걸침까지 스스로 해내므로 손대지 않는다.
+      const s = window.getSelection();
+      const aHost = s.rangeCount ? hostOf(s.anchorNode) : null;
+      if (!aHost || host === aHost) return;
+      anchor = { node: s.anchorNode, offset: s.anchorOffset, host: aHost };
+    } else if (host === anchor.host) {
+      stop();                             // 시작 칸으로 돌아옴 — 브라우저에 맡긴다
+      return;
+    }
+    e.preventDefault();
+    cross = { node: at.node, offset: at.offset };
+    if (!raf) raf = requestAnimationFrame(tick);
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (anchor && cross) {
+      // 드래그 끝 처리도 우리 선택을 덮을 수 있다 — 다음 프레임에 한 번 더
+      const a = anchor;
+      const b = cross;
+      requestAnimationFrame(() => assert(a, b));
+    }
+    stop();
+  });
+}
+
+/* main.js */
+
+
+
+
+
+
+
+
+
+
+
+
+const APP_NAME = '문서 편집기';
+document.title = APP_NAME;
+
+const state = { doc: null };
+
+function demoDoc() {
+  const doc = createDocument({ title: '신청 모델의 세부 사양서' });
+  doc.blocks = [
+    createBlock('heading', { text: '신청 모델의 세부 사양서' }),
+    createBlock('section', { no: '01', title: '제어반 적용 범위 및 제품 특기사항' }),
+  ];
+  for (let i = 1; i <= 60; i++) {
+    doc.blocks.push(createBlock('para', {
+      text: i + '. 안전회로의 전압은 AC 110V 를 사용하며, 브레이크 및 도어 모터 전압은 따로 분기한다.',
+    }));
+  }
+  return doc;
+}
+
+function draw(opt = {}) {
+  const pagesEl = document.getElementById('pages');
+
+  // 다시 그리기 전에 지금 커서가 몇 번째 글자에 있는지 세어 둔다.
+  // 목록이면 "블록 전체"가 아니라 "그 항목 안"에서 센다 — 블록 전체로 세면 항목 경계에서
+  // 이전 항목 끝과 다음 항목 처음이 같은 번호가 되어, 커서가 이전 항목으로 붙는다(실기기 지적 1).
+  let keepId = null;
+  let keepItem = null;
+  let keepPos = 0;
+  if (opt.keepCaret) {
+    const blk = activeBlockEl(pagesEl);
+    const sel = window.getSelection();
+    if (blk && sel && sel.anchorNode) {
+      keepId = blk.dataset.id;
+      const li = activeItemEl(blk);
+      if (li) {
+        keepItem = li.dataset.i;
+        keepPos = offsetIn(li, sel.anchorNode, sel.anchorOffset);
+      } else {
+        keepPos = offsetIn(blk, sel.anchorNode, sel.anchorOffset);
+      }
+    }
+  }
+
+  const r = renderPages(state.doc, pagesEl, document.getElementById('gauge'));
+
+  // sel.item 이 있으면 그 목록 항목 안에서 고른다 (도구모음이 목록 항목 서식에 쓴다)
+  const hostIn = (el, item) => (item === null || item === undefined)
+    ? el : el.querySelector('.lst li[data-i="' + item + '"]');
+
+  if (opt.sel && opt.sel.multi) {
+    // 여러 블록에 걸친 선택 복원 — 양 끝 좌표만 있으면 브라우저가 사이를 채운다
+    const resolve = (p) => {
+      const el = pagesEl.querySelector('.blk[data-id="' + p.id + '"]');
+      const host = el && hostIn(el, p.item);
+      return host ? nodeAt(host, p.pos) : null;
+    };
+    const na = resolve(opt.sel.a);
+    const nb = resolve(opt.sel.b);
+    if (na && nb) window.getSelection().setBaseAndExtent(na.node, na.offset, nb.node, nb.offset);
+  } else if (opt.sel) {
+    const el = pagesEl.querySelector('.blk[data-id="' + opt.sel.id + '"]');
+    const host = el && hostIn(el, opt.sel.item);
+    if (host) selectRange(host, opt.sel.from, opt.sel.to);
+  } else if (opt.caret) {
+    // 정확한 자리(블록·목록 항목·글자 번호)로 커서를 놓는다 — 걸침 지우기가 쓴다
+    const el = pagesEl.querySelector('.blk[data-id="' + opt.caret.id + '"]');
+    const host = el && (hostIn(el, opt.caret.item) || el);
+    if (host) caretTo(host, opt.caret.pos);
+  } else if (opt.caretId) {
+    const el = pagesEl.querySelector('.blk[data-id="' + opt.caretId + '"]');
+    if (el) caretTo(el, opt.caretEnd ? Number.MAX_SAFE_INTEGER : 0);
+  } else if (keepId) {
+    const el = pagesEl.querySelector('.blk[data-id="' + keepId + '"]');
+    const host = el && (hostIn(el, keepItem) || el);
+    if (host) caretTo(host, keepPos);
+  }
+  return r;
+}
+
+state.doc = demoDoc();
+
+const history = createHistory(200);
+history.push(state.doc.blocks);
+
+// 편집을 멈추고 5초가 지나면 브라우저 내부 저장소에 스스로 보관한다(최근 20시점)
+let snapTimer = null;
+function markDirty() {
+  clearTimeout(snapTimer);
+  snapTimer = setTimeout(async () => {
+    try { await saveSnapshot(serialize(state.doc), state.name || '(이름 없음)'); }
+    catch (e) { console.warn('자동 보관 실패:', e.message); }
+  }, 5000);
+}
+
+// 편집이 문서를 바꿀 때는 항상 이 문으로 들어와 기록이 쌓인다
+const applyDoc = (d) => { state.doc = d; history.push(d.blocks); markDirty(); };
+
+document.addEventListener('keydown', (e) => {
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (!ctrl) return;
+  if (e.key === 'z' && !e.shiftKey) {
+    const b = history.undo();
+    if (b) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: b }); draw(); }
+  } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+    const b = history.redo();
+    if (b) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: b }); draw(); }
+  }
+});
+
+window.__app = { state, draw, DEFAULT_PAGE, history, saveSnapshot, listSnapshots };
+draw();
+
+attachEditor({
+  pagesEl: document.getElementById('pages'),
+  getDoc: () => state.doc,
+  setDoc: applyDoc,
+  redraw: draw,
+});
+
+attachToolbar({
+  barEl: document.getElementById('bar'),
+  pagesEl: document.getElementById('pages'),
+  getDoc: () => state.doc,
+  setDoc: applyDoc,
+  redraw: draw,
+});
+
+attachDragSelect({ pagesEl: document.getElementById('pages') });
+
+// ---- 문서 폴더 열기·저장 ----
+state.dir = null;
+state.name = null;
+
+function msg(t) { document.getElementById('folder-msg').textContent = t; }
+
+async function refreshList() {
+  const box = document.getElementById('doclist');
+  box.textContent = '';
+  if (!state.dir) return;
+  for (const name of await listDocs(state.dir)) {
+    const a = document.createElement('a');
+    a.textContent = name.replace(DOC_EXT, '');
+    a.className = name === state.name ? 'on' : '';
+    a.addEventListener('click', async () => {
+      state.doc = deserialize(await readDoc(state.dir, name));
+      state.name = name;
+      history.push(state.doc.blocks);
+      draw();
+      refreshList();
+    });
+    box.appendChild(a);
+  }
+}
+
+document.getElementById('btn-folder').addEventListener('click', async () => {
+  try {
+    state.dir = await pickFolder();
+    msg('폴더: ' + state.dir.name);
+    await refreshList();
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;      // 사람이 취소한 것 — 오류가 아니다
+    msg('폴더를 열지 못했다: ' + e.message);
+  }
+});
+
+document.getElementById('btn-save').addEventListener('click', async () => {
+  if (!state.dir) { msg('먼저 문서 폴더를 여세요'); return; }
+  const name = state.name || ((state.doc.meta.title || '새 문서') + DOC_EXT);
+  try {
+    await writeDoc(state.dir, name, serialize(state.doc));
+    state.name = name;
+    msg('저장함: ' + name);
+    await refreshList();
+  } catch (e) { msg('저장하지 못했다: ' + e.message); }
+});
+
+if (!isSupported()) msg('⚠ 이 브라우저는 폴더 열기를 지원하지 않는다. 크롬·엣지로 열어야 한다');
+
+document.getElementById('btn-pdf').addEventListener('click', () => {
+  printDoc(document.getElementById('main'));
+});
+
+})();
+</script>
+</body></html>
