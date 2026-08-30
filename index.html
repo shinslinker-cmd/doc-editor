@@ -2464,9 +2464,57 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
   }
   document.addEventListener('selectionchange', paintCells);
 
-  // 잘라내기(Ctrl+X)의 걸침판은 아직 없다 — 반쪽 지움을 막기 위해 계속 막는다
+  // 고른 구간의 «글»을 뽑는다 — 잘라내기가 클립보드에 담을 값이다.
+  // 표 칸은 한 행을 탭으로 잇고 행마다 줄을 바꾼다(엑셀에 그대로 붙는 모양).
+  // ⚠ 경계만 문 칸(from===to)은 글이 없으니 뺀다 — 넣으면 빈 줄이 생긴다.
+  function targetsText(targets) {
+    const doc = getDoc();
+    const rows = new Map();     // '블록id/행' → 그 행의 칸 글 목록
+    const lines = [];
+    for (const t of targets) {
+      if (t.to <= t.from) continue;
+      const b = doc.blocks.find(x => x.id === t.id);
+      if (!b) continue;
+      let runs = null;
+      if (t.cell) {
+        const row = t.cell[0] === 'h' ? (b.head && b.head[0]) : (b.rows && b.rows[t.cell[0]]);
+        runs = row && row[t.cell[1]] ? row[t.cell[1]].runs : null;
+      } else if (t.item === null || t.item === undefined) runs = b.runs;
+      else runs = b.items && b.items[t.item];
+      if (!Array.isArray(runs)) continue;
+      const s = runsText(sliceRuns(runs, t.from, t.to));
+      if (t.cell) {
+        const key = t.id + '/' + t.cell[0];
+        if (!rows.has(key)) { rows.set(key, []); lines.push(rows.get(key)); }
+        rows.get(key).push(s);
+      } else lines.push(s);
+    }
+    return lines.map(l => (Array.isArray(l) ? l.join('\t') : l)).join('\n');
+  }
+
+  // 잘라내기(Ctrl+X) — 고른 글을 클립보드에 담고, 걸침 지우기와 «똑같은 규칙»으로 지운다.
+  // ⛔ 예전에는 반쪽 지움을 막으려고 아무 일도 안 하게 막아 뒀다(2026-08-30 풀었다).
+  // 한 칸 «안»의 잘라내기는 그대로 브라우저가 하고 flush 가 되읽는다.
   pagesEl.addEventListener('cut', (e) => {
-    if (targetsIn(pagesEl).length > 1) e.preventDefault();
+    const targets = crossTargets();
+    if (targets.length < 2) return;
+    e.preventDefault();
+    const text = targetsText(targets);
+    if (e.clipboardData) e.clipboardData.setData('text/plain', text);
+    if (targets.some(x => x.cell)) {
+      // 표가 끼면 구조는 남기고 칸 «속»만 비운다(계획 R5·R6)
+      const doc = getDoc();
+      const r = deleteMixed(doc.blocks, targets);
+      if (!r) return;
+      setDoc(Object.assign({}, doc, { blocks: r.blocks }));
+      cancelIdle();
+      redraw({ caret: r.caret });
+      return;
+    }
+    const r = deleteTargets(targets);
+    if (!r) return;
+    cancelIdle();
+    redraw({ caret: r.caret });
   });
 }
 
@@ -3134,6 +3182,7 @@ async function refreshList() {
     a.addEventListener('click', async () => {
       state.doc = deserialize(await readDoc(state.dir, name));
       state.name = name;
+      state.fileHandle = null;          // 폴더의 문서를 열었다 — 파일 하나 연결은 푼다
       history.push(state.doc.blocks);
       draw();
       refreshList();
@@ -3176,7 +3225,47 @@ document.getElementById('btn-folder').addEventListener('click', async () => {
   } catch (e) { /* 폴더가 없어졌으면 그냥 새로 고르면 된다 */ }
 })();
 
+// ── 탐색기에서 .sdoc 을 눌러 이 앱으로 열리는 길 (2026-08-30 SKY) ──
+// 브라우저에 «설치»된 앱만 파일을 넘겨받을 수 있다(manifest 의 file_handlers).
+// 넘어오는 것은 경로가 아니라 «파일 손잡이»라, 그대로 읽고 그 파일에 되저장할 수 있다.
+// ⚠ 이 길로 연 문서는 폴더 목록과 무관하다 — 저장은 그 파일 자체에 한다.
+state.fileHandle = null;
+
+async function openFileHandle(fh) {
+  try {
+    const text = await (await fh.getFile()).text();
+    state.doc = deserialize(text);
+    state.fileHandle = fh;
+    state.name = fh.name;
+    history.push(state.doc.blocks);
+    draw();
+    msg('파일: ' + fh.name);
+    refreshList();
+  } catch (e) { msg('문서를 열지 못했다: ' + e.message); }
+}
+
+if ('launchQueue' in window && 'files' in LaunchParams.prototype) {
+  window.launchQueue.setConsumer(async (params) => {
+    if (!params || !params.files || !params.files.length) return;
+    await openFileHandle(params.files[0]);
+  });
+}
+
 document.getElementById('btn-save').addEventListener('click', async () => {
+  // 탐색기에서 .sdoc 을 눌러 연 문서는 «그 파일»에 되저장한다 — 폴더가 없어도 된다
+  if (state.fileHandle) {
+    try {
+      if (state.fileHandle.requestPermission
+          && await state.fileHandle.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+        msg('저장 권한을 받지 못했다'); return;
+      }
+      const w = await state.fileHandle.createWritable();
+      await w.write(serialize(state.doc));
+      await w.close();
+      msg('저장함: ' + state.fileHandle.name);
+    } catch (e) { msg('저장하지 못했다: ' + e.message); }
+    return;
+  }
   if (!state.dir) { msg(NEED_DIR); return; }
   const name = state.name || ((state.doc.meta.title || '새 문서') + DOC_EXT);
   try {
@@ -3191,6 +3280,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
 document.getElementById('btn-new').addEventListener('click', () => {
   state.doc = createDocument();
   state.name = null;
+  state.fileHandle = null;
   history.push(state.doc.blocks);
   draw({ caretId: state.doc.blocks[0].id });
   refreshList();
@@ -3214,6 +3304,7 @@ document.getElementById('btn-saveas').addEventListener('click', async () => {
         && !window.confirm('「' + name + '」 문서가 이미 있습니다. 덮어쓸까요?')) return;
     await writeDoc(state.dir, full, serialize(state.doc));
     state.name = full;
+    state.fileHandle = null;          // 이제 폴더의 이 파일이 «지금 문서»다
     msg('저장함: ' + full);
     await refreshList();
   } catch (e) { msg('저장하지 못했다: ' + e.message); }
