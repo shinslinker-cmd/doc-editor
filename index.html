@@ -15,6 +15,9 @@
   --page-w:794px; --page-h:1123px;
 }
 * { box-sizing:border-box; }
+/* ⛔ 가로로 쓸어도 «뒤로 가기»가 되지 않게 한다 — 태블릿에서 표를 손가락으로 끌면
+   브라우저가 그걸 뒤로 가기로 받아 «편집 중인 화면이 통째로 날아간다»(실측 2026-08-30). */
+html, body { overscroll-behavior-x:contain; }
 body { margin:0; background:var(--desk); color:var(--ink);
        font-family:'Noto Sans KR','맑은 고딕','Malgun Gothic',sans-serif; }
 #app { display:flex; min-height:100vh; }
@@ -85,7 +88,10 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .blk { outline:none; white-space:pre-wrap; }
 .blk .mono { font-family:'IBM Plex Mono',Consolas,monospace; }
 /* 표 — §8 확정값. 열 너비는 colgroup 픽셀(합 674)이 정하고 table-layout:fixed 가 지킨다 */
-.blk-table { margin:4px 0 12px; position:relative; }
+/* touch-action: pan-y — 표 위에서 «세로»로 끄는 것만 브라우저에 맡긴다(화면 넘기기).
+   가로로 끄는 것은 우리가 «칸 고르기»로 쓴다. 이 한 줄이 없으면 손가락 가로 끌기가
+   브라우저 손에 먼저 넘어가 칸이 안 골라진다(실측 2026-08-30). */
+.blk-table { margin:4px 0 12px; position:relative; touch-action:pan-y; }
 .blk-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
 .blk-table td { outline:none; word-break:break-word; }
 .blk-table thead td { background:#f6f7fa; border-bottom:1.5px solid var(--ink);
@@ -857,7 +863,11 @@ async function pickFolder() {
   return window.showDirectoryPicker({ id: 'doc-editor', mode: 'readwrite' });
 }
 
+// 문서는 고른 폴더 «안»의 서류 폴더에 담는다.
+// ⚠ 사람이 이미 서류 폴더 자체를 골랐으면 그 안에 또 서류 를 만들지 않는다
+//   (2026-08-30 SKY 가 기본 위치로 …\11. 문서 편집기\서류 를 지목 — 그대로 골라도 되게).
 async function docsDir(dirHandle) {
+  if (dirHandle.name === SUB) return dirHandle;
   return dirHandle.getDirectoryHandle(SUB, { create: true });
 }
 
@@ -869,6 +879,16 @@ async function listDocs(dirHandle) {
   }
   names.sort();
   return names;
+}
+
+// ⛔ 한글 이름은 «글자로» 비교하면 안 된다. 운영체제가 「한」을 ㅎ+ㅏ+ㄴ 으로 풀어(NFD)
+//    돌려주는 일이 있어, 사람이 친 합쳐진 이름(NFC)과 다른 글자열이 된다 —
+//    그러면 이미 있는 파일을 «없다» 고 보고 조용히 덮어쓴다(2026-08-30 실측).
+const same = (a, b) => String(a).normalize('NFC') === String(b).normalize('NFC');
+
+async function docExists(dirHandle, name) {
+  const names = await listDocs(dirHandle);
+  return names.some(n => same(n, name));
 }
 
 async function readDoc(dirHandle, name) {
@@ -883,6 +903,74 @@ async function writeDoc(dirHandle, name, text) {
   const w = await fh.createWritable();
   await w.write(text);
   await w.close();
+}
+
+// ── 고른 폴더를 기억한다 (2026-08-30 SKY: "문서 폴더를 기억하게 하자") ──
+// 폴더 손잡이(handle)는 브라우저 내부 저장소(IndexedDB)에 그대로 담을 수 있다.
+// ⚠ 담아 둬도 «권한»은 따로다. 브라우저를 껐다 켜면 권한이 «물어봄» 으로 내려갈 수 있고,
+//   그때는 사람이 버튼을 누르는 순간에만 다시 허락을 받을 수 있다(브라우저 보안).
+// ⛔ 이름은 저장소 전체에서 겹치면 안 된다 — 빌드가 모듈을 한 덩어리로 합치기 때문에
+//   autosave.js 의 DB·STORE·tx 와 같은 이름을 쓰면 화면이 통째로 안 뜬다(2026-08-30 실측).
+// ⛔ 저장소 이름도 따로 쓴다 — autosave 와 같은 이름·같은 판번호로 열면 새 칸(handles)이
+//   만들어지지 않아 조용히 실패한다(판 올리기가 안 일어난다).
+const DIR_DB = 'doc-editor-dir';
+const DIR_STORE = 'handles';
+const DIR_KEY = 'docdir';
+
+function openDirDB() {
+  return new Promise((res, rej) => {
+    const q = indexedDB.open(DIR_DB, 1);
+    q.onupgradeneeded = () => {
+      const db = q.result;
+      if (!db.objectStoreNames.contains(DIR_STORE)) db.createObjectStore(DIR_STORE);
+    };
+    q.onsuccess = () => res(q.result);
+    q.onerror = () => rej(q.error);
+  });
+}
+
+function dirTx(db, mode, fn) {
+  return new Promise((res, rej) => {
+    const t = db.transaction(DIR_STORE, mode);
+    const r = fn(t.objectStore(DIR_STORE));
+    t.oncomplete = () => res(r && r.result);
+    t.onerror = () => rej(t.error);
+  });
+}
+
+async function rememberDir(handle) {
+  try {
+    const db = await openDirDB();
+    await dirTx(db, 'readwrite', (s) => s.put(handle, DIR_KEY));
+    db.close();
+    return true;
+  } catch (e) { return false; }
+}
+
+async function recallDir() {
+  try {
+    const db = await openDirDB();
+    const h = await dirTx(db, 'readonly', (s) => s.get(DIR_KEY));
+    db.close();
+    return h || null;
+  } catch (e) { return null; }
+}
+
+async function forgetDir() {
+  try {
+    const db = await openDirDB();
+    await dirTx(db, 'readwrite', (s) => s.delete(DIR_KEY));
+    db.close();
+  } catch (e) { /* 지울 게 없으면 그만이다 */ }
+}
+
+// 'granted' 면 바로 쓸 수 있고, 'prompt' 면 사람이 버튼을 누를 때만 허락을 받을 수 있다.
+async function dirPermission(handle, ask) {
+  if (!handle || !handle.queryPermission) return 'granted';   // 옛 브라우저 — 그냥 써 본다
+  const opt = { mode: 'readwrite' };
+  let st = await handle.queryPermission(opt);
+  if (st !== 'granted' && ask && handle.requestPermission) st = await handle.requestPermission(opt);
+  return st;
 }
 
 /* autosave.js */
@@ -2165,9 +2253,14 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const b = doc.blocks.find(x => x.id === blkEl.dataset.id);
     if (!b) return;
     const col = Number(g.dataset.col);
+    // 눈금(손잡이)은 왼쪽부터 이 경계까지의 폭에 놓여 있다 — 끌 때 같이 옮기려면 그 값이 필요하다
+    const left0 = b.cols.slice(0, col).reduce((s, c) => s + (c.w || 0), 0);
     grip = { id: b.id, col, startX: e.clientX,
-      startW: b.cols[col].w, pairW: b.cols[col].w + b.cols[col + 1].w,
-      cols: Array.from(pagesEl.querySelectorAll('.blk-table[data-id="' + b.id + '"] colgroup')) };
+      startW: b.cols[col].w, pairW: b.cols[col].w + b.cols[col + 1].w, left0,
+      cols: Array.from(pagesEl.querySelectorAll('.blk-table[data-id="' + b.id + '"] colgroup')),
+      // 같은 경계의 눈금은 장마다 하나씩 있다(이어진 장의 보기 전용 눈금 포함) — 전부 같이 옮긴다
+      grips: Array.from(pagesEl.querySelectorAll(
+        '.blk-table[data-id="' + b.id + '"] .colgrip[data-col="' + col + '"]')) };
     g.classList.add('on');
     try { g.setPointerCapture(e.pointerId); } catch (err) { /* 합성 이벤트에는 없다 */ }
   });
@@ -2178,6 +2271,8 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
       cg.children[grip.col].style.width = w + 'px';
       cg.children[grip.col + 1].style.width = (grip.pairW - w) + 'px';
     }
+    // ⭐ 눈금도 손끝을 따라간다 — 전에는 놓는 순간에야 제자리를 찾아 «선이 안 따라온다» 고 보였다
+    for (const gg of grip.grips) gg.style.left = (grip.left0 + w - 3) + 'px';
   });
   // ⚠ 어느 경계를 끌었는지는 e.target 이 아니라 grip 에서 읽는다 — setPointerCapture 덕에
   //   손잡이 밖에서 놓아도 이벤트는 오지만, target 을 믿으면 꼬인다.
@@ -2195,6 +2290,50 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     cancelIdle();
     redraw({ keepCaret: true });
   });
+
+  // ── 손가락으로 칸 고르기 (2026-08-30 SKY: "태블릿으로 손가락으로 드래그 칸이 골라지지 않아") ──
+  // 터치에서는 그냥 끌면 브라우저가 «화면 넘기기»로 받아 글이 안 골라진다. 그래서 표 안에서만
+  // 우리가 가로챈다. ⚠ 세로로 먼저 움직이면 화면 넘기기로 두고(표를 지나 아래로 읽어야 하니까),
+  // 가로로 먼저 움직였을 때만 칸 고르기로 본다.
+  let touchPick = null;   // { td, mode:'undecided'|'select'|'scroll', x0, y0 }
+  // ⚠ 열 손잡이(.colgrip)가 칸 위를 7px 덮고 있다 — 그 자리를 짚으면 손잡이만 잡혀
+  //   «칸이 없다» 고 나온다. 겹친 것을 다 훑어 «칸» 을 찾는다(실측 2026-08-30).
+  const tdAt = (x, y) => {
+    for (const el of document.elementsFromPoint(x, y)) {
+      const td = el && el.closest ? el.closest('.blk-table td[data-r]') : null;
+      if (td) return td;
+    }
+    return null;
+  };
+  pagesEl.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { touchPick = null; return; }
+    const t = e.touches[0];
+    const td = tdAt(t.clientX, t.clientY);
+    touchPick = td ? { td, mode: 'undecided', x0: t.clientX, y0: t.clientY } : null;
+  }, { passive: true });
+  pagesEl.addEventListener('touchmove', (e) => {
+    if (!touchPick || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchPick.x0;
+    const dy = t.clientY - touchPick.y0;
+    if (touchPick.mode === 'undecided') {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;      // 아직 어느 쪽인지 모른다
+      touchPick.mode = Math.abs(dx) > Math.abs(dy) ? 'select' : 'scroll';
+    }
+    if (touchPick.mode !== 'select') return;
+    const td = tdAt(t.clientX, t.clientY);
+    const same = td && td.closest('.blk[data-id]') === touchPick.td.closest('.blk[data-id]');
+    if (!same) return;                                      // 표 밖으로 나가면 그냥 둔다
+    e.preventDefault();                                     // 화면이 밀리지 않게
+    const a = nodeAt(touchPick.td, 0);
+    const b = nodeAt(td, textLen(td));
+    const s = window.getSelection();
+    s.removeAllRanges();
+    s.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
+  }, { passive: false });
+  const endTouch = () => { touchPick = null; };
+  pagesEl.addEventListener('touchend', endTouch, { passive: true });
+  pagesEl.addEventListener('touchcancel', endTouch, { passive: true });
 
   // ── 칸이 골라진 것을 «보이게» 칠한다 (2026-08-30 SKY: "셀이 선택 되게 해줘") ──
   // 브라우저의 글자 선택 파란색만으로는 «칸이 골라졌다»가 안 보인다. 칸 통째로 무는
@@ -2777,7 +2916,9 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-window.__app = { state, draw, DEFAULT_PAGE, history, saveSnapshot, listSnapshots };
+// 검사 도구가 들여다보는 창구다(tools/*.js). 화면 동작에는 쓰지 않는다.
+window.__app = { state, draw, DEFAULT_PAGE, history, saveSnapshot, listSnapshots,
+                 rememberDir, recallDir, forgetDir, docExists };
 draw();
 
 attachEditor({
@@ -2803,8 +2944,10 @@ function msg(t) { document.getElementById('folder-msg').textContent = t; }
 
 // 문서를 어디에 담을지는 «사람이 폴더를 골라야» 정해진다(브라우저 보안 — 프로그램이 마음대로 못 연다).
 // 고른 폴더 «안»에 서류 폴더가 생기고 .sdoc 문서가 거기 쌓인다(io/folder.js SUB).
-// ⚠ 브라우저는 그 선택을 새로고침 뒤까지 기억하지 못한다 — 그래서 열 때마다 한 번 골라야 한다.
+// 고른 폴더는 기억해 두고 다음에 열 때 되살린다 — 권한이 남아 있으면 그냥 이어지고,
+// 브라우저가 권한을 내렸으면 「📁 문서 폴더 열기」를 «한 번 누르는 것»만으로 이어진다.
 const NEED_DIR = '먼저 왼쪽 위 「📁 문서 폴더 열기」를 눌러 폴더를 고르세요 — 그 안에 「서류」 폴더가 생기고 문서가 거기 저장됩니다';
+const dirLabel = (h) => '폴더: ' + h.name + (h.name === '서류' ? '' : ' ▸ 서류');
 
 async function refreshList() {
   const box = document.getElementById('doclist');
@@ -2825,16 +2968,39 @@ async function refreshList() {
   }
 }
 
+async function useDir(handle) {
+  state.dir = handle;
+  await rememberDir(handle);
+  msg(dirLabel(handle));
+  await refreshList();
+}
+
 document.getElementById('btn-folder').addEventListener('click', async () => {
   try {
+    // ① 기억해 둔 폴더가 있으면 먼저 그것으로 이어 본다 — 버튼 한 번이면 폴더 창이 안 뜬다.
+    //    (버튼을 누른 «이 순간» 이 브라우저가 허락을 물어봐 주는 유일한 때다)
+    if (!state.dir) {
+      const saved = await recallDir();
+      if (saved && await dirPermission(saved, true) === 'granted') { await useDir(saved); return; }
+      if (saved) await forgetDir();                // 사람이 거절했거나 폴더가 없어졌다
+    }
     state.dir = await pickFolder();
-    msg('폴더: ' + state.dir.name);
-    await refreshList();
+    await useDir(state.dir);
   } catch (e) {
     if (e && e.name === 'AbortError') return;      // 사람이 취소한 것 — 오류가 아니다
     msg('폴더를 열지 못했다: ' + e.message);
   }
 });
+
+// 열자마자 — 지난 폴더의 권한이 아직 살아 있으면 아무것도 안 눌러도 그대로 이어진다
+(async () => {
+  const saved = await recallDir();
+  if (!saved) return;
+  try {
+    if (await dirPermission(saved, false) === 'granted') { await useDir(saved); return; }
+    msg('지난 폴더 「' + saved.name + '」로 이어가려면 「📁 문서 폴더 열기」를 한 번 누르세요');
+  } catch (e) { /* 폴더가 없어졌으면 그냥 새로 고르면 된다 */ }
+})();
 
 document.getElementById('btn-save').addEventListener('click', async () => {
   if (!state.dir) { msg(NEED_DIR); return; }
@@ -2868,8 +3034,9 @@ document.getElementById('btn-saveas').addEventListener('click', async () => {
   if (!name) { msg('이름이 비었습니다'); return; }
   const full = name + DOC_EXT;
   try {
-    const names = await listDocs(state.dir);
-    if (full !== state.name && names.includes(full)
+    // ⛔ 이미 있으면 «편집 중인 그 파일이라도» 물어본다(워드와 같다) — 다른 문서가 조용히
+    //   사라지는 것을 막는 자리다. 한글 이름은 docExists 가 NFC 로 맞춰 비교한다.
+    if (await docExists(state.dir, full)
         && !window.confirm('「' + name + '」 문서가 이미 있습니다. 덮어쓸까요?')) return;
     await writeDoc(state.dir, full, serialize(state.doc));
     state.name = full;
