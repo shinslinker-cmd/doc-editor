@@ -2148,6 +2148,26 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     if (t === 'deleteContentBackward' && collapsed) { if (mergeAt(-1)) e.preventDefault(); return; }
     if (t === 'deleteContentForward' && collapsed) { if (mergeAt(1)) e.preventDefault(); return; }
 
+    // 표를 붙여넣으면 «표»로 들어온다 (2026-08-30 SKY). 워드·엑셀에서 복사한 표도 같다.
+    // ⚠ 표 칸 «안»에 표를 붙이는 것은 표 속의 표가 되어 버리니 하지 않는다(글자로 들어간다).
+    if (t === 'insertFromPaste' && e.dataTransfer) {
+      const html = e.dataTransfer.getData('text/html') || '';
+      const blkT = activeBlockEl(pagesEl);
+      const inCellT = blkT && activeCellEl(blkT);
+      if (html.indexOf('<table') >= 0 && blkT && !inCellT && targets.length < 2) {
+        const t2 = tableFromHtml(html);
+        if (t2) {
+          e.preventDefault();
+          flush(false);
+          const doc = getDoc();
+          setDoc(Object.assign({}, doc, { blocks: insertAfter(doc.blocks, blkT.dataset.id, t2) }));
+          cancelIdle();
+          redraw({ caret: { id: t2.id, cell: t2.head && t2.head.length ? ['h', 0] : [0, 0], pos: 0 } });
+          return;
+        }
+      }
+    }
+
     // 여러 줄 붙여넣기 — 줄마다 문단이 되도록 우리가 넣는다(브라우저에 맡기면 한 문단에
     // 통째로 들어가 그 덩어리가 다음 장으로 밀린다). 표 칸 안은 줄바꿈이 정상이라 그대로.
     if (t === 'insertFromPaste' && e.dataTransfer) {
@@ -2562,6 +2582,107 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     return lines.map(l => (Array.isArray(l) ? l.join('\t') : l)).join('\n');
   }
 
+  // 붙여넣기로 들어온 <table> 을 우리 표 블록으로 바꾼다 (2026-08-30 SKY).
+  // 워드·엑셀·이 편집기가 담은 표를 다 받는다. 서식은 걸러내고 «글자와 격자»만 가져온다
+  // — 붙여넣기는 원래 서식을 거르는 것이 이 프로그램의 방침이다.
+  function tableFromHtml(html) {
+    const doc0 = new DOMParser().parseFromString(html, 'text/html');
+    const tbl = doc0.querySelector('table');
+    if (!tbl) return null;
+    const trs = Array.from(tbl.querySelectorAll('tr'));
+    if (!trs.length) return null;
+    // 격자를 직사각형으로 편다 — 병합(colspan/rowspan)은 덮인 자리를 cov 로 채운다
+    const grid = [];
+    const put = (r, c, cell) => {
+      while (grid.length <= r) grid.push([]);
+      grid[r][c] = cell;
+    };
+    trs.forEach((tr, r) => {
+      let c = 0;
+      for (const td of Array.from(tr.children)) {
+        while (grid[r] && grid[r][c]) c += 1;
+        const cs = Math.max(1, Number(td.getAttribute('colspan')) || 1);
+        const rs = Math.max(1, Number(td.getAttribute('rowspan')) || 1);
+        const txt = (td.innerText !== undefined ? td.innerText : td.textContent) || '';
+        // 눈에 안 보이는 «붙는 공백»(nbsp)은 보통 공백으로 — 워드·엑셀이 그걸로 채워 보낸다
+        const cell = { runs: runsFromText(txt.replace(/\u00a0/g, ' ').trim()) };
+        if (cs > 1) cell.cs = cs;
+        if (rs > 1) cell.rs = rs;
+        put(r, c, cell);
+        for (let i = 0; i < rs; i++) for (let j = 0; j < cs; j++) {
+          if (i || j) put(r + i, c + j, { runs: [], cov: 1 });
+        }
+        c += cs;
+      }
+    });
+    const ncols = grid.reduce((n, row) => Math.max(n, row.length), 0);
+    if (!ncols) return null;
+    for (const row of grid) for (let c = 0; c < ncols; c++) if (!row[c]) row[c] = { runs: [] };
+    // 첫 줄은 머리글로 쓴다(워드·엑셀 표도 대개 첫 줄이 제목줄이다)
+    const head = [grid[0].slice(0, ncols)];
+    const rows = grid.slice(1).map(r => r.slice(0, ncols));
+    const made = createBlock('table', {
+      cols: Array.from({ length: ncols }, () => ({ w: Math.floor(674 / ncols) })),
+      head, rows: rows.length ? rows : [Array.from({ length: ncols }, () => ({ runs: [] }))],
+    });
+    // 열 너비 합을 텍스트 폭에 맞춘다 — 안 맞추면 표가 종이 밖으로 나간다
+    const pg = getDoc().page;
+    return Object.assign(made, normalizeWidths(made, pg.width - pg.margin.left - pg.margin.right));
+  }
+
+  // 고른 표 칸들을 «표 모양»으로도 담는다 (2026-08-30 SKY: "표 자체도 복사 되게").
+  // 글자만 담으면 워드·엑셀에 붙일 때 줄글이 된다 — text/html 로 <table> 을 같이 담으면
+  // 워드·엑셀·이 편집기 모두 «표»로 받는다. 표 밖 대상이 섞이면 표로 안 담는다.
+  function targetsTableHtml(targets) {
+    const cells = targets.filter(t => t.cell);
+    if (!cells.length || cells.length !== targets.filter(t => t.to > t.from || t.cell).length) return '';
+    const id = cells[0].id;
+    if (cells.some(t => t.id !== id)) return '';          // 표가 둘이면 표로 안 담는다
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === id);
+    if (!b || b.type !== 'table') return '';
+    const rows = new Map();                               // 행 번호 → 그 행의 칸들
+    for (const t of cells) {
+      const key = String(t.cell[0]);
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key).push(t);
+    }
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    const trs = [];
+    for (const [, list] of rows) {
+      list.sort((x, y) => x.cell[1] - y.cell[1]);
+      const tds = list.map((t) => {
+        const row = t.cell[0] === 'h' ? (b.head && b.head[0]) : (b.rows && b.rows[t.cell[0]]);
+        const cell = row && row[t.cell[1]];
+        const runs = cell ? cell.runs : null;
+        const span = (cell && cell.cs > 1 ? ' colspan="' + cell.cs + '"' : '')
+                   + (cell && cell.rs > 1 ? ' rowspan="' + cell.rs + '"' : '');
+        return '<td' + span + '>' + esc(runsText(sliceRuns(runs || [], t.from, t.to))) + '</td>';
+      }).join('');
+      trs.push('<tr>' + tds + '</tr>');
+    }
+    return '<table border="1">' + trs.join('') + '</table>';
+  }
+
+  // 클립보드에 담는다 — 글자(text/plain)는 늘, 표면 표 모양(text/html)도 함께.
+  function putClipboard(dt, targets) {
+    if (!dt) return;
+    dt.setData('text/plain', targetsText(targets));
+    const html = targetsTableHtml(targets);
+    if (html) dt.setData('text/html', html);
+  }
+
+  // 복사(Ctrl+C) — 지우지는 않고 담기만 한다. 표면 표 모양으로도 담는다.
+  // ⚠ 표가 아닌 보통 글은 브라우저 기본 복사가 더 낫다(서식까지 그대로) — 건드리지 않는다.
+  pagesEl.addEventListener('copy', (e) => {
+    const targets = crossTargets();
+    if (targets.length < 2) return;
+    if (!targetsTableHtml(targets)) return;               // 표가 아니면 브라우저에 맡긴다
+    e.preventDefault();
+    putClipboard(e.clipboardData, targets);
+  });
+
   // 잘라내기(Ctrl+X) — 고른 글을 클립보드에 담고, 걸침 지우기와 «똑같은 규칙»으로 지운다.
   // ⛔ 예전에는 반쪽 지움을 막으려고 아무 일도 안 하게 막아 뒀다(2026-08-30 풀었다).
   // 한 칸 «안»의 잘라내기는 그대로 브라우저가 하고 flush 가 되읽는다.
@@ -2569,8 +2690,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const targets = crossTargets();
     if (targets.length < 2) return;
     e.preventDefault();
-    const text = targetsText(targets);
-    if (e.clipboardData) e.clipboardData.setData('text/plain', text);
+    putClipboard(e.clipboardData, targets);
     if (targets.some(x => x.cell)) {
       // 표가 끼면 구조는 남기고 칸 «속»만 비운다(계획 R5·R6)
       const doc = getDoc();
@@ -3021,9 +3141,12 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   document.addEventListener('selectionchange', refresh);
   pagesEl.addEventListener('keyup', refresh);
 
+  // ⛔ e.key 로만 보면 «한글 자판»에서 Ctrl+B 가 'ㅠ' 로 와서 굵게가 안 먹는다
+  //    (되돌리기와 같은 뿌리 — 2026-08-30 실측). e.code(자판과 무관한 키 자리)를 같이 본다.
+  const hit = (e, ch, code) => e.key === ch || e.key === ch.toUpperCase() || e.code === code;
   document.addEventListener('keydown', (e) => {
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
-    const key = e.key === 'b' ? 'b' : e.key === 'i' ? 'i' : e.key === 'u' ? 'u' : null;
+    const key = hit(e, 'b', 'KeyB') ? 'b' : hit(e, 'i', 'KeyI') ? 'i' : hit(e, 'u', 'KeyU') ? 'u' : null;
     if (!key) return;
     e.preventDefault();
     toggle(key);
@@ -3196,13 +3319,21 @@ function drawWithSel(sel) {
   draw({ sel });
 }
 
+// ⛔ 단축키를 e.key 로만 보면 «한글 자판»에서 통째로 안 먹는다 — Ctrl+Z 가 key='ㅋ' 로
+//    오기 때문이다(2026-08-30 실측). 잘라내기·복사는 브라우저가 알아서 해 주니 되는데
+//    되돌리기만 안 돼서 «잘라내기 뒤 되돌리기가 안 된다»로 보였다.
+//    e.code 는 «자판에 상관없는 키 자리»라 한글 상태에서도 KeyZ 로 온다. 둘 다 본다.
+const isKey = (e, ch, code) => e.key === ch || e.key === ch.toUpperCase() || e.code === code;
+
 document.addEventListener('keydown', (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   if (!ctrl) return;
-  if (e.key === 'z' && !e.shiftKey) {
+  const z = isKey(e, 'z', 'KeyZ');
+  const y = isKey(e, 'y', 'KeyY');
+  if (z && !e.shiftKey) {
     const r = history.undo();
     if (r) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: r.blocks }); drawWithSel(r.sel); }
-  } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+  } else if (y || (z && e.shiftKey)) {
     const r = history.redo();
     if (r) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: r.blocks }); drawWithSel(r.sel); }
   }
