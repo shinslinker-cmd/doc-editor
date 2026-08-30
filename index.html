@@ -26,7 +26,9 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .s-eyebrow { font:600 9px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8;
              letter-spacing:1.4px; margin-top:6px; }
 #main { flex:1; padding:0 0 60px; }
-#pages { display:flex; flex-direction:column; align-items:center; gap:28px; padding-top:28px; }
+/* 입력판(D16) — 문서 전체가 하나의 contenteditable 이라 초점 테두리를 끈다 */
+#pages { display:flex; flex-direction:column; align-items:center; gap:28px; padding-top:28px;
+         outline:none; caret-color:var(--ink); }
 
 /* 위쪽 도구모음 — 화면에 붙어 있고 문서와 함께 스크롤되지 않는다 */
 #bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:6px;
@@ -193,7 +195,8 @@ body { margin:0; background:var(--desk); color:var(--ink);
       <button class="tb" data-list="1" title="번호 목록">1. 목록</button>
       </span>
     </div>
-    <div id="pages"></div>
+    <!-- ⭐ 문서 전체가 하나의 입력판이다 (D16) — 선택·커서·조합·터치는 브라우저가 한다 -->
+    <div id="pages" contenteditable="true" spellcheck="false"></div>
   </main>
 </div>
 <div id="gauge" aria-hidden="true"></div>
@@ -635,11 +638,14 @@ function domToRuns(el) {
 
 
 
+// ⭐ 입력판은 #pages 하나다(D16 — 한 장의 입력판). 블록은 그냥 그림이고,
+//    섹션 줄·쪽 번호처럼 글이 아닌 것만 편집 불가 섬(contenteditable=false)으로 막는다.
 function blockEl(block) {
   const el = document.createElement('div');
   el.className = 'blk blk-' + block.type;
   el.dataset.id = block.id;
   if (block.type === 'section') {
+    el.setAttribute('contenteditable', 'false');
     const n = document.createElement('span'); n.className = 'n'; n.textContent = block.no || '';
     const t = document.createElement('span'); t.className = 't'; t.textContent = block.title || '';
     const r = document.createElement('span'); r.className = 'rule';
@@ -650,15 +656,11 @@ function blockEl(block) {
     (block.items || [[]]).forEach((item, i) => {
       const li = document.createElement('li');
       li.dataset.i = String(i);
-      li.setAttribute('contenteditable', 'true');
-      li.setAttribute('spellcheck', 'false');
       for (const n of runsToNodes(item)) li.appendChild(n);
       box.appendChild(li);
     });
     el.appendChild(box);
   } else {
-    el.setAttribute('contenteditable', 'true');
-    el.setAttribute('spellcheck', 'false');
     if (block.align) el.style.textAlign = block.align;
     for (const n of runsToNodes(block.runs || [])) el.appendChild(n);
   }
@@ -682,6 +684,7 @@ function renderPages(doc, pagesEl, gaugeEl) {
     }
     const no = document.createElement('div');
     no.className = 'pgno';
+    no.setAttribute('contenteditable', 'false');
     no.textContent = (i + 1) + ' / ' + pages.length;
     pg.append(body, no);
     pagesEl.appendChild(pg);
@@ -843,43 +846,40 @@ function nodeAt(el, pos) {
   return last;
 }
 
-// 커서가 놓일 자리에서 실제로 타자를 받는 편집 칸을 찾는다.
-// 목록 블록은 겉 상자(.blk)가 아니라 안쪽 항목(li)이 편집 칸이라, 겉 상자에 focus() 를 해도
-// 조용히 무시된다 — 커서가 안 보이고 타자도 안 들어간다(실기기 지적 5).
-function editableHostOf(el, at, pos) {
-  const base = at.node.nodeType === 1 ? at.node : at.node.parentElement;
-  const host = base && base.closest ? base.closest('[contenteditable="true"]') : null;
-  if (host) return { host, at };
-  // 글자가 하나도 없는 항목은 글자 세기로 못 들어간다 — 편집 칸을 직접 찾아 그 안에 놓는다
-  const inner = el.querySelectorAll('[contenteditable="true"]');
-  if (inner.length) {
-    const li = pos <= 0 ? inner[0] : inner[inner.length - 1];
-    return { host: li, at: { node: li, offset: 0 } };
-  }
-  return { host: el, at };
+// 초점은 입력판(#pages — 문서 전체가 하나의 contenteditable, D16)에 준다.
+// 커서 자리는 그 안의 아무 마디에나 놓을 수 있다.
+function focusRootOf(node, fallbackEl) {
+  const e = node && (node.nodeType === 1 ? node : node.parentElement);
+  const root = e && e.closest ? e.closest('[contenteditable="true"]') : null;
+  return root || fallbackEl;
 }
 
 function caretTo(el, pos) {
-  const found = editableHostOf(el, nodeAt(el, pos), pos);
+  let at = nodeAt(el, pos);
+  // 글자가 하나도 없는 목록 항목은 글자 세기로 못 들어간다 — 항목 안에 직접 놓는다
+  if (at.node.nodeType === 1 && at.node.querySelectorAll && !at.node.matches('.lst li')) {
+    const lis = at.node.querySelectorAll('.lst li');
+    if (lis.length) at = { node: pos <= 0 ? lis[0] : lis[lis.length - 1], offset: 0 };
+  }
   const r = document.createRange();
-  r.setStart(found.at.node, found.at.offset);
+  r.setStart(at.node, at.offset);
   r.collapse(true);
   const s = window.getSelection();
   s.removeAllRanges();
   s.addRange(r);
-  found.host.focus();
+  focusRootOf(at.node, el).focus();
 }
 
 function selectRange(el, from, to) {
-  const a = editableHostOf(el, nodeAt(el, from), from);
+  const a = nodeAt(el, from);
   const b = nodeAt(el, to);
   const r = document.createRange();
-  r.setStart(a.at.node, a.at.offset);
+  r.setStart(a.node, a.offset);
   r.setEnd(b.node, b.offset);
   const s = window.getSelection();
   s.removeAllRanges();
   s.addRange(r);
-  a.host.focus();
+  focusRootOf(a.node, el).focus();
 }
 
 function rangeIn(el) {
@@ -902,10 +902,11 @@ function activeBlockEl(pagesEl) {
   return blk && pagesEl.contains(blk) ? blk : null;
 }
 
-// 화면의 편집 칸(문단·제목 블록, 목록 항목)을 문서 순서대로 — 커서·선택이 블록을
-// 넘나들 때의 디딤돌이다. 섹션 줄처럼 편집이 아닌 블록은 자연히 건너뛴다.
+// 화면의 글 칸(문단·제목 블록, 목록 항목)을 문서 순서대로.
+// 입력판이 하나가 된 뒤(D16)에는 속성이 아니라 블록 종류로 찾는다 — 섹션 줄은 글이 아니다.
 function editableEls(pagesEl) {
-  return Array.from(pagesEl.querySelectorAll('.blk[contenteditable="true"], .lst li[data-i]'));
+  return Array.from(pagesEl.querySelectorAll(
+    '.blk[data-id]:not(.blk-section):not(.blk-list), .blk-list .lst li[data-i]'));
 }
 
 // 지금 선택이 걸쳐 있는 편집 칸들을 문서 순서대로 [{el, from, to}] 로 준다.
@@ -948,6 +949,13 @@ function activeItemEl(blkEl) {
 }
 
 /* editor.js */
+// 편집을 다스린다 (D16 — 한 장의 입력판).
+// 선택·커서·한글 조합·터치는 브라우저가 한다. 우리는 «구조를 바꾸는 동작»만
+// beforeinput 에서 가로채 모델에 반영한다: 엔터(가르기) · 블록 경계 지우기(병합) ·
+// 걸침 선택 편집 · 걸침 붙여넣기 · 실행취소. 칸 «안»의 타자·지우기·붙여넣기는
+// 브라우저가 하고, input 뒤 flush 가 그 칸을 모델로 되읽는다(붙여넣기 서식도 그때 걸러진다).
+// ⛔ 한글 조합 중에는 모델·화면을 건드리지 않는다(§12-12). 걸침 위 조합은 조합이
+//    끼어들기 «전»(compositionstart)에 수술(deleteCrossInPlace)로 지운다.
 
 
 
@@ -955,10 +963,11 @@ function activeItemEl(blkEl) {
 
 
 
-// 한글 입력: 조합 중에는 모델을 건드리지 않는다. 조합이 끝난 뒤에만 반영한다.
 function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
   let composing = false;
   let pending = null;   // { id, runs } 또는 목록 항목이면 { id, itemIndex, runs }
+  let idle = null;
+  function cancelIdle() { clearTimeout(idle); idle = null; }
 
   function flush(redrawAfter) {
     if (!pending) return;
@@ -979,11 +988,35 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     if (redrawAfter) redraw({ caretId: p.id, caretEnd: true });
   }
 
-  // 걸침 선택의 «지우기용» 대상들. targetsIn(글자가 실제로 고른 칸들)에 두 가지를 더한다:
-  // ① 경계만 문 칸 — 줄 끝 빈 곳에서 시작한 드래그는 첫 칸의 글자를 0개 골라 targetsIn
-  //    에서 빠지는데, 워드처럼 그 경계를 지우면 두 블록이 한 블록으로 합쳐져야 한다.
-  // ② 사이에 통째로 낀 섹션 줄 — 편집 칸이 아니라 targetsIn 에 안 잡히지만 화면에는
-  //    선택으로 칠해진다. 안 지우면 "선택했는데 남는" 사고(실기기 2026-08-30).
+  // input 의 target 은 입력판 전체다 — 반영할 칸은 커서 위치로 찾는다
+  function capture() {
+    const blk = activeBlockEl(pagesEl);
+    if (!blk) return;
+    const li = activeItemEl(blk);
+    if (li) pending = { id: blk.dataset.id, itemIndex: Number(li.dataset.i), runs: domToRuns(li) };
+    else pending = { id: blk.dataset.id, runs: domToRuns(blk) };
+  }
+
+  pagesEl.addEventListener('input', () => {
+    capture();
+    if (!composing) flush(false);   // 모델만 갱신, 다시 그리지 않는다(커서가 튄다)
+    // 다시 그리기(쪽 나눔 갱신)는 "다 치고 잠깐 멈췄을 때" 만 한다
+    clearTimeout(idle);
+    idle = setTimeout(() => { if (!composing) redraw({ keepCaret: true }); }, 350);
+  });
+
+  pagesEl.addEventListener('compositionstart', () => {
+    // 걸침 선택 위에서 조합이 시작되면, 조합 글자가 끼기 전에 지금 지운다.
+    // 입력판이 하나라 초점(#pages)은 그대로다 — 조합이 안전하게 이어진다.
+    deleteCrossInPlace();
+    composing = true;
+  });
+  pagesEl.addEventListener('compositionend', () => {
+    composing = false;
+    flush(false);   // 조합 중 미뤄 둔 마지막 글자를 모델로 — 이벤트 순서에 맡기지 않는다
+  });
+
+  // ── 걸침 선택(여러 칸) 좌표: 글자를 문 칸들 + 경계만 문 칸 + 사이에 낀 섹션 줄 ──
   function crossTargets() {
     const s = window.getSelection();
     if (!s.rangeCount || s.getRangeAt(0).collapsed) return [];
@@ -991,7 +1024,9 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const targets = targetsIn(pagesEl);
     const edge = (node, offset, atStart) => {
       const e = node.nodeType === 1 ? node : node.parentElement;
-      const host = e && e.closest ? e.closest('[contenteditable="true"]') : null;
+      const host = e && e.closest
+        ? e.closest('.blk[data-id]:not(.blk-section):not(.blk-list), .blk-list .lst li[data-i]')
+        : null;
       if (!host) return;
       const li = host.matches('.lst li[data-i]') ? host : null;
       const blk = li ? li.closest('.blk[data-id]') : host;
@@ -1005,52 +1040,44 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     edge(r.startContainer, r.startOffset, true);
     edge(r.endContainer, r.endOffset, false);
     if (targets.length < 2) return targets;
-    const covered = Array.from(pagesEl.querySelectorAll('.blk-section[data-id]'))
-      .filter(el => r.intersectsNode(el) && !el.contains(r.startContainer) && !el.contains(r.endContainer))
-      .map(el => ({ id: el.dataset.id, item: null, from: 0, to: 0 }));
-    // 첫·끝 대상만 아니면 자리는 상관없다 — deleteAcross 가 통째로 지운다
-    targets.splice(1, 0, ...covered);
+    targets.splice(1, 0, ...coveredSections(r));
     return targets;
   }
 
-  // 한글 조합이 걸침 선택 위에서 시작되면: ⛔ 조합 중에는 화면을 못 갈아엎으므로(§12-12)
-  // 선택만 접어 조합이 제자리에서 이어지게 하고, 조합이 끝난 뒤에 지운다.
-  // (처음에는 조합 직전에 지우고 다시 그렸는데, 조합이 붙을 곳이 사라져
-  //  한글이 "될 때가 있고 안 될 때가 있는" 경합이 났다 — 실기기 2026-08-30)
-  // ⚠ 걸침 위 한글은 조합 시작(compositionstart)보다 «앞»인 키 신호(Process)에서
-  //   즉시 지운다. 조합 «중»에는 화면을 못 바꾸고(§12-12), 조합이 끝나기를 기다리면
-  //   입력기가 마지막 글자의 조합을 열어 둬서 "다른 곳을 클릭해야 지워지는" 증상이
-  //   났다(실기기 2026-08-30). 다만 전체 다시 그리기는 조합이 붙을 곳을 부수므로
-  //   (그게 "한글이 될 때 안 될 때"의 원인이었다) — deleteCrossInPlace() 가
-  //   첫 칸(조합이 붙을 요소)을 살려 둔 채 필요한 DOM 만 수술한다.
-  pagesEl.addEventListener('compositionstart', () => { composing = true; });
-  pagesEl.addEventListener('compositionend', () => {
-    composing = false;
-    flush(false);   // 조합 중 미뤄 둔 마지막 글자를 모델로 — 브라우저의 이벤트 순서에 맡기지 않는다
-  });
+  function coveredSections(r) {
+    return Array.from(pagesEl.querySelectorAll('.blk-section[data-id]'))
+      .filter(el => r.intersectsNode(el) && !el.contains(r.startContainer) && !el.contains(r.endContainer))
+      .map(el => ({ id: el.dataset.id, item: null, from: 0, to: 0 }));
+  }
 
-  // 걸침 선택을 화면 전체를 다시 그리지 않고 지운다. 모델을 먼저 고치고,
-  // 첫 칸의 «속»만 합쳐진 토막으로 갈아 끼운 뒤(요소는 그대로 — 조합이 안전),
-  // 없어진 블록·목록 항목의 DOM 을 떼고, 커서를 이음매에 놓는다.
-  // 쪽 나눔은 잠시 어긋나지만 다음 다시 그리기(타자 멈춤 0.35초 뒤)가 바로잡는다.
+  function deleteTargets(targets) {
+    const doc = getDoc();
+    const r = deleteAcross(doc.blocks, targets);
+    if (!r) return null;
+    setDoc(Object.assign({}, doc, { blocks: r.blocks }));
+    return r.caret;
+  }
+
+  // 걸침 선택을 화면 전체를 다시 그리지 않고 지운다(조합 직전용 — §12-12).
+  // 첫 칸의 «속»만 합쳐진 토막으로 갈아 끼우고, 없어진 블록·항목 DOM 을 떼고,
+  // 커서를 이음매에 둔다. 쪽 나눔은 다음 다시 그리기가 바로잡는다.
   function deleteCrossInPlace() {
     const targets = crossTargets();
     if (targets.length < 2) return;
-    const doc = getDoc();
-    const r = deleteAcross(doc.blocks, targets);
-    if (!r) return;
     const first = targets[0];
     const firstItem = first.item === null || first.item === undefined ? null : first.item;
     const firstHost = firstItem === null
       ? pagesEl.querySelector('.blk[data-id="' + first.id + '"]')
       : pagesEl.querySelector('.blk[data-id="' + first.id + '"] .lst li[data-i="' + firstItem + '"]');
     if (!firstHost) return;
-    setDoc(Object.assign({}, doc, { blocks: r.blocks }));
-    const mergedB = r.blocks.find(b => b.id === first.id);
+    const caret = deleteTargets(targets);
+    if (!caret) return;
+    const doc = getDoc();
+    const mergedB = doc.blocks.find(b => b.id === first.id);
     const runs = firstItem === null ? mergedB.runs : mergedB.items[firstItem];
     firstHost.textContent = '';
     for (const n of runsToNodes(runs)) firstHost.appendChild(n);
-    const alive = new Set(r.blocks.map(b => b.id));
+    const alive = new Set(doc.blocks.map(b => b.id));
     for (let i = 1; i < targets.length; i++) {
       const t = targets[i];
       if (!alive.has(t.id)) {
@@ -1061,311 +1088,179 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
         if (li) li.remove();
       }
     }
-    // 남은 목록 항목의 번호를 모델과 다시 맞춘다 (안 맞으면 다음 타자가 엉뚱한 항목에 붙는다)
+    // 남은 목록 항목 번호를 모델과 다시 맞춘다 (안 맞으면 다음 타자가 엉뚱한 항목에 붙는다)
     for (const id of new Set(targets.map(t => t.id))) {
       if (!alive.has(id)) continue;
       pagesEl.querySelectorAll('.blk[data-id="' + id + '"] .lst li')
         .forEach((li, i) => { li.dataset.i = String(i); });
     }
     cancelIdle();
-    caretTo(firstHost, r.caret.pos);
+    caretTo(firstHost, caret.pos);
   }
 
-  // 예약된 자동 다시 그리기를 지운다. Enter·Backspace 가 제 손으로 다시 그린 뒤에도
-  // 타자 때 예약된 것이 0.35초 뒤 발사되면, 방금 놓은 커서를 옛 자리로 되돌린다(실기기 지적 1).
-  let idle = null;
-  function cancelIdle() { clearTimeout(idle); idle = null; }
+  // ── 구조 지킴이 ──
+  pagesEl.addEventListener('beforeinput', (e) => {
+    const t = e.inputType;
+    if (t === 'historyUndo' || t === 'historyRedo') { e.preventDefault(); return; } // Ctrl+Z 는 main.js
+    if (t === 'insertFromDrop') { e.preventDefault(); return; }  // 글 끌어놓기는 아직 — 구조가 깨진다
+    if (composing || t === 'insertCompositionText') return;      // 조합은 compositionstart 가 처리했다
 
-  pagesEl.addEventListener('input', (e) => {
-    const el = e.target.closest && e.target.closest('.blk[data-id]');
-    if (el) {
-      const li = e.target.closest && e.target.closest('.lst li[data-i]');
-      if (li) pending = { id: el.dataset.id, itemIndex: Number(li.dataset.i), runs: domToRuns(li) };
-      else pending = { id: el.dataset.id, runs: domToRuns(el) };
-      if (!composing) flush(false);  // 모델만 갱신, 다시 그리지 않는다(커서가 튄다)
-    }
-    // 다시 그리기는 "다 치고 잠깐 멈췄을 때" 만 한다
-    clearTimeout(idle);
-    idle = setTimeout(() => { if (!composing) redraw({ keepCaret: true }); }, 350);
-  });
-
-  // ── 화살표가 블록 경계를 넘는다 ──
-  // 블록마다 편집 칸이 따로라 브라우저는 커서를 칸 밖으로 못 내보낸다(실측: 상·하·경계
-  // 좌우 모두 제자리). 그래서 커서가 칸의 끝 줄(↓)·첫 줄(↑)에 있을 때만 우리가 옆 칸으로
-  // 잇는다 — 칸 안에 줄이 더 있으면 브라우저가 잘 움직이므로 손대지 않는다.
-  // ⚠ "안 움직였으면 잇기" 방식은 안 된다: 브라우저가 끝 줄에서 ↓를 "줄 끝으로 이동"으로
-  //   처리해 커서가 움직인 것으로 보인다(실측 — 두 번 눌러야 넘어갔다).
-  function hostAround(cur, dir) {
-    const els = editableEls(pagesEl);
-    const i = els.indexOf(cur);
-    return i < 0 ? null : els[i + dir] || null;
-  }
-
-  // 칸의 첫/끝 줄이 화면에서 어느 높이인지 — 커서가 그 줄에 있는지 비교하는 데 쓴다
-  function edgeLineTop(host, dir) {
-    const len = textLen(host);
-    if (!len) return null;               // 빈 칸 — 줄이 하나뿐이니 항상 경계다
-    const at = nodeAt(host, dir > 0 ? len : 0);
-    const r = document.createRange();
-    r.setStart(at.node, at.offset);
-    r.collapse(true);
-    const rect = r.getBoundingClientRect();
-    return rect.height ? rect.top : null;
-  }
-
-  // 옆 칸의 첫/끝 줄, 지금 커서와 같은 가로 위치로 들어간다. 화면 밖이면 먼저
-  // 조금 스크롤한다 (⛔ scrollIntoView 금지 — 설계서 §12-9).
-  function jumpInto(target, dir, x) {
-    let rect = target.getBoundingClientRect();
-    if (dir > 0 && rect.top > window.innerHeight - 40) window.scrollBy(0, rect.top - (window.innerHeight - 80));
-    if (dir < 0 && rect.bottom < 40) window.scrollBy(0, 80 - rect.bottom);
-    rect = target.getBoundingClientRect();
-    const cx = Math.min(Math.max(x, rect.left + 1), rect.right - 1);
-    const cy = dir > 0 ? rect.top + Math.min(12, rect.height / 2)
-                       : rect.bottom - Math.min(12, rect.height / 2);
-    const r = document.caretRangeFromPoint(cx, cy);
-    if (r && target.contains(r.startContainer)) {
-      const rr = document.createRange();
-      rr.setStart(r.startContainer, r.startOffset);
-      rr.collapse(true);
-      const s = window.getSelection();
-      s.removeAllRanges();
-      s.addRange(rr);
-      target.focus();
-    } else {
-      caretTo(target, dir > 0 ? 0 : Number.MAX_SAFE_INTEGER);
-    }
-  }
-
-  // ── 걸침 선택(여러 블록)의 지우기·타자 덮어쓰기 ──
-  // 브라우저에 맡기면 첫 블록만 반쪽 지운다(실측 2026-08-30) — 모델에서 직접 지운다.
-  // 순수 로직은 core/edit.js 의 deleteAcross, 시험은 test/edit.test.js.
-  // 한글 조합은 여기가 아니라 위의 compositionstart/end 경로가 맡는다.
-  function deleteTargets(targets) {
-    const doc = getDoc();
-    const r = deleteAcross(doc.blocks, targets);
-    if (!r) return null;
-    setDoc(Object.assign({}, doc, { blocks: r.blocks }));
-    return r.caret;
-  }
-
-  pagesEl.addEventListener('keydown', (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey || composing) return;
-    if (e.key === 'Process') {
-      // 한글 조합이 시작되기 직전 — 걸침 선택을 지금 즉시, 화면을 부수지 않고 지운다
-      deleteCrossInPlace();
-      return;
-    }
-    const kind = (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Enter') ? 'del'
-      : (e.key.length === 1 ? 'char' : null);
-    if (!kind) return;
     const targets = crossTargets();
-    if (targets.length < 2) return;              // 걸침이 아니면 기존 흐름에 맡긴다
-    e.stopImmediatePropagation();                // 아래 Enter·Backspace 처리로 안 흘린다
-    const caret = deleteTargets(targets);
-    if (!caret) { e.preventDefault(); return; }
-    if (kind === 'char') {
-      // 지운 자리에 그 글자를 우리 손으로 넣는다 — 기본 입력은 어디로 갈지 보장이 없다
+    if (targets.length > 1) {
+      // 여러 칸에 걸친 편집 — 브라우저가 블록을 제멋대로 병합하기 전에 우리가 지운다
       e.preventDefault();
-      const doc = getDoc();
-      const b = doc.blocks.find(x => x.id === caret.id);
-      if (b) {
-        let patch;
-        if (caret.item === null) {
-          patch = { runs: insertText(b.runs, caret.pos, e.key) };
-        } else {
-          const items = b.items.slice();
-          items[caret.item] = insertText(items[caret.item], caret.pos, e.key);
-          patch = { items };
-        }
-        setDoc(Object.assign({}, getDoc(), { blocks: replaceBlock(getDoc().blocks, b.id, patch) }));
-      }
+      const caret = deleteTargets(targets);
+      if (!caret) return;
+      let text = '';
+      if (t === 'insertText' && e.data) text = e.data;
+      if (t === 'insertFromPaste' && e.dataTransfer) text = e.dataTransfer.getData('text/plain') || '';
+      if (text) insertAtCaret(caret, text);
       cancelIdle();
-      redraw({ caret: { id: caret.id, item: caret.item, pos: caret.pos + 1 } });
-      return;
-    }
-    // Backspace·Delete·Enter: 지우기까지만 한다 (Enter 로 갈라 넣기는 다음에)
-    e.preventDefault();
-    cancelIdle();
-    redraw({ caret });
-  });
-  // 잘라내기(Ctrl+X)의 걸침판은 아직 없다 — 반쪽 지움을 막기 위해 계속 막는다
-  pagesEl.addEventListener('cut', (e) => {
-    if (targetsIn(pagesEl).length > 1) e.preventDefault();
-  });
-
-  const hostOfNode = (n) => {
-    const el = n && (n.nodeType === 1 ? n : n.parentElement);
-    return el && el.closest ? el.closest('[contenteditable="true"]') : null;
-  };
-
-  pagesEl.addEventListener('keydown', (e) => {
-    const el = e.target.closest && e.target.closest('.blk[data-id]');
-    if (!el) return;
-    if (composing) return;
-
-    // Shift+화살표 — 선택을 블록 경계 너머로 늘린다 (늘어나는 쪽은 초점 focus 끝이다)
-    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.shiftKey
-        && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const dir = e.key === 'ArrowDown' ? 1 : -1;
-      const s = window.getSelection();
-      if (!s.rangeCount) return;
-      const fhost = hostOfNode(s.focusNode);
-      if (!fhost) return;
-      const fr = document.createRange();
-      fr.setStart(s.focusNode, s.focusOffset);
-      fr.collapse(true);
-      const rect = fr.getBoundingClientRect();
-      const edgeTop = edgeLineTop(fhost, dir);
-      const onEdge = edgeTop === null || rect.height === 0 || Math.abs(rect.top - edgeTop) < 2;
-      if (!onEdge) return;                 // 칸 안에 줄이 더 있다 — 브라우저가 늘린다
-      const next = hostAround(fhost, dir);
-      if (!next) return;
-      e.preventDefault();
-      let nr = next.getBoundingClientRect();
-      if (dir > 0 && nr.top > window.innerHeight - 40) window.scrollBy(0, nr.top - (window.innerHeight - 80));
-      if (dir < 0 && nr.bottom < 40) window.scrollBy(0, 80 - nr.bottom);
-      nr = next.getBoundingClientRect();
-      const cx = Math.min(Math.max(rect.left || nr.left + 1, nr.left + 1), nr.right - 1);
-      const cy = dir > 0 ? nr.top + Math.min(12, nr.height / 2)
-                         : nr.bottom - Math.min(12, nr.height / 2);
-      const cr = document.caretRangeFromPoint(cx, cy);
-      if (cr && next.contains(cr.startContainer)) s.extend(cr.startContainer, cr.startOffset);
-      else {
-        const at = nodeAt(next, dir > 0 ? textLen(next) : 0);
-        s.extend(at.node, at.offset);
-      }
+      redraw({ caret: { id: caret.id, item: caret.item, pos: caret.pos + text.length } });
       return;
     }
 
-    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && e.shiftKey
-        && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const s = window.getSelection();
-      if (!s.rangeCount) return;
-      const fhost = hostOfNode(s.focusNode);
-      if (!fhost) return;
-      const pos = offsetIn(fhost, s.focusNode, s.focusOffset);
-      if (e.key === 'ArrowLeft' && pos === 0) {
-        const prev = hostAround(fhost, -1);
-        if (prev) {
-          e.preventDefault();
-          const at = nodeAt(prev, textLen(prev));
-          s.extend(at.node, at.offset);
-        }
-      } else if (e.key === 'ArrowRight' && pos >= textLen(fhost)) {
-        const next = hostAround(fhost, 1);
-        if (next) {
-          e.preventDefault();
-          const at = nodeAt(next, 0);
-          s.extend(at.node, at.offset);
-        }
-      }
-      return;
-    }
-
-    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown')
-        && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const dir = e.key === 'ArrowDown' ? 1 : -1;
-      const s = window.getSelection();
-      if (!s.rangeCount || !s.getRangeAt(0).collapsed) return;  // 선택 중이면 기본 동작
-      const cur = e.target.closest('[contenteditable="true"]') || el;
-      const rect = s.getRangeAt(0).getBoundingClientRect();
-      const edgeTop = edgeLineTop(cur, dir);
-      const onEdge = edgeTop === null || rect.height === 0
-        || Math.abs(rect.top - edgeTop) < 2;
-      if (!onEdge) return;                 // 칸 안에 줄이 더 있다 — 브라우저가 처리
-      const next = hostAround(cur, dir);
-      if (!next) return;                   // 문서의 처음/끝
-      e.preventDefault();
-      jumpInto(next, dir, rect.left || cur.getBoundingClientRect().left + 1);
-      return;
-    }
-
-    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight')
-        && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const s = window.getSelection();
-      if (!s.rangeCount || !s.getRangeAt(0).collapsed) return;
-      const cur = e.target.closest('[contenteditable="true"]') || el;
-      const pos = offsetIn(cur, s.anchorNode, s.anchorOffset);
-      if (e.key === 'ArrowLeft' && pos === 0) {
-        const prev = hostAround(cur, -1);
-        if (prev) { e.preventDefault(); caretTo(prev, Number.MAX_SAFE_INTEGER); }
-      } else if (e.key === 'ArrowRight' && pos >= textLen(cur)) {
-        const next = hostAround(cur, 1);
-        if (next) { e.preventDefault(); caretTo(next, 0); }
-      }
-      return;
-    }
-
-    if (e.key === 'Enter' && !e.shiftKey) {
-      const li = e.target.closest && e.target.closest('.lst li[data-i]');
-      if (li) {
+    // 섹션 줄이 낀 선택 지우기 (글 칸 없이 섹션만 문 경우 — 통짜 섬이라 직접 지운다)
+    const s = window.getSelection();
+    const collapsed = !s.rangeCount || s.getRangeAt(0).collapsed;
+    if (!collapsed && (t === 'deleteContentBackward' || t === 'deleteContentForward'
+        || t === 'insertText' || t === 'insertParagraph')) {
+      const secs = coveredSections(s.getRangeAt(0));
+      if (secs.length && targets.length === 0) {
         e.preventDefault();
-        flush(false);
-        const doc = getDoc();
-        const b = doc.blocks.find(x => x.id === el.dataset.id);
-        if (!b) return;
-        const i = Number(li.dataset.i);
+        let doc = getDoc();
+        let blocks = doc.blocks;
+        for (const sec of secs) blocks = removeBlock(blocks, sec.id);
+        setDoc(Object.assign({}, doc, { blocks }));
+        cancelIdle();
+        redraw({});
+        return;
+      }
+    }
+
+    if (t === 'insertParagraph') { e.preventDefault(); enterAt(); return; }
+    if (t === 'deleteContentBackward' && collapsed) { if (mergeAt(-1)) e.preventDefault(); return; }
+    if (t === 'deleteContentForward' && collapsed) { if (mergeAt(1)) e.preventDefault(); return; }
+    // 그 밖(칸 안 타자·지우기·붙여넣기·Shift+Enter 줄바꿈)은 브라우저가 하고 flush 가 되읽는다
+  });
+
+  function insertAtCaret(caret, text) {
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === caret.id);
+    if (!b) return;
+    let patch;
+    if (caret.item === null || caret.item === undefined) {
+      patch = { runs: insertText(b.runs, caret.pos, text) };
+    } else {
+      const items = b.items.slice();
+      items[caret.item] = insertText(items[caret.item], caret.pos, text);
+      patch = { items };
+    }
+    setDoc(Object.assign({}, getDoc(), { blocks: replaceBlock(getDoc().blocks, b.id, patch) }));
+  }
+
+  // 엔터 — 커서 자리에서 가른다 (뒷부분이 새 문단/항목이 된다. 워드와 같다)
+  function enterAt() {
+    flush(false);
+    const blk = activeBlockEl(pagesEl);
+    if (!blk) return;
+    const li = activeItemEl(blk);
+    const host = li || blk;
+    const r = rangeIn(host);
+    if (!r) return;
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === blk.dataset.id);
+    if (!b) return;
+
+    if (li && Array.isArray(b.items)) {
+      const i = Number(li.dataset.i);
+      const item = b.items[i] || [];
+      if (!runsLength(item)) {
+        // 빈 항목에서 엔터 → 그 항목을 빼고 목록을 벗어나 문단이 된다
         const items = b.items.slice();
-
-        // 글이 있는 항목에서 Enter → 아래에 빈 항목을 하나 더하고 커서를 그 안에 둔다
-        if (items[i] && items[i].length) {
-          items.splice(i + 1, 0, []);
-          setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id, { items }) }));
-          cancelIdle();
-          redraw({});
-          const nli = pagesEl.querySelector('.blk[data-id="' + b.id + '"] .lst li[data-i="' + (i + 1) + '"]');
-          if (nli) {
-            const r2 = document.createRange();
-            r2.setStart(nli, 0);
-            r2.collapse(true);
-            const s2 = window.getSelection();
-            s2.removeAllRanges();
-            s2.addRange(r2);
-            nli.focus();
-          }
-          return;
-        }
-
-        // 빈 항목에서 Enter → 그 항목을 빼고 목록을 벗어나 문단이 된다
         items.splice(i, 1);
         const fresh = createBlock('para');
         let blocks;
         if (items.length) {
-          // 목록이 남았다 → 목록 바로 뒤에 새 문단을 넣는다
           blocks = insertAfter(replaceBlock(doc.blocks, b.id, { items }), b.id, fresh);
         } else {
-          // 항목이 하나도 안 남았다 → 목록 블록 자리를 새 문단으로 갈아 끼운다
           // ⛔ removeBlock 뒤에 insertAfter 를 쓰면 기준 id 가 이미 없어 오류가 난다
           blocks = doc.blocks.slice();
           blocks[blocks.findIndex(x => x.id === b.id)] = fresh;
         }
         setDoc(Object.assign({}, doc, { blocks }));
         cancelIdle();
-        redraw({ caretId: fresh.id, caretEnd: false });
+        redraw({ caret: { id: fresh.id, item: null, pos: 0 } });
         return;
       }
-
-      e.preventDefault();
-      flush(false);
-      const doc = getDoc();
-      const fresh = createBlock('para');
-      setDoc(Object.assign({}, doc, { blocks: insertAfter(doc.blocks, el.dataset.id, fresh) }));
+      const items = b.items.slice();
+      items[i] = sliceRuns(item, 0, r.from);
+      items.splice(i + 1, 0, sliceRuns(item, r.to, runsLength(item)));
+      setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id, { items }) }));
       cancelIdle();
-      redraw({ caretId: fresh.id, caretEnd: false });
+      redraw({ caret: { id: b.id, item: i + 1, pos: 0 } });
       return;
     }
 
-    if (e.key === 'Backspace' && el.textContent === '') {
-      e.preventDefault();
+    if (!Array.isArray(b.runs)) return;
+    const before = sliceRuns(b.runs, 0, r.from);
+    const after = sliceRuns(b.runs, r.to, runsLength(b.runs));
+    const fresh = createBlock('para', { runs: after });
+    const blocks = insertAfter(replaceBlock(doc.blocks, b.id, { runs: before }), b.id, fresh);
+    setDoc(Object.assign({}, doc, { blocks }));
+    cancelIdle();
+    redraw({ caret: { id: fresh.id, item: null, pos: 0 } });
+  }
+
+  // 블록 경계의 Backspace(-1)·Delete(+1) — 브라우저가 블록 DOM 을 제멋대로 합치기 전에
+  // 우리가 병합한다. 이웃이 섹션 줄이면 섹션을 지운다. 처리했으면 true.
+  function mergeAt(dir) {
+    const s = window.getSelection();
+    if (!s.rangeCount) return false;
+    const blk = activeBlockEl(pagesEl);
+    if (!blk) return false;
+    const li = activeItemEl(blk);
+    const host = li || blk;
+    const pos = offsetIn(host, s.anchorNode, s.anchorOffset);
+    if (dir < 0 && pos !== 0) return false;              // 칸 안 지우기 — 브라우저가 한다
+    if (dir > 0 && pos < textLen(host)) return false;
+    flush(false);
+
+    // 목록의 첫/끝 항목이 아니면 같은 목록의 이웃 항목과 병합 — 아래 공통 경로가 처리
+    const edgeItem = li ? (dir < 0 ? Number(li.dataset.i) === 0 : !li.nextElementSibling) : true;
+    if (edgeItem) {
       const doc = getDoc();
-      const i = doc.blocks.findIndex(b => b.id === el.dataset.id);
-      const prev = i > 0 ? doc.blocks[i - 1] : null;
-      if (!prev) return;
-      setDoc(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, el.dataset.id) }));
-      cancelIdle();
-      redraw({ caretId: prev.id, caretEnd: true });
+      const bi = doc.blocks.findIndex(x => x.id === blk.dataset.id);
+      const nb = doc.blocks[bi + dir];
+      if (!nb) return true;                              // 문서의 처음/끝 — 아무 일도 없다
+      if (nb.type === 'section') {
+        setDoc(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, nb.id) }));
+        cancelIdle();
+        redraw({ caret: { id: blk.dataset.id, item: li ? Number(li.dataset.i) : null, pos } });
+        return true;
+      }
     }
+    const els = editableEls(pagesEl);
+    const i = els.indexOf(host);
+    const other = els[i + dir];
+    if (!other) return true;
+    const at = (el, end) => {
+      const l = el.matches('.lst li[data-i]') ? el : null;
+      const bk = l ? l.closest('.blk[data-id]') : el;
+      const p = end ? textLen(el) : 0;
+      return { id: bk.dataset.id, item: l ? Number(l.dataset.i) : null, from: p, to: p };
+    };
+    const pair = dir < 0 ? [at(other, true), at(host, false)] : [at(host, true), at(other, false)];
+    const caret = deleteTargets(pair);
+    if (!caret) return false;
+    cancelIdle();
+    redraw({ caret });
+    return true;
+  }
+
+  // 잘라내기(Ctrl+X)의 걸침판은 아직 없다 — 반쪽 지움을 막기 위해 계속 막는다
+  pagesEl.addEventListener('cut', (e) => {
+    if (targetsIn(pagesEl).length > 1) e.preventDefault();
   });
 }
 
@@ -1621,87 +1516,7 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   refresh();
 }
 
-/* drag.js */
-// 여러 블록에 걸친 드래그 선택 (실기기 지적 2 — 2026-08-30 SKY, A안 확정).
-// 블록마다 편집 칸이 따로라 브라우저는 드래그 선택을 그 칸 안에서 끊는다.
-// 그래서 포인터가 시작 칸을 벗어난 동안만 우리가 선택을 대신 잇는다 —
-// 같은 칸 안의 드래그는 브라우저가 잘하므로 손대지 않는다.
-//
-// ⚠ 시작점은 브라우저의 선택(anchor)을 그대로 쓴다. 처음에는 mousedown 좌표로
-//   시작점을 추측했는데, 줄 끝 빈 곳처럼 글자가 없는 곳에서 시작하면 실제 시작점과
-//   어긋나 "드래그 시작 위치에 따라 지워지는 범위가 다른" 사고가 났다(실기기 2026-08-30).
-// ⚠ 브라우저의 자체 갱신(첫 칸으로 좁힘)이 mousemove 기본 동작으로 «나중에» 실행되어
-//   우리 선택을 되덮는다(실측). 매 프레임 그리기 직전(requestAnimationFrame)에
-//   원하는 선택으로 되돌린다 — 좁혀진 상태가 화면에 나갈 틈이 없다.
-function attachDragSelect({ pagesEl }) {
-  let anchor = null;   // 걸침이 시작된 순간의 선택 시작점 { node, offset, host }
-  let cross = null;    // 시작 칸 밖의 마지막 지점 { node, offset } — 안 벗어났으면 null
-  let raf = 0;
-
-  const caretAt = (x, y) => {
-    const r = document.caretRangeFromPoint(x, y);
-    return r ? { node: r.startContainer, offset: r.startOffset } : null;
-  };
-  const hostOf = (node) => {
-    const e = node && (node.nodeType === 1 ? node : node.parentElement);
-    return e && e.closest ? e.closest('[contenteditable="true"]') : null;
-  };
-  const alive = (p) => p && p.node && p.node.isConnected;
-  const assert = (a, b) => {
-    if (!alive(a) || !alive(b)) return;
-    const s = window.getSelection();
-    if (s.anchorNode === a.node && s.anchorOffset === a.offset
-        && s.focusNode === b.node && s.focusOffset === b.offset) return;
-    s.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
-  };
-  const stop = () => {
-    anchor = null;
-    cross = null;
-    if (raf) { cancelAnimationFrame(raf); raf = 0; }
-  };
-  const tick = () => {
-    raf = 0;
-    if (!anchor || !cross) return;
-    assert(anchor, cross);
-    raf = requestAnimationFrame(tick);
-  };
-
-  pagesEl.addEventListener('mousedown', stop);
-
-  pagesEl.addEventListener('mousemove', (e) => {
-    if (e.buttons !== 1) return;
-    const at = caretAt(e.clientX, e.clientY);
-    const host = at && hostOf(at.node);
-    if (!host) return;                    // 종이 여백 위 — 마지막 상태 유지
-    if (!anchor) {
-      // 아직 걸침 전 — 브라우저 선택의 시작점을 본다. 편집 칸 밖에서 시작한
-      // 드래그(종이 여백 등)는 브라우저가 걸침까지 스스로 해내므로 손대지 않는다.
-      const s = window.getSelection();
-      const aHost = s.rangeCount ? hostOf(s.anchorNode) : null;
-      if (!aHost || host === aHost) return;
-      anchor = { node: s.anchorNode, offset: s.anchorOffset, host: aHost };
-    } else if (host === anchor.host) {
-      stop();                             // 시작 칸으로 돌아옴 — 브라우저에 맡긴다
-      return;
-    }
-    e.preventDefault();
-    cross = { node: at.node, offset: at.offset };
-    if (!raf) raf = requestAnimationFrame(tick);
-  });
-
-  document.addEventListener('mouseup', () => {
-    if (anchor && cross) {
-      // 드래그 끝 처리도 우리 선택을 덮을 수 있다 — 다음 프레임에 한 번 더
-      const a = anchor;
-      const b = cross;
-      requestAnimationFrame(() => assert(a, b));
-    }
-    stop();
-  });
-}
-
 /* main.js */
-
 
 
 
@@ -1839,8 +1654,6 @@ attachToolbar({
   setDoc: applyDoc,
   redraw: draw,
 });
-
-attachDragSelect({ pagesEl: document.getElementById('pages') });
 
 // ---- 문서 폴더 열기·저장 ----
 state.dir = null;
