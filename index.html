@@ -33,7 +33,10 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .s-name { font-size:19px; font-weight:900; letter-spacing:-.3px; }
 .s-eyebrow { font:600 9px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8;
              letter-spacing:1.4px; margin-top:6px; }
-#main { flex:1; padding:0 0 60px; }
+/* ⛔ min-width:0 이 없으면 이 칸이 «안의 내용만큼» 커져 화면 밖으로 나간다(flex 기본값이
+   min-width:auto 라서다). 리본의 표 묶음이 좁은 화면에서 잘려 보이던 진짜 원인이었다
+   (실측 2026-08-30: 화면 800px 인데 main 이 884px). 이게 있어야 안쪽 max-width 가 통한다. */
+#main { flex:1; min-width:0; padding:0 0 60px; }
 /* 입력판(D16) — 문서 전체가 하나의 contenteditable 이라 초점 테두리를 끈다 */
 #pages { display:flex; flex-direction:column; align-items:center; gap:28px; padding-top:28px;
          outline:none; caret-color:var(--ink); }
@@ -68,7 +71,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
    ⚠ 버튼이 13개라 태블릿 폭에서는 묶음 자체가 화면보다 넓어져 «가로 스크롤»이 생겼다(실측).
       묶음은 하나로 두되 «묶음 안에서» 접히게 한다 — 상자는 하나로 보이고 줄만 늘어난다. */
 .tbg-table { position:relative; padding:9px 8px 5px; border:1px solid var(--line); border-radius:8px;
-             flex:0 1 auto; min-width:0; flex-wrap:wrap; row-gap:6px; }
+             flex:0 1 auto; min-width:0; max-width:100%; flex-wrap:wrap; row-gap:6px; }
 .tbg-table::before { content:attr(data-label); position:absolute; top:-1px; left:9px;
                      transform:translateY(-50%); padding:0 5px; background:#fff;
                      font-size:9.5px; font-weight:700; letter-spacing:.4px; color:var(--dim); }
@@ -129,7 +132,9 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 여러 칸에 걸쳐 고르면 «칸 통째»로 칠한다 — 워드처럼 칸이 선택된 것이 보인다.
    반쪽만 파랗다가 칸 통째로 지워지면 놀라므로, 칠하는 범위와 지워지는 범위를 같게 뒀다. */
 .blk-table td.cellsel { background:rgba(84,144,255,.25); }
-.blk-table td.cellsel::selection, .blk-table td.cellsel *::selection { background:transparent; }
+/* 칸을 고르는 동안에는 그 표의 «글자 파란색»을 끈다 — 골라진 네모 밖 칸까지 파랗게
+   보이면 어디가 골라진 것인지 알 수 없다(2026-08-30 SKY 지적) */
+.blk-table.cells-picking td::selection, .blk-table.cells-picking td *::selection { background:transparent; }
 @media print { .colgrip { display:none !important; }
                .blk-table td { border-right:0 !important; }
                .blk-table td.cellsel { background:transparent; } }
@@ -1723,11 +1728,63 @@ function editableEls(pagesEl) {
 
 // 지금 선택이 걸쳐 있는 편집 칸들을 문서 순서대로 [{el, from, to}] 로 준다.
 // 한 칸 안의 선택이면 1개, 여러 블록에 걸친 선택이면 여러 개가 나온다.
+// 지금 선택이 «한 표 안»의 칸 여럿에 걸치면, 시작 칸과 끝 칸이 만드는 «네모»를 준다.
+// ⭐ 워드·엑셀과 같은 방식이다(2026-08-30 SKY). 글자 순서로 훑으면 두 칸만 끌어도 그
+//    사이에 낀 엉뚱한 칸이 딸려 오고, 아래→위로 끌면 잡히는 칸이 달라진다.
+//    시작(anchor)·끝(focus)을 쓰므로 끄는 방향이 어느 쪽이든 같은 네모가 나온다.
+// ⚠ 병합 칸이 네모에 걸치면 그 칸을 다 품도록 네모를 넓힌다 — 반쪽 칸이 남으면 안 된다.
+function cellRectIn(pagesEl) {
+  const s = window.getSelection();
+  if (!s || s.rangeCount === 0 || s.getRangeAt(0).collapsed) return null;
+  const tdOf = (node) => {
+    const e = node && (node.nodeType === 1 ? node : node.parentElement);
+    const td = e && e.closest ? e.closest('.blk-table td[data-r]') : null;
+    return td && pagesEl.contains(td) ? td : null;
+  };
+  const a = tdOf(s.anchorNode);
+  const b = tdOf(s.focusNode);
+  if (!a || !b) return null;
+  const id = a.closest('.blk[data-id]').dataset.id;
+  if (b.closest('.blk[data-id]').dataset.id !== id) return null;   // 다른 표면 네모가 없다
+  // 장을 넘은 표는 조각이 여러 개다 — 같은 id 의 칸을 전부 모은다
+  const all = Array.from(pagesEl.querySelectorAll('.blk-table[data-id="' + id + '"] td[data-r]'));
+  const box = (td) => {                       // 머리글은 몸통 0행 «위»라 -1 로 둔다
+    const r = td.dataset.r === 'h' ? -1 : Number(td.dataset.r);
+    const c = Number(td.dataset.c);
+    return [r, r + (td.rowSpan || 1) - 1, c, c + (td.colSpan || 1) - 1];
+  };
+  const A = box(a);
+  const B = box(b);
+  let r1 = Math.min(A[0], B[0]), r2 = Math.max(A[1], B[1]);
+  let c1 = Math.min(A[2], B[2]), c2 = Math.max(A[3], B[3]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const td of all) {
+      const [x1, x2, y1, y2] = box(td);
+      if (x1 > r2 || x2 < r1 || y1 > c2 || y2 < c1) continue;      // 안 겹친다
+      if (x1 < r1) { r1 = x1; grew = true; }
+      if (x2 > r2) { r2 = x2; grew = true; }
+      if (y1 < c1) { c1 = y1; grew = true; }
+      if (y2 > c2) { c2 = y2; grew = true; }
+    }
+  }
+  const cells = all.filter(td => {
+    const [x1, x2, y1, y2] = box(td);
+    return x1 >= r1 && x2 <= r2 && y1 >= c1 && y2 <= c2;
+  });
+  return cells.length > 1 ? cells : null;     // 한 칸 «안» 선택은 글자 단위 그대로
+}
+
 function rangesIn(pagesEl) {
   const s = window.getSelection();
   if (!s || s.rangeCount === 0) return [];
   const r = s.getRangeAt(0);
   if (r.collapsed) return [];
+  const rect = cellRectIn(pagesEl);
+  if (rect) {                                 // 표 «안»의 네모 선택 — 그 칸들만, 통째로
+    return rect.map(el => ({ el, from: 0, to: textLen(el), whole: 1 })).filter(x => x.to > x.from);
+  }
   const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
   // ⭐ 표 칸이 다른 칸·문단과 «함께» 걸리면 그 칸은 통째로 고른 것으로 본다(워드와 같다).
   //    반쪽만 문 칸이 남으면 화면(칸이 통째로 파랗다)과 실제 지워지는 범위가 어긋난다.
@@ -1748,13 +1805,15 @@ function rangesIn(pagesEl) {
 // 지금 선택이 «칸 통째»로 무는 표 칸들 — 화면을 칠하는 쪽이 쓴다.
 // rangesIn 과 달리 빈 칸(글자 0)도 준다: 비어 있어도 «골라졌다»는 보여야 한다.
 function wholeCellsIn(pagesEl) {
+  const rect = cellRectIn(pagesEl);
+  if (rect) return rect;                      // 표 «안»의 네모 선택
   const s = window.getSelection();
   if (!s || s.rangeCount === 0) return [];
   const r = s.getRangeAt(0);
   if (r.collapsed) return [];
   const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
   if (hit.length < 2) return [];
-  return hit.filter(el => el.matches('td[data-r]'));
+  return hit.filter(el => el.matches('td[data-r]'));   // 표 «밖»과 섞인 선택
 }
 
 // rangesIn 의 화면 요소를 모델 좌표 [{id, item|null, from, to}] 로 바꾼다.
@@ -2378,7 +2437,14 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
   // 선택이면 그 td 에 표시를 달고, CSS 가 칸 전체를 칠한다.
   function paintCells() {
     for (const td of pagesEl.querySelectorAll('td.cellsel')) td.classList.remove('cellsel');
-    for (const td of wholeCellsIn(pagesEl)) td.classList.add('cellsel');
+    for (const t of pagesEl.querySelectorAll('.blk-table.cells-picking')) t.classList.remove('cells-picking');
+    const cells = wholeCellsIn(pagesEl);
+    for (const td of cells) {
+      td.classList.add('cellsel');
+      // 그 표에서는 브라우저의 «글자 파란색»을 끈다 — 네모 밖 칸이 파랗게 남으면 헷갈린다
+      const t = td.closest('.blk-table');
+      if (t) t.classList.add('cells-picking');
+    }
   }
   document.addEventListener('selectionchange', paintCells);
 
@@ -2481,6 +2547,7 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     let blocks = doc.blocks;
     let touched = false;
     for (const t of targets) {
+      if (t.to <= t.from) continue;      // 커서만 있는 자리 — 입힐 글자가 없다
       const b = blocks.find(x => x.id === t.id);
       const src = b ? runsOf(b, t) : null;
       if (!src) continue;
@@ -2526,6 +2593,19 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       const bb = doc.blocks.find(x => x.id === t.id);
       return bb ? runsOf(bb, t) : null;
     };
+    // 선택 없이 커서만 있을 때의 «지금 자리» 좌표 — 길이 0 이라 서식은 안 먹고,
+    // 칸/블록 단위 기능(정렬·세로 맞춤·목록)만 이 자리에 먹는다
+    let caretAt = null;
+    let caretHost = null;
+    if (el) {
+      const td = activeCellEl(el);
+      const li = td ? null : activeItemEl(el);
+      caretHost = td || li || el;
+      caretAt = td
+        ? { id: el.dataset.id, item: null,
+            cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] }
+        : { id: el.dataset.id, item: li ? Number(li.dataset.i) : null };
+    }
     for (const btn of buttons) {
       const key = btn.dataset.mark;
       let on = false;
@@ -2534,20 +2614,23 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
           const src = srcOf(t);
           return src && allMarked(src, t.from, t.to, key);
         });
-      } else if (b && el) {
-        const td = activeCellEl(el);
-        const li = td ? null : activeItemEl(el);
-        const at = td
-          ? { cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] }
-          : { item: li ? Number(li.dataset.i) : null };
-        const src = runsOf(b, at);
-        const r = src ? rangeIn(td || li || el) : null;
+      } else if (b && caretAt) {
+        const src = runsOf(b, caretAt);
+        const r = src ? rangeIn(caretHost) : null;
         if (src && r) on = !!markAt(src, r.from)[key];
       }
       btn.classList.toggle('on', on);
       btn.disabled = !b && !targets;
     }
+    // ⛔ 직전 선택을 «그대로 두면» 안 된다 — 드래그로 몇 칸을 고른 뒤 다른 칸에 커서만
+    //   놓고 버튼을 누르면 아까 그 칸들이 바뀐다(2026-08-30 SKY 지적: 주 제어기판을
+    //   눌렀는데 다른 칸이 위쪽 맞춤이 됨). 커서만 남았으면 «그 커서 자리»로 갈아 끼운다.
     if (targets && targets.some(t => srcOf(t))) lastSels = targets;
+    else if (caretAt && caretHost) {
+      const p = rangeIn(caretHost);
+      const pos = p ? p.from : 0;
+      lastSels = [Object.assign({}, caretAt, { from: pos, to: pos })];
+    } else lastSels = null;
   }
 
   // 값이 있는 서식(크기·색)은 켜고 끄는 게 아니라 값을 넣거나 뺀다
