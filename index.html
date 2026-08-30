@@ -84,6 +84,23 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 연속 공백과 Shift+Enter 줄바꿈을 그대로 살린다 */
 .blk { outline:none; white-space:pre-wrap; }
 .blk .mono { font-family:'IBM Plex Mono',Consolas,monospace; }
+/* 표 — §8 확정값. 열 너비는 colgroup 픽셀(합 674)이 정하고 table-layout:fixed 가 지킨다 */
+.blk-table { margin:4px 0 12px; position:relative; }
+.blk-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
+.blk-table td { outline:none; word-break:break-word; }
+.blk-table thead td { background:#f6f7fa; border-bottom:1.5px solid var(--ink);
+                      padding:7px 8px; font-size:10.5px; font-weight:700; color:#454a58;
+                      text-align:center; line-height:1.35; letter-spacing:-.1px; }
+.blk-table tbody td { padding:6.5px 8px; font-size:11.5px; border-bottom:1px solid var(--line-soft);
+                      color:#2b2f3a; font-variant-numeric:tabular-nums; line-height:1.4;
+                      vertical-align:top; }
+.blk-table tbody tr:last-child td { border-bottom:1px solid #d8dbe3; }
+/* 빈 칸에도 커서가 서게 — 목록 빈 항목과 같은 수법(폭 0 보이지 않는 글자) */
+.blk-table td:empty::before { content:'\200B'; }
+/* 열 경계 손잡이 — 평소엔 투명, 올리면 §8 헤어라인보다 살짝 진하게 */
+.colgrip { position:absolute; top:0; bottom:0; width:7px; cursor:col-resize; z-index:3; }
+.colgrip:hover, .colgrip.on { background:rgba(84,144,255,.35); }
+@media print { .colgrip { display:none !important; } }
 .blk-heading { font-size:27px; font-weight:900; line-height:1.2; margin:0 0 5px; letter-spacing:-.4px; }
 .blk-section { display:flex; align-items:center; gap:9px; margin:22px 0 9px; }
 .blk-section .n { font:600 11.5px 'IBM Plex Mono',Consolas,monospace;
@@ -143,7 +160,9 @@ body { margin:0; background:var(--desk); color:var(--ink);
     <div class="s-eyebrow">SAMIL ELTEC CO., LTD.</div></div>
   <div class="side-btns">
     <button id="btn-folder">📁 문서 폴더 열기</button>
+    <button id="btn-new">새 문서</button>
     <button id="btn-save">저장</button>
+    <button id="btn-saveas">다른 이름으로 저장</button>
     <button id="btn-pdf" class="pri">PDF 저장</button>
   </div>
   <div id="folder-msg"></div>
@@ -198,6 +217,19 @@ body { margin:0; background:var(--desk); color:var(--ink);
       <span class="tbg">
       <button class="tb" data-list="0" title="글머리표 목록">• 목록</button>
       <button class="tb" data-list="1" title="번호 목록">1. 목록</button>
+      </span>
+      <span class="tb-sep"></span>
+      <span class="tbg">
+      <button class="tb" data-table="insert" title="표 넣기 (3×3)">▦ 표</button>
+      <button class="tb" data-table="row+" title="아래에 행 추가">행＋</button>
+      <button class="tb" data-table="row-" title="이 행 지우기">행−</button>
+      <button class="tb" data-table="col+" title="오른쪽에 열 추가">열＋</button>
+      <button class="tb" data-table="col-" title="이 열 지우기">열−</button>
+      <button class="tb" data-table="merge" title="고른 칸 병합">병합</button>
+      <button class="tb" data-table="split" title="병합 풀기">분할</button>
+      <button class="tb" data-table="splitx" title="이 칸을 옆으로 둘로">옆 나누기</button>
+      <button class="tb" data-table="splity" title="이 칸을 아래로 둘로">아래 나누기</button>
+      <button class="tb" data-table="del" title="표 지우기 (Ctrl+Z 로 복구)">표 지우기</button>
       </span>
     </div>
     <!-- ⭐ 문서 전체가 하나의 입력판이다 (D16) — 선택·커서·조합·터치는 브라우저가 한다 -->
@@ -316,10 +348,390 @@ function insertText(runs, pos, text, mark) {
     .concat(sliceRuns(runs, p, len)));
 }
 
+// 모든 토막에 똑같이 붙어 있는 서식만 준다. 목록 표식(•·번호)이 이것을 따라간다 —
+// 항목 전체가 같은 서식일 때만 표식이 바뀌는 것이 워드의 동작이다.
+function uniformMark(runs) {
+  const rs = (runs || []).filter(r => r && r.t);
+  if (!rs.length) return {};
+  const out = {};
+  for (const k of MARK_KEYS) {
+    const v = rs[0][k];
+    if (v === undefined || v === null || v === false) continue;
+    if (rs.every(r => r[k] === v)) out[k] = v;
+  }
+  return out;
+}
+
+/* table.js */
+// 표 순수 계산 — DOM 을 모른다. 표를 제자리에서 고치지 않고 항상 새 객체를 만든다.
+// 표 = { type:'table', cols:[{w,align?}], head:[[cell,…]](0~1행), rows:[[cell,…],…] }
+// cell = { runs:Run[], align?, bg?, cs?, rs?, cov? }
+// ⭐ 격자는 항상 직사각형이다(rows[r].length === cols.length). 병합은 칸을 지우는 게 아니라
+//    기준 칸에 cs/rs 를 붙이고 덮인 칸을 cov:1 로 남긴다 — 너비 계산·장 나눔이 여기 기댄다.
+// ⛔ 병합은 몸통 행끼리만. 머리글 행은 1행짜리 단순 행이다(계획 R10).
+
+
+const MIN_COL_W = 30;
+
+const cloneRows = (rows) => rows.map(row => row.slice());
+const bare = (cell) => { const n = Object.assign({}, cell); delete n.cs; delete n.rs; delete n.cov; return n; };
+
+// (r,c) 를 덮는 병합의 기준 칸 좌표. 덮이지 않았으면 자기 자신.
+function anchorOf(t, r, c) {
+  if (!t.rows[r] || !t.rows[r][c] || !t.rows[r][c].cov) return [r, c];
+  for (let ar = 0; ar <= r; ar++) for (let ac = 0; ac < t.cols.length; ac++) {
+    const cell = t.rows[ar] && t.rows[ar][ac];
+    if (!cell || cell.cov) continue;
+    if (ar + (cell.rs || 1) > r && ac <= c && ac + (cell.cs || 1) > c) return [ar, ac];
+  }
+  return [r, c];
+}
+
+function addRow(t, at) {
+  const n = t.cols.length;
+  const rows = cloneRows(t.rows);
+  const fresh = Array.from({ length: n }, () => ({ runs: [] }));
+  if (at > 0 && at < rows.length) {
+    for (let c = 0; c < n; c++) {
+      const [ar, ac] = anchorOf(t, at, c);
+      const cell = t.rows[ar][ac];
+      if (ar < at && ar + (cell.rs || 1) > at) {        // 삽입 지점을 세로로 가로지르는 병합
+        if (c === ac) rows[ar][ac] = Object.assign({}, cell, { rs: (cell.rs || 1) + 1 });
+        fresh[c] = { runs: [], cov: 1 };
+      }
+    }
+  }
+  rows.splice(at, 0, fresh);
+  return Object.assign({}, t, { rows });
+}
+
+function delRow(t, at) {
+  if (t.rows.length <= 1) return t;                     // 마지막 행은 «표 지우기»로만
+  const rows = [];
+  for (let r = 0; r < t.rows.length; r++) if (r !== at) rows.push(t.rows[r].slice());
+  for (let c = 0; c < t.cols.length; c++) {
+    const cell = t.rows[at][c];
+    if (cell.cov) {
+      const [ar, ac] = anchorOf(t, at, c);
+      if (ar === at || c !== ac) continue;              // 기준이 지워지는 행이면 아래에서 처리
+      const a = t.rows[ar][ac];
+      const next = Object.assign({}, a, { rs: (a.rs || 1) - 1 });
+      if (next.rs <= 1) delete next.rs;
+      rows[ar][ac] = next;                              // ar < at 이라 새 배열에서도 같은 자리
+    } else if ((cell.rs || 1) > 1) {
+      const moved = Object.assign({}, cell, { rs: cell.rs - 1 });   // 글을 아래 칸에 물려준다
+      if (moved.rs <= 1) delete moved.rs;
+      rows[at][c] = moved;                              // 원래 at+1 행이 새 배열에서 at
+    }
+  }
+  return Object.assign({}, t, { rows });
+}
+
+function addCol(t, at, total) {
+  const n = t.cols.length;
+  const cols = t.cols.map(c => Object.assign({}, c));
+  cols.splice(at, 0, { w: MIN_COL_W });
+  const rows = t.rows.map((row, r) => {
+    const next = row.slice();
+    let fresh = { runs: [] };
+    if (at > 0 && at < n) {
+      const [ar, ac] = anchorOf(t, r, at);
+      const cell = t.rows[ar][ac];
+      if (ac < at && ac + (cell.cs || 1) > at) {        // 삽입 지점을 가로로 가로지르는 병합
+        if (r === ar && next[ac] === row[ac]) next[ac] = Object.assign({}, cell, { cs: (cell.cs || 1) + 1 });
+        fresh = { runs: [], cov: 1 };
+      }
+    }
+    next.splice(at, 0, fresh);
+    return next;
+  });
+  // ⚠ 머리글에도 가로 병합(cs·cov)이 있을 수 있다 — 임의 칸 나누기(R16)가 만든다
+  let head = t.head;
+  if (head && head.length) {
+    const hrow = head[0].slice();
+    let fresh = { runs: [] };
+    if (at > 0 && at < n) {
+      const oi = rowAnchor(hrow, at);
+      if (oi < at && oi + (hrow[oi].cs || 1) > at) {
+        hrow[oi] = Object.assign({}, hrow[oi], { cs: (hrow[oi].cs || 1) + 1 });
+        fresh = { runs: [], cov: 1 };
+      }
+    }
+    hrow.splice(at, 0, fresh);
+    head = [hrow];
+  }
+  return normalizeWidths(Object.assign({}, t, { cols, rows, head }), total);
+}
+
+function delCol(t, at, total) {
+  if (t.cols.length <= 1) return t;
+  const cols = t.cols.filter((_, i) => i !== at).map(c => Object.assign({}, c));
+  const rows = t.rows.map((row, r) => {
+    const next = row.slice();
+    const cell = row[at];
+    if (cell.cov) {
+      const [ar, ac] = anchorOf(t, r, at);
+      if (r === ar && ac !== at) {                      // 기준이 왼쪽에 있는 가로 병합
+        const a = t.rows[ar][ac];
+        const n2 = Object.assign({}, a, { cs: (a.cs || 1) - 1 });
+        if (n2.cs <= 1) delete n2.cs;
+        next[ac] = n2;
+      }
+    } else if ((cell.cs || 1) > 1) {
+      const moved = Object.assign({}, cell, { cs: cell.cs - 1 });   // 글을 오른쪽 칸에 물려준다
+      if (moved.cs <= 1) delete moved.cs;
+      next[at + 1] = moved;
+    }
+    next.splice(at, 1);
+    return next;
+  });
+  let head = t.head;
+  if (head && head.length) {
+    const hrow = head[0].slice();
+    const hc = hrow[at];
+    if (hc.cov) {
+      const oi = rowAnchor(hrow, at);
+      if (oi !== at) {
+        const a = Object.assign({}, hrow[oi], { cs: (hrow[oi].cs || 1) - 1 });
+        if (a.cs <= 1) delete a.cs;
+        hrow[oi] = a;
+      }
+    } else if ((hc.cs || 1) > 1) {
+      const moved = Object.assign({}, hc, { cs: hc.cs - 1 });
+      if (moved.cs <= 1) delete moved.cs;
+      hrow[at + 1] = moved;
+    }
+    hrow.splice(at, 1);
+    head = [hrow];
+  }
+  return normalizeWidths(Object.assign({}, t, { cols, rows, head }), total);
+}
+
+// ⛔ 글이 사라지지 않는다 — 덮일 칸들의 글을 기준 칸에 줄바꿈으로 모은다(계획 R8).
+function mergeCells(t, r1, c1, r2, c2) {
+  let a = Math.min(r1, r2), z = Math.max(r1, r2);
+  let l = Math.min(c1, c2), x = Math.max(c1, c2);
+  let grew = true;                                      // 겹치는 기존 병합을 다 품을 때까지
+  while (grew) {
+    grew = false;
+    for (let r = 0; r < t.rows.length; r++) for (let c = 0; c < t.cols.length; c++) {
+      const cell = t.rows[r][c];
+      if (cell.cov) continue;
+      const rs = cell.rs || 1, cs = cell.cs || 1;
+      if (r > z || r + rs - 1 < a || c > x || c + cs - 1 < l) continue;
+      if (r < a) { a = r; grew = true; }
+      if (c < l) { l = c; grew = true; }
+      if (r + rs - 1 > z) { z = r + rs - 1; grew = true; }
+      if (c + cs - 1 > x) { x = c + cs - 1; grew = true; }
+    }
+  }
+  if (a === z && l === x) return t;
+  const rows = cloneRows(t.rows);
+  const joined = [];
+  for (let r = a; r <= z; r++) for (let c = l; c <= x; c++) {
+    const cell = t.rows[r][c];
+    if (cell.cov || !runsLength(cell.runs || [])) continue;
+    if (joined.length) joined.push({ t: '\n' });
+    joined.push(...cell.runs);
+  }
+  for (let r = a; r <= z; r++) for (let c = l; c <= x; c++) {
+    if (r === a && c === l) {
+      const base = bare(t.rows[a][l]);
+      base.runs = normalizeRuns(joined);
+      if (z > a) base.rs = z - a + 1;
+      if (x > l) base.cs = x - l + 1;
+      rows[r][c] = base;
+    } else rows[r][c] = { runs: [], cov: 1 };
+  }
+  return Object.assign({}, t, { rows });
+}
+
+function splitCell(t, r, c) {
+  const [ar, ac] = anchorOf(t, r, c);
+  const cell = t.rows[ar][ac];
+  const rs = cell.rs || 1, cs = cell.cs || 1;
+  if (rs === 1 && cs === 1) return t;
+  const rows = cloneRows(t.rows);
+  for (let i = ar; i < ar + rs; i++) for (let j = ac; j < ac + cs; j++) {
+    rows[i][j] = (i === ar && j === ac) ? bare(cell) : { runs: [] };
+  }
+  return Object.assign({}, t, { rows });
+}
+
+// 세로 병합으로 묶인 행 덩어리 — 장 나눔이 이 단위로만 일어난다(계획 R12).
+function rowGroups(t) {
+  const groups = [];
+  let r = 0;
+  while (r < t.rows.length) {
+    let to = r;
+    for (let rr = r; rr <= to; rr++) for (let c = 0; c < t.cols.length; c++) {
+      const [ar, ac] = anchorOf(t, rr, c);
+      const cell = t.rows[ar][ac];
+      const end = ar + (cell.rs || 1) - 1;
+      if (end > to) to = end;
+    }
+    groups.push([r, to]);
+    r = to + 1;
+  }
+  return groups;
+}
+
+// 합을 정확히 total 로 — 반올림 오차는 마지막 열이 흡수한다.
+function normalizeWidths(t, total) {
+  const n = t.cols.length;
+  const cols = t.cols.map(c => Object.assign({}, c));
+  let sum = 0;
+  for (const c of cols) { c.w = Math.max(MIN_COL_W, Math.round(Number(c.w) || 0)); sum += c.w; }
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    cols[i].w = i === n - 1 ? Math.max(MIN_COL_W, total - acc)
+                            : Math.max(MIN_COL_W, Math.round(cols[i].w * total / sum));
+    acc += cols[i].w;
+  }
+  return Object.assign({}, t, { cols });
+}
+
+// i번째 경계 끌기 — i열과 i+1열이 주고받아 합이 안 변한다(계획 R13).
+function setColWidth(t, i, w) {
+  if (i < 0 || i >= t.cols.length - 1) return t;
+  const cols = t.cols.map(c => Object.assign({}, c));
+  const pair = cols[i].w + cols[i + 1].w;
+  const nw = Math.max(MIN_COL_W, Math.min(Math.round(w), pair - MIN_COL_W));
+  cols[i].w = nw;
+  cols[i + 1].w = pair - nw;
+  return Object.assign({}, t, { cols });
+}
+
+// 칸 «속»의 고른 구간만 지운다. 구조는 그대로다(계획 R5).
+function clearCellRanges(t, targets) {
+  const rows = cloneRows(t.rows);
+  const head = t.head && t.head.length ? [t.head[0].slice()] : t.head;
+  for (const g of targets || []) {
+    const row = g.r === 'h' ? (head && head[0]) : rows[g.r];
+    const cell = row && row[g.c];
+    if (!cell || cell.cov) continue;
+    const len = runsLength(cell.runs || []);
+    const runs = normalizeRuns(sliceRuns(cell.runs || [], 0, g.from)
+      .concat(sliceRuns(cell.runs || [], g.to, len)));
+    row[g.c] = Object.assign({}, cell, { runs });
+  }
+  return Object.assign({}, t, { rows, head });
+}
+
+function tableText(t) {
+  const line = (row) => (row || []).filter(c => !c.cov).map(c => runsText(c.runs || [])).join('\t');
+  return (t.head || []).map(line).concat((t.rows || []).map(line)).join('\n');
+}
+
+// ── 임의 칸 나누기(계획 R16 — 워드의 «셀 분할») ──
+// 홑칸을 나누려면 그 자리에 격자 눈금이 하나 더 필요하다 → 격자 열(행)을 복제하되
+// 같은 줄의 다른 칸들은 병합(cs/rs)을 1 키워 겉모습이 안 변하게 한다.
+// ⚠ 그래서 «머리글 칸에도 cs·cov 가 생길 수 있다» — 그리기와 열 넣기/빼기가 이를 안다.
+
+// 한 행 «안»에서 at 위치를 덮는(가로 병합) 칸의 번호. 세로 병합은 모른다 — 머리글용.
+function rowAnchor(row, at) {
+  for (let i = at; i >= 0; i--) {
+    if (row[i] && row[i].cov) continue;
+    if (row[i] && i + (row[i].cs || 1) > at) return i;
+    break;
+  }
+  return at;
+}
+
+// 격자 열 at 를 둘로 복제한다 — at 의 너비를 반씩 나눠 갖고, 모든 줄에서 그 자리를
+// 소유한 칸의 cs 가 1 커져 겉모습이 안 변한다. (임의 나누기의 밑작업)
+function dupGridCol(t, at) {
+  const cols = t.cols.map(c => Object.assign({}, c));
+  const half = Math.max(MIN_COL_W, Math.round(cols[at].w / 2));
+  const rest = Math.max(MIN_COL_W, (cols[at].w || half * 2) - half);
+  cols[at] = Object.assign({}, cols[at], { w: half });
+  cols.splice(at + 1, 0, { w: rest });
+  const rows = t.rows.map((row, r) => {
+    const next = row.slice();
+    const [ar, ac] = anchorOf(t, r, at);
+    if (r === ar) next[ac] = Object.assign({}, t.rows[ar][ac], { cs: (t.rows[ar][ac].cs || 1) + 1 });
+    next.splice(at + 1, 0, { runs: [], cov: 1 });
+    return next;
+  });
+  let head = t.head;
+  if (head && head.length) {
+    const hrow = head[0].slice();
+    const oi = rowAnchor(hrow, at);
+    hrow[oi] = Object.assign({}, hrow[oi], { cs: (hrow[oi].cs || 1) + 1 });
+    hrow.splice(at + 1, 0, { runs: [], cov: 1 });
+    head = [hrow];
+  }
+  return Object.assign({}, t, { cols, rows, head });
+}
+
+// 몸통 행 at 를 둘로 복제한다 — 모든 열에서 그 자리를 소유한 칸의 rs 가 1 커진다.
+function dupGridRow(t, at) {
+  const rows = cloneRows(t.rows);
+  const fresh = [];
+  for (let c = 0; c < t.cols.length; c++) {
+    const [ar, ac] = anchorOf(t, at, c);
+    if (c === ac) rows[ar][ac] = Object.assign({}, t.rows[ar][ac], { rs: (t.rows[ar][ac].rs || 1) + 1 });
+    fresh.push({ runs: [], cov: 1 });
+  }
+  rows.splice(at + 1, 0, fresh);
+  return Object.assign({}, t, { rows });
+}
+
+// 직사각형 구역을 «왼/위 조각(글 전부) + 오른/아래 조각(빈 칸) + 나머지 cov» 로 다시 깐다
+function repave(rows, ar, ac, rs, cs, splitAtCol, splitAtRow, keep) {
+  for (let i = ar; i < ar + rs; i++) for (let j = ac; j < ac + cs; j++) {
+    if (i === ar && j === ac) {
+      const a = Object.assign({}, keep);
+      const w1 = (splitAtCol || ac + cs) - ac;
+      const h1 = (splitAtRow || ar + rs) - ar;
+      if (w1 > 1) a.cs = w1; else delete a.cs;
+      if (h1 > 1) a.rs = h1; else delete a.rs;
+      rows[i][j] = a;
+    } else if (splitAtCol && i === ar && j === splitAtCol) {
+      const b = { runs: [] };
+      if (ac + cs - splitAtCol > 1) b.cs = ac + cs - splitAtCol;
+      if (rs > 1) b.rs = rs;
+      rows[i][j] = b;
+    } else if (splitAtRow && i === splitAtRow && j === ac) {
+      const b = { runs: [] };
+      if (cs > 1) b.cs = cs;
+      if (ar + rs - splitAtRow > 1) b.rs = ar + rs - splitAtRow;
+      rows[i][j] = b;
+    } else rows[i][j] = { runs: [], cov: 1 };
+  }
+}
+
+// 칸을 옆으로 둘로 나눈다(R16). 홑칸이면 격자 열을 복제해 자리를 만든다.
+function splitCellAcross(t, r, c, total) {
+  const [ar, ac] = anchorOf(t, r, c);
+  let base = t;
+  if ((t.rows[ar][ac].cs || 1) === 1) base = dupGridCol(t, ac);
+  const cell = base.rows[ar][ac];
+  const cs = cell.cs || 1;
+  const rs = cell.rs || 1;
+  const rows = cloneRows(base.rows);
+  repave(rows, ar, ac, rs, cs, ac + Math.ceil(cs / 2), null, bare(cell));
+  return normalizeWidths(Object.assign({}, base, { rows }), total);
+}
+
+// 칸을 아래로 둘로 나눈다(R16). 홑칸이면 몸통 행을 복제해 자리를 만든다.
+function splitCellDown(t, r, c) {
+  const [ar, ac] = anchorOf(t, r, c);
+  let base = t;
+  if ((t.rows[ar][ac].rs || 1) === 1) base = dupGridRow(t, ar);
+  const cell = base.rows[ar][ac];
+  const cs = cell.cs || 1;
+  const rs = cell.rs || 1;
+  const rows = cloneRows(base.rows);
+  repave(rows, ar, ac, rs, cs, null, ar + Math.ceil(rs / 2), bare(cell));
+  return Object.assign({}, base, { rows });
+}
+
 /* blocks.js */
 
 
-const BLOCK_TYPES = ['heading', 'section', 'para', 'list'];
+
+const BLOCK_TYPES = ['heading', 'section', 'para', 'list', 'table'];
 
 let seq = 0;
 function resetIds(n = 0) { seq = n; }
@@ -335,6 +747,17 @@ function createBlock(type, props = {}) {
   if (!BLOCK_TYPES.includes(type)) throw new Error('알 수 없는 블록 종류: ' + type);
   const base = { id: newId(), type, variants: null };
   if (type === 'section') return Object.assign(base, { no: props.no || '', title: props.title || '' });
+  if (type === 'table') {
+    const ncols = props.cols ? props.cols.length : (props.ncols || 3);
+    const empty = () => ({ runs: [] });
+    // 삽입하는 쪽이 normalizeWidths 로 실제 텍스트 폭에 맞춘다
+    const cols = props.cols ? props.cols.map(c => Object.assign({}, c))
+      : Array.from({ length: ncols }, () => ({ w: Math.floor(674 / ncols) }));
+    const head = props.head !== undefined ? props.head : [Array.from({ length: ncols }, empty)];
+    const rows = props.rows || Array.from({ length: props.nrows || 3 },
+      () => Array.from({ length: ncols }, empty));
+    return Object.assign(base, { cols, head, rows });
+  }
   if (type === 'list') {
     const items = Array.isArray(props.items) && props.items.length
       ? props.items.map(normalizeRuns)
@@ -350,6 +773,7 @@ function createBlock(type, props = {}) {
 function blockText(b) {
   if (!b) return '';
   if (b.type === 'section') return [b.no, b.title].filter(Boolean).join(' ');
+  if (b.type === 'table') return tableText(b);
   if (b.type === 'list') return (b.items || []).map(runsText).join('\n');
   if (Array.isArray(b.runs)) return runsText(b.runs);
   return b.text || '';
@@ -359,7 +783,7 @@ function blockText(b) {
 
 
 
-const DOC_VERSION = 2;
+const DOC_VERSION = 3;
 
 const DEFAULT_PAGE = {
   width: 794, height: 1123,
@@ -516,8 +940,11 @@ function printDoc(mainEl) {
 }
 
 /* paginate.js */
-// ⛔ 이 함수는 blocks 를 읽기만 한다. 절대 고치지 않는다.
-// ⛔ 블록을 버리거나 쪼개지 않는다. 한 장보다 큰 블록은 그 장에 혼자 둔다.
+// ⛔ 이 함수는 blocks·heights 를 읽기만 한다. 절대 고치지 않는다.
+// ⛔ 블록(행)을 버리거나 쪼개지 않는다. 한 장보다 큰 블록·행 묶음은 그 장에 혼자 둔다.
+// 반환: 장마다 entry 목록. 보통 블록 { id } · 표 조각 { id, rowFrom, rowTo, cont }
+//   (cont:1 = 이어진 조각 — 그리는 쪽이 머리글 행을 다시 그린다)
+// heights[id]: 숫자(보통 블록) 또는 { head, rows:[px,…], groups:[[from,to],…] }(표)
 function paginate(blocks, heights, opts) {
   const limit = opts && opts.contentHeight;
   if (!(typeof limit === 'number' && limit > 0)) {
@@ -527,18 +954,65 @@ function paginate(blocks, heights, opts) {
   const pages = [];
   let cur = [];
   let used = 0;
+  const flush = () => { pages.push(cur); cur = []; used = 0; };
+
   for (const b of blocks || []) {
-    const h = Number(heights && heights[b.id]) || 0;
-    const need = cur.length === 0 ? h : gap + h;
-    if (cur.length > 0 && used + need > limit) {
-      pages.push(cur);
-      cur = [];
-      used = 0;
-      cur.push(b.id);
-      used = h;
+    const h = heights && heights[b.id];
+
+    if (h && typeof h === 'object' && Array.isArray(h.rows)) {
+      // ── 표: 행 묶음(세로 병합 덩어리) 단위로 채운다 ──
+      const head = Number(h.head) || 0;
+      const rowsH = h.rows.map(Number);
+      const groups = (Array.isArray(h.groups) && h.groups.length)
+        ? h.groups : rowsH.map((_, i) => [i, i]);
+
+      if (!rowsH.length) {                       // 머리글만 있는 표 — 조각 하나로 그대로
+        if (cur.length > 0 && used + gap + head > limit) flush();
+        const lead = cur.length === 0 ? 0 : gap;
+        cur.push({ id: b.id, rowFrom: 0, rowTo: -1, cont: 0 });
+        used += lead + head;
+        continue;
+      }
+
+      let gi = 0;
+      let from = 0;
+      let firstChunk = true;
+      while (gi < groups.length) {
+        const lead = cur.length === 0 ? 0 : gap;
+        const budget = limit - used - lead - head;
+        let to = from - 1;
+        let sum = 0;
+        while (gi < groups.length) {
+          const [a, z] = groups[gi];
+          let gh = 0;
+          for (let r = a; r <= z; r++) gh += rowsH[r] || 0;
+          if (sum === 0 && gh > budget && cur.length > 0) break;   // 이 장엔 시작도 못 한다
+          if (sum > 0 && sum + gh > budget) break;                 // 이 장은 여기까지
+          sum += gh;
+          to = z;
+          gi += 1;
+          if (sum > budget) break;   // 홀로 큰 묶음 — 이 장에 혼자 둔다(쪼개지 않는다)
+        }
+        if (to < from) { flush(); continue; }    // 빈손 — 새 장에서 다시
+        cur.push({ id: b.id, rowFrom: from, rowTo: to, cont: firstChunk ? 0 : 1 });
+        used += lead + head + sum;
+        firstChunk = false;
+        from = to + 1;
+        if (gi < groups.length) flush();         // 아직 행이 남았다 — 다음 조각은 새 장
+      }
       continue;
     }
-    cur.push(b.id);
+
+    // ── 보통 블록: 1단계 규칙 그대로 ──
+    const hh = Number(h) || 0;
+    const need = cur.length === 0 ? hh : gap + hh;
+    if (cur.length > 0 && used + need > limit) {
+      flush();
+      cur.push({ id: b.id });
+      used = hh;
+      continue;
+    }
+    cur.push({ id: b.id });
     used += need;
   }
   pages.push(cur);
@@ -546,6 +1020,7 @@ function paginate(blocks, heights, opts) {
 }
 
 /* measure.js */
+
 
 
 function contentHeightOf(page) {
@@ -564,10 +1039,24 @@ function measureAll(blocks, gaugeEl, makeEl) {
     els.push([b.id, el]);
   }
   const out = {};
+  const byId = new Map(blocks.map(b => [b.id, b]));
   for (const [id, el] of els) {
-    const r = el.getBoundingClientRect();
+    const b = byId.get(id);
     const cs = getComputedStyle(el);
-    out[id] = r.height + parseFloat(cs.marginTop || 0) + parseFloat(cs.marginBottom || 0);
+    const mt = parseFloat(cs.marginTop || 0);
+    const mb = parseFloat(cs.marginBottom || 0);
+    if (b && b.type === 'table') {
+      const thead = el.querySelector('thead');
+      const rows = Array.from(el.querySelectorAll('tbody tr'))
+        .map(tr => tr.getBoundingClientRect().height);
+      // 블록 위/아래 여백은 머리글/마지막 행에 얹는다 — 장 셈이 실제와 같아진다
+      const head = (thead ? thead.getBoundingClientRect().height : 0) + mt;
+      if (rows.length) rows[rows.length - 1] += mb;
+      out[id] = { head: rows.length ? head : head + mb, rows, groups: rowGroups(b) };
+      continue;
+    }
+    const r = el.getBoundingClientRect();
+    out[id] = r.height + mt + mb;
   }
   gaugeEl.textContent = '';
   return out;
@@ -643,12 +1132,14 @@ function domToRuns(el) {
 
 
 
+
 // ⭐ 입력판은 #pages 하나다(D16 — 한 장의 입력판). 블록은 그냥 그림이고,
 //    섹션 줄·쪽 번호처럼 글이 아닌 것만 편집 불가 섬(contenteditable=false)으로 막는다.
 function blockEl(block) {
   const el = document.createElement('div');
   el.className = 'blk blk-' + block.type;
   el.dataset.id = block.id;
+  if (block.type === 'table') return tableEl(block, null);
   if (block.type === 'section') {
     el.setAttribute('contenteditable', 'false');
     const n = document.createElement('span'); n.className = 'n'; n.textContent = block.no || '';
@@ -661,6 +1152,11 @@ function blockEl(block) {
     (block.items || [[]]).forEach((item, i) => {
       const li = document.createElement('li');
       li.dataset.i = String(i);
+      // 표식(•·번호)은 li 에서 상속된다 — 항목 전체가 같은 서식이면 li 에 입혀 따라가게 한다
+      const m = uniformMark(item);
+      if (m.sz) li.style.fontSize = m.sz + 'px';
+      if (m.c) li.style.color = m.c;
+      if (m.b) li.style.fontWeight = '700';
       for (const n of runsToNodes(item)) li.appendChild(n);
       box.appendChild(li);
     });
@@ -683,9 +1179,11 @@ function renderPages(doc, pagesEl, gaugeEl) {
     pg.className = 'page';
     const body = document.createElement('div');
     body.className = 'page-body';
-    for (const id of ids) {
-      const b = byId.get(id);
-      if (b) body.appendChild(blockEl(b));
+    for (const ent of ids) {
+      const b = byId.get(ent.id);
+      if (!b) continue;
+      if (b.type === 'table') body.appendChild(tableEl(b, ent));
+      else body.appendChild(blockEl(b));
     }
     const no = document.createElement('div');
     no.className = 'pgno';
@@ -695,6 +1193,77 @@ function renderPages(doc, pagesEl, gaugeEl) {
     pagesEl.appendChild(pg);
   });
   return { pages };
+}
+
+// 표 한 조각을 그린다. part = { rowFrom, rowTo, cont } · null 이면 전체(높이 재기용).
+// ⭐ 이어진 장의 머리글(cont)은 «그림»이다(편집 불가) — 진짜 머리글 DOM 은 첫 조각 하나여야
+//    타자가 어긋나지 않는다(계획 R11). 덮인 칸(cov)은 그리지 않는다.
+function tableEl(block, part) {
+  const el = document.createElement('div');
+  el.className = 'blk blk-table';
+  el.dataset.id = block.id;
+  if (part && part.cont) el.dataset.cont = '1';
+  const tbl = document.createElement('table');
+  const cg = document.createElement('colgroup');
+  for (const c of block.cols || []) {
+    const col = document.createElement('col');
+    col.style.width = (c.w || 0) + 'px';
+    cg.appendChild(col);
+  }
+  tbl.appendChild(cg);
+  const fill = (td, cell) => { for (const n of runsToNodes(cell.runs || [])) td.appendChild(n); };
+  if (block.head && block.head.length) {
+    const thead = document.createElement('thead');
+    const tr = document.createElement('tr');
+    block.head[0].forEach((cell, c) => {
+      if (cell.cov) return;                 // 임의 칸 나누기(R16)가 머리글에도 가로 병합을 만든다
+      const td = document.createElement('td');
+      if (cell.cs) td.colSpan = cell.cs;
+      if (part && part.cont) td.setAttribute('contenteditable', 'false');
+      else { td.dataset.r = 'h'; td.dataset.c = String(c); }
+      fill(td, cell);
+      tr.appendChild(td);
+    });
+    thead.appendChild(tr);
+    tbl.appendChild(thead);
+  }
+  const tbody = document.createElement('tbody');
+  const from = part ? part.rowFrom : 0;
+  const to = part ? part.rowTo : (block.rows || []).length - 1;
+  for (let r = from; r <= to; r++) {
+    const tr = document.createElement('tr');
+    (block.rows[r] || []).forEach((cell, c) => {
+      if (cell.cov) return;
+      const td = document.createElement('td');
+      td.dataset.r = String(r);
+      td.dataset.c = String(c);
+      if (cell.cs) td.colSpan = cell.cs;
+      if (cell.rs) td.rowSpan = cell.rs;
+      const align = cell.align || (block.cols[c] && block.cols[c].align) || null;
+      if (align) td.style.textAlign = align;
+      if (cell.bg) td.style.background = cell.bg;
+      fill(td, cell);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+  tbl.appendChild(tbody);
+  el.appendChild(tbl);
+  // 열 경계 손잡이 — 첫 조각에만(이어진 조각에서 끌면 헷갈린다). 편집 불가 섬.
+  if (!part || !part.cont) {
+    let x = 0;
+    (block.cols || []).forEach((c, i) => {
+      if (i === block.cols.length - 1) return;            // 마지막 경계는 없다(합 고정 — R13)
+      x += c.w || 0;
+      const grip = document.createElement('div');
+      grip.className = 'colgrip';
+      grip.setAttribute('contenteditable', 'false');
+      grip.dataset.col = String(i);
+      grip.style.left = (x - 3) + 'px';
+      el.appendChild(grip);
+    });
+  }
+  return el;
 }
 
 /* edit.js */
@@ -707,6 +1276,7 @@ function renderPages(doc, pagesEl, gaugeEl) {
 // · 엔터는 항상 가른다 → opt.break 로 강제 가르기
 // 반환: { blocks, caret(머리 끝 — 지우기의 커서), caretTail(꼬리 시작 — 엔터의 커서), split }
 // ⛔ 선택 밖 글자는 하나도 사라지지 않는다 — 시험(test/edit.test.js)이 이것을 못 박는다.
+
 
 
 function runsAt(b, t) {
@@ -801,6 +1371,64 @@ function deleteAcross(blocks, targets, opt) {
   const caret = { id: first.id, item: fi, pos: first.from };
   if (!caretTail) caretTail = caret;   // 합쳐졌으면 이음매가 곧 꼬리 시작이다
   return { blocks: out, caret, caretTail, split };
+}
+
+// 표 칸이 낀 걸침 지우기(계획 R5·R6) — 표는 구조가 남고 칸 «속»만 비워진다.
+// 표 밖 문단·항목은 각자 제 구간만 잃는다(통째로 물린 문단·항목·섹션 줄은 없어진다).
+// ⛔ 표 경계를 넘는 병합은 하지 않는다 — deleteAcross 의 머리+꼬리 잇기를 여기서는 안 쓴다.
+function deleteMixed(blocks, targets) {
+  if (!Array.isArray(targets) || !targets.length) return null;
+  const byId = new Map();
+  for (const t of targets) {
+    if (!byId.has(t.id)) byId.set(t.id, []);
+    byId.get(t.id).push(t);
+  }
+  const out = [];
+  const survived = new Set();
+  for (const b of blocks) {
+    const ts = byId.get(b.id);
+    if (!ts) { out.push(b); continue; }
+    if (b.type === 'table') {
+      const cellTs = ts.filter(t => t.cell).map(t => ({ r: t.cell[0], c: t.cell[1], from: t.from, to: t.to }));
+      out.push(Object.assign({}, b, clearCellRanges(b, cellTs)));
+      survived.add(b.id);
+      continue;
+    }
+    if (b.type === 'section') continue;                    // 물린 섹션 줄은 없어진다
+    if (Array.isArray(b.items)) {
+      const hit = new Map(ts.filter(t => t.item !== null && t.item !== undefined).map(t => [t.item, t]));
+      const items = [];
+      b.items.forEach((it, i) => {
+        const t = hit.get(i);
+        if (!t) { items.push(it); return; }
+        const len = runsLength(it);
+        if (t.from <= 0 && t.to >= len) return;            // 통째로 물린 항목은 없어진다
+        items.push(normalizeRuns(sliceRuns(it, 0, t.from).concat(sliceRuns(it, t.to, len))));
+      });
+      if (!items.length) continue;
+      out.push(Object.assign({}, b, { items }));
+      survived.add(b.id);
+      continue;
+    }
+    const t = ts[0];
+    const len = runsLength(b.runs || []);
+    if (t.from <= 0 && t.to >= len) continue;              // 통째로 물린 문단은 없어진다
+    out.push(Object.assign({}, b, {
+      runs: normalizeRuns(sliceRuns(b.runs, 0, t.from).concat(sliceRuns(b.runs, t.to, len))),
+    }));
+    survived.add(b.id);
+  }
+  // 커서 — 살아남은 첫 대상. 다 없어졌으면 남은 첫 블록 처음.
+  let caret = null;
+  for (const t of targets) {
+    if (!survived.has(t.id)) continue;
+    caret = { id: t.id, item: t.item === undefined ? null : t.item, pos: t.from };
+    if (t.cell) caret.cell = t.cell;
+    break;
+  }
+  if (!caret && out.length) caret = { id: out[0].id, item: null, pos: 0 };
+  if (!caret) return null;
+  return { blocks: out, caret };
 }
 
 /* editor-ops.js */
@@ -946,9 +1574,11 @@ function activeBlockEl(pagesEl) {
 
 // 화면의 글 칸(문단·제목 블록, 목록 항목)을 문서 순서대로.
 // 입력판이 하나가 된 뒤(D16)에는 속성이 아니라 블록 종류로 찾는다 — 섹션 줄은 글이 아니다.
+// ⚠ .blk-table 래퍼가 문단 선택자에 걸리면 표 전체가 «한 칸»으로 잡힌다 — 반드시 뺀다.
 function editableEls(pagesEl) {
   return Array.from(pagesEl.querySelectorAll(
-    '.blk[data-id]:not(.blk-section):not(.blk-list), .blk-list .lst li[data-i]'));
+    '.blk[data-id]:not(.blk-section):not(.blk-list):not(.blk-table), '
+    + '.blk-list .lst li[data-i], .blk-table td[data-r]'));
 }
 
 // 지금 선택이 걸쳐 있는 편집 칸들을 문서 순서대로 [{el, from, to}] 로 준다.
@@ -972,6 +1602,12 @@ function rangesIn(pagesEl) {
 // 도구모음(걸침 서식)과 편집기(걸침 지우기)가 같은 좌표를 쓴다.
 function targetsIn(pagesEl) {
   return rangesIn(pagesEl).map(p => {
+    const td = p.el.matches('td[data-r]') ? p.el : null;
+    if (td) {
+      const blk = td.closest('.blk[data-id]');
+      const r = td.dataset.r === 'h' ? 'h' : Number(td.dataset.r);
+      return { id: blk.dataset.id, item: null, cell: [r, Number(td.dataset.c)], from: p.from, to: p.to };
+    }
     const li = p.el.matches('.lst li[data-i]') ? p.el : null;
     const blk = li ? li.closest('.blk[data-id]') : p.el;
     return { id: blk.dataset.id, item: li ? Number(li.dataset.i) : null, from: p.from, to: p.to };
@@ -990,6 +1626,18 @@ function activeItemEl(blkEl) {
   return li && blkEl.contains(li) ? li : null;
 }
 
+// 선택이 표 칸(td) 안이면 그 td 를 준다. 칸마다 편집 칸이 따로라
+// 글자 번호를 "그 칸 안"에서 세야 어긋나지 않는다(목록 항목과 같은 이유).
+function activeCellEl(blkEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !blkEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const td = e.closest('td[data-r]');
+  return td && blkEl.contains(td) ? td : null;
+}
+
 /* editor.js */
 // 편집을 다스린다 (D16 — 한 장의 입력판).
 // 선택·커서·한글 조합·터치는 브라우저가 한다. 우리는 «구조를 바꾸는 동작»만
@@ -998,6 +1646,7 @@ function activeItemEl(blkEl) {
 // 브라우저가 하고, input 뒤 flush 가 그 칸을 모델로 되읽는다(붙여넣기 서식도 그때 걸러진다).
 // ⛔ 한글 조합 중에는 모델·화면을 건드리지 않는다(§12-12). 걸침 위 조합은 조합이
 //    끼어들기 «전»(compositionstart)에 수술(deleteCrossInPlace)로 지운다.
+
 
 
 
@@ -1017,7 +1666,21 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     pending = null;
     const doc = getDoc();
     let patch;
-    if (p.itemIndex === undefined) {
+    if (p.cell) {
+      const b = doc.blocks.find(x => x.id === p.id);
+      if (!b || b.type !== 'table') return;
+      if (p.cell[0] === 'h') {
+        const head = [b.head[0].slice()];
+        head[0][p.cell[1]] = Object.assign({}, head[0][p.cell[1]], { runs: p.runs });
+        patch = { head };
+      } else {
+        const rows = b.rows.slice();
+        const row = rows[p.cell[0]].slice();
+        row[p.cell[1]] = Object.assign({}, row[p.cell[1]], { runs: p.runs });
+        rows[p.cell[0]] = row;
+        patch = { rows };
+      }
+    } else if (p.itemIndex === undefined) {
       patch = { runs: p.runs };
     } else {
       const b = doc.blocks.find(x => x.id === p.id);
@@ -1034,6 +1697,13 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
   function capture() {
     const blk = activeBlockEl(pagesEl);
     if (!blk) return;
+    const td = activeCellEl(blk);
+    if (td) {
+      pending = { id: blk.dataset.id,
+        cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)],
+        runs: domToRuns(td) };
+      return;
+    }
     const li = activeItemEl(blk);
     if (li) pending = { id: blk.dataset.id, itemIndex: Number(li.dataset.i), runs: domToRuns(li) };
     else pending = { id: blk.dataset.id, runs: domToRuns(blk) };
@@ -1106,6 +1776,35 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
   function deleteCrossInPlace() {
     const targets = crossTargets();
     if (targets.length < 2) return;
+    if (targets.some(x => x.cell)) {
+      // 표가 낀 걸침 위 조합 — 모델만 고치고, 화면은 문 칸들의 «속»만 갈아 끼운다.
+      // 표 조각 DOM 수술은 위험해서 다시 그리기는 조합이 끝난 뒤 flush 경로에 맡긴다(§12-12).
+      const doc = getDoc();
+      const r = deleteMixed(doc.blocks, targets);
+      if (!r) return;
+      setDoc(Object.assign({}, doc, { blocks: r.blocks }));
+      const alive = new Set(r.blocks.map(b => b.id));
+      const cellSel = (t) => '.blk[data-id="' + t.id + '"] td[data-r="' + t.cell[0]
+        + '"][data-c="' + t.cell[1] + '"]';
+      const refill2 = (el, runs) => {
+        el.textContent = '';
+        for (const n of runsToNodes(runs || [])) el.appendChild(n);
+      };
+      for (const t of targets) {
+        const host = t.cell ? pagesEl.querySelector(cellSel(t))
+                            : pagesEl.querySelector('.blk[data-id="' + t.id + '"]');
+        if (!host) continue;
+        if (!alive.has(t.id)) { host.remove(); continue; }
+        const b = r.blocks.find(x => x.id === t.id);
+        if (t.cell) refill2(host, t.cell[0] === 'h' ? b.head[0][t.cell[1]].runs : b.rows[t.cell[0]][t.cell[1]].runs);
+        else if (t.item === null || t.item === undefined) { if (b.runs) refill2(host, b.runs); }
+      }
+      cancelIdle();
+      const caretHost = r.caret.cell ? pagesEl.querySelector(cellSel(r.caret))
+                                     : pagesEl.querySelector('.blk[data-id="' + r.caret.id + '"]');
+      if (caretHost) caretTo(caretHost, r.caret.pos);
+      return;
+    }
     const first = targets[0];
     const last = targets[targets.length - 1];
     const firstItem = first.item === null || first.item === undefined ? null : first.item;
@@ -1160,6 +1859,21 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
 
     const targets = crossTargets();
     if (targets.length > 1) {
+      if (targets.some(x => x.cell)) {
+        // 표가 낀 걸침 — 표 구조는 남고 칸 속만 비운다(계획 R5·R6). Enter 도 가르지 않는다.
+        e.preventDefault();
+        const doc = getDoc();
+        const r = deleteMixed(doc.blocks, targets);
+        if (!r) return;
+        setDoc(Object.assign({}, doc, { blocks: r.blocks }));
+        let text = '';
+        if (t === 'insertText' && e.data) text = e.data;
+        if (t === 'insertFromPaste' && e.dataTransfer) text = e.dataTransfer.getData('text/plain') || '';
+        if (text) insertAtCaret(r.caret, text);
+        cancelIdle();
+        redraw({ caret: Object.assign({}, r.caret, { pos: r.caret.pos + text.length }) });
+        return;
+      }
       // 여러 칸에 걸친 편집 — 브라우저가 블록을 제멋대로 병합하기 전에 우리가 지운다.
       // 워드 규칙(실측 2026-08-30): 엔터는 항상 가르고, 지우기·타자는 deleteAcross 의
       // 자동 규칙(양쪽 다 글자를 물었으면 가르고, 경계만 물렸으면 합친다)을 따른다.
@@ -1198,7 +1912,14 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
       }
     }
 
-    if (t === 'insertParagraph') { e.preventDefault(); enterAt(); return; }
+    if (t === 'insertParagraph') {
+      e.preventDefault();
+      const blk2 = activeBlockEl(pagesEl);
+      const td = blk2 && activeCellEl(blk2);
+      if (td) { enterInCell(blk2, td); return; }   // 칸 안 Enter = 줄바꿈(계획 R1)
+      enterAt();
+      return;
+    }
     if (t === 'deleteContentBackward' && collapsed) { if (mergeAt(-1)) e.preventDefault(); return; }
     if (t === 'deleteContentForward' && collapsed) { if (mergeAt(1)) e.preventDefault(); return; }
     // 그 밖(칸 안 타자·지우기·붙여넣기·Shift+Enter 줄바꿈)은 브라우저가 하고 flush 가 되읽는다
@@ -1209,7 +1930,22 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const b = doc.blocks.find(x => x.id === caret.id);
     if (!b) return;
     let patch;
-    if (caret.item === null || caret.item === undefined) {
+    if (caret.cell) {
+      if (b.type !== 'table') return;
+      if (caret.cell[0] === 'h') {
+        const head = [b.head[0].slice()];
+        head[0][caret.cell[1]] = Object.assign({}, head[0][caret.cell[1]],
+          { runs: insertText(head[0][caret.cell[1]].runs, caret.pos, text) });
+        patch = { head };
+      } else {
+        const rows = b.rows.slice();
+        const row = rows[caret.cell[0]].slice();
+        row[caret.cell[1]] = Object.assign({}, row[caret.cell[1]],
+          { runs: insertText(row[caret.cell[1]].runs, caret.pos, text) });
+        rows[caret.cell[0]] = row;
+        patch = { rows };
+      }
+    } else if (caret.item === null || caret.item === undefined) {
       patch = { runs: insertText(b.runs, caret.pos, text) };
     } else {
       const items = b.items.slice();
@@ -1272,6 +2008,63 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     redraw({ caret: { id: fresh.id, item: null, pos: 0 } });
   }
 
+  // 칸 안 Enter — 새 블록이 아니라 칸 «안» 줄바꿈이다(계획 R1). 워드도 화면상 같다.
+  function enterInCell(blk, td) {
+    flush(false);
+    const r = rangeIn(td);
+    if (!r) return;
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === blk.dataset.id);
+    if (!b || b.type !== 'table') return;
+    const cell = [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)];
+    const src = cell[0] === 'h' ? b.head[0][cell[1]].runs : b.rows[cell[0]][cell[1]].runs;
+    const len = runsLength(src || []);
+    const runs = sliceRuns(src || [], 0, r.from).concat([{ t: '\n' }], sliceRuns(src || [], r.to, len));
+    let patch;
+    if (cell[0] === 'h') {
+      const head = [b.head[0].slice()];
+      head[0][cell[1]] = Object.assign({}, head[0][cell[1]], { runs });
+      patch = { head };
+    } else {
+      const rows = b.rows.slice();
+      const row = rows[cell[0]].slice();
+      row[cell[1]] = Object.assign({}, row[cell[1]], { runs });
+      rows[cell[0]] = row;
+      patch = { rows };
+    }
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id, patch) }));
+    cancelIdle();
+    redraw({ caret: { id: b.id, cell, pos: r.from + 1 } });
+  }
+
+  // Tab — 다음/이전 칸으로. 마지막 칸에서 Tab 은 행을 늘린다(계획 R2, 워드와 같다).
+  function moveCell(blk, td, dir) {
+    flush(false);
+    const id = blk.dataset.id;
+    const tds = Array.from(pagesEl.querySelectorAll(
+      '.blk-table[data-id="' + id + '"] td[data-r]'));
+    const i = tds.indexOf(td);
+    const next = tds[i + dir];
+    if (next) { caretTo(next, dir > 0 ? 0 : Number.MAX_SAFE_INTEGER); return; }
+    if (dir < 0) return;
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === id);
+    if (!b || b.type !== 'table') return;
+    const t2 = addRow(b, b.rows.length);
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, id, { rows: t2.rows }) }));
+    cancelIdle();
+    redraw({ caret: { id, cell: [b.rows.length, 0], pos: 0 } });
+  }
+
+  pagesEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const blk = activeBlockEl(pagesEl);
+    const td = blk && activeCellEl(blk);
+    if (!td) return;                 // 표 밖 Tab 은 지금대로(브라우저)
+    e.preventDefault();
+    moveCell(blk, td, e.shiftKey ? -1 : 1);
+  });
+
   // 블록 경계의 Backspace(-1)·Delete(+1) — 브라우저가 블록 DOM 을 제멋대로 합치기 전에
   // 우리가 병합한다. 이웃이 섹션 줄이면 섹션을 지운다. 처리했으면 true.
   function mergeAt(dir) {
@@ -1279,6 +2072,14 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     if (!s.rangeCount) return false;
     const blk = activeBlockEl(pagesEl);
     if (!blk) return false;
+    const tdHost = activeCellEl(blk);
+    if (tdHost) {
+      // 칸 경계 지우기 — 칸 밖으로 새 나가는 병합은 하지 않는다(계획 R3, 워드와 같다).
+      const p = offsetIn(tdHost, s.anchorNode, s.anchorOffset);
+      if (dir < 0 && p === 0) return true;                 // 브라우저가 못 하게 막기만 한다
+      if (dir > 0 && p >= textLen(tdHost)) return true;
+      return false;                                        // 칸 안 지우기 — 브라우저가 한다
+    }
     const li = activeItemEl(blk);
     const host = li || blk;
     const pos = offsetIn(host, s.anchorNode, s.anchorOffset);
@@ -1299,11 +2100,13 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
         redraw({ caret: { id: blk.dataset.id, item: li ? Number(li.dataset.i) : null, pos } });
         return true;
       }
+      if (nb.type === 'table') return true;                // 문단이 표로 빨려 들지 않는다(계획 R4)
     }
     const els = editableEls(pagesEl);
     const i = els.indexOf(host);
     const other = els[i + dir];
     if (!other) return true;
+    if (other.matches && other.matches('td[data-r]')) return true;   // 경계 너머가 표 칸 — 병합 금지
     const at = (el, end) => {
       const l = el.matches('.lst li[data-i]') ? el : null;
       const bk = l ? l.closest('.blk[data-id]') : el;
@@ -1318,6 +2121,48 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     return true;
   }
 
+  // ── 열 너비 끌기 — 끄는 동안은 colgroup 만 미리보기로 바꾸고, 놓으면 모델에 적는다 ──
+  let grip = null;   // { id, col, startX, startW, pairW, cols:[colgroup,…] }
+  pagesEl.addEventListener('pointerdown', (e) => {
+    const g = e.target.closest && e.target.closest('.colgrip');
+    if (!g) return;
+    e.preventDefault();
+    const blkEl = g.closest('.blk-table[data-id]');
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === blkEl.dataset.id);
+    if (!b) return;
+    const col = Number(g.dataset.col);
+    grip = { id: b.id, col, startX: e.clientX,
+      startW: b.cols[col].w, pairW: b.cols[col].w + b.cols[col + 1].w,
+      cols: Array.from(pagesEl.querySelectorAll('.blk-table[data-id="' + b.id + '"] colgroup')) };
+    g.classList.add('on');
+    try { g.setPointerCapture(e.pointerId); } catch (err) { /* 합성 이벤트에는 없다 */ }
+  });
+  pagesEl.addEventListener('pointermove', (e) => {
+    if (!grip) return;
+    const w = Math.max(30, Math.min(grip.startW + (e.clientX - grip.startX), grip.pairW - 30));
+    for (const cg of grip.cols) {                          // 모든 조각의 colgroup 을 같이
+      cg.children[grip.col].style.width = w + 'px';
+      cg.children[grip.col + 1].style.width = (grip.pairW - w) + 'px';
+    }
+  });
+  // ⚠ 어느 경계를 끌었는지는 e.target 이 아니라 grip 에서 읽는다 — setPointerCapture 덕에
+  //   손잡이 밖에서 놓아도 이벤트는 오지만, target 을 믿으면 꼬인다.
+  pagesEl.addEventListener('pointerup', (e) => {
+    if (!grip) return;
+    const { id, col, startX, startW, pairW } = grip;
+    grip = null;
+    pagesEl.querySelectorAll('.colgrip.on').forEach(x => x.classList.remove('on'));
+    const w = Math.max(30, Math.min(startW + (e.clientX - startX), pairW - 30));
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === id);
+    if (!b || b.type !== 'table') return;
+    const next = setColWidth(b, col, w);
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, id, { cols: next.cols }) }));
+    cancelIdle();
+    redraw({ keepCaret: true });
+  });
+
   // 잘라내기(Ctrl+X)의 걸침판은 아직 없다 — 반쪽 지움을 막기 위해 계속 막는다
   pagesEl.addEventListener('cut', (e) => {
     if (targetsIn(pagesEl).length > 1) e.preventDefault();
@@ -1325,28 +2170,31 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
 }
 
 /* history.js */
-// 블록 배열 자체를 쌓는다. 블록은 제자리에서 안 고치므로(immutable)
+// 블록 배열과 «그 편집 순간의 선택»을 함께 쌓는다. 블록은 제자리에서 안 고치므로
 // 안 바뀐 블록은 여러 상태가 같은 객체를 가리킨다 — 그래서 가볍다.
+// 되돌릴 때는 방금 무른 편집의 선택을 준다 — 드래그해 굵게 → Ctrl+Z 하면
+// 그 드래그가 다시 칠해져 이어서 다른 서식을 입힐 수 있다(워드와 같다).
 function createHistory(limit = 200) {
-  const past = [];
+  const past = [];     // [{ blocks, sel }]
   const future = [];
   return {
-    push(blocks) {
-      if (past.length && past[past.length - 1] === blocks) return;
-      past.push(blocks);
+    push(blocks, sel) {
+      if (past.length && past[past.length - 1].blocks === blocks) return;
+      past.push({ blocks, sel: sel || null });
       while (past.length > limit) past.shift();
       future.length = 0;
     },
     undo() {
       if (past.length < 2) return null;
-      future.push(past.pop());
-      return past[past.length - 1];
+      const undone = past.pop();
+      future.push(undone);
+      return { blocks: past[past.length - 1].blocks, sel: undone.sel };
     },
     redo() {
       if (!future.length) return null;
       const next = future.pop();
       past.push(next);
-      return next;
+      return { blocks: next.blocks, sel: next.sel };
     },
     canUndo() { return past.length >= 2; },
     canRedo() { return future.length > 0; },
@@ -1355,6 +2203,7 @@ function createHistory(limit = 200) {
 }
 
 /* toolbar.js */
+
 
 
 
@@ -1379,10 +2228,27 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
 
   // 서식을 입힐 토막 목록 — 문단은 블록의 runs, 목록은 그 항목(items[i])
   function runsOf(b, at) {
+    if (at.cell) {
+      const row = at.cell[0] === 'h' ? (b.head && b.head[0]) : (b.rows && b.rows[at.cell[0]]);
+      const cell = row && row[at.cell[1]];
+      return cell && !cell.cov && Array.isArray(cell.runs) ? cell.runs : null;
+    }
     if (at.item === null || at.item === undefined) return Array.isArray(b.runs) ? b.runs : null;
     return Array.isArray(b.items) && Array.isArray(b.items[at.item]) ? b.items[at.item] : null;
   }
   function patchOf(b, at, runs) {
+    if (at.cell) {
+      if (at.cell[0] === 'h') {
+        const head = [b.head[0].slice()];
+        head[0][at.cell[1]] = Object.assign({}, head[0][at.cell[1]], { runs });
+        return { head };
+      }
+      const rows = b.rows.slice();
+      const row = rows[at.cell[0]].slice();
+      row[at.cell[1]] = Object.assign({}, row[at.cell[1]], { runs });
+      rows[at.cell[0]] = row;
+      return { rows };
+    }
     if (at.item === null || at.item === undefined) return { runs };
     const items = b.items.slice();
     items[at.item] = runs;
@@ -1412,7 +2278,9 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     if (targets.length === 1) return targets[0];
     const a = targets[0];
     const b = targets[targets.length - 1];
-    return { multi: 1, a: { id: a.id, item: a.item, pos: a.from }, b: { id: b.id, item: b.item, pos: b.to } };
+    // ⚠ cell 을 같이 실어야 표 칸 걸침 선택이 다시 그린 뒤에도 되살아난다(draw 의 hostOf 가 본다)
+    return { multi: 1, a: { id: a.id, item: a.item, cell: a.cell, pos: a.from },
+             b: { id: b.id, item: b.item, cell: b.cell, pos: b.to } };
   }
 
   function toggle(key) {
@@ -1448,9 +2316,13 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
           return src && allMarked(src, t.from, t.to, key);
         });
       } else if (b && el) {
-        const li = activeItemEl(el);
-        const src = runsOf(b, { item: li ? Number(li.dataset.i) : null });
-        const r = src ? rangeIn(li || el) : null;
+        const td = activeCellEl(el);
+        const li = td ? null : activeItemEl(el);
+        const at = td
+          ? { cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] }
+          : { item: li ? Number(li.dataset.i) : null };
+        const src = runsOf(b, at);
+        const r = src ? rangeIn(td || li || el) : null;
         if (src && r) on = !!markAt(src, r.from)[key];
       }
       btn.classList.toggle('on', on);
@@ -1469,6 +2341,37 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   // 정렬은 토막이 아니라 블록 전체에 붙는다 — 걸침 선택이면 걸친 블록 전부에
   function setAlign(align) {
     const targets = targetRanges();
+    const parts = targets && targets.length ? targets : null;
+    const cellTs = (parts || []).filter(t => t.cell);
+    if (cellTs.length || (activeBlockEl(pagesEl) && activeCellEl(activeBlockEl(pagesEl)))) {
+      // 표 칸 정렬 — 블록이 아니라 «칸»에 붙는다
+      const doc0 = getDoc();
+      let list = cellTs;
+      if (!list.length) {
+        const el = activeBlockEl(pagesEl);
+        const td = activeCellEl(el);
+        list = [{ id: el.dataset.id,
+          cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] }];
+      }
+      let blocks = doc0.blocks;
+      for (const t of list) {
+        const b = blocks.find(x => x.id === t.id);
+        if (!b || b.type !== 'table') continue;
+        const row0 = t.cell[0] === 'h' ? b.head[0] : b.rows[t.cell[0]];
+        const cell = Object.assign({}, row0[t.cell[1]], { align });
+        blocks = replaceBlock(blocks, t.id, (() => {
+          if (t.cell[0] === 'h') {
+            const head = [b.head[0].slice()]; head[0][t.cell[1]] = cell; return { head };
+          }
+          const rows = b.rows.slice(); const row = rows[t.cell[0]].slice();
+          row[t.cell[1]] = cell; rows[t.cell[0]] = row; return { rows };
+        })());
+      }
+      setDoc(Object.assign({}, doc0, { blocks }));
+      if (parts) redraw({ sel: selOf(parts) });
+      else redraw({ caret: { id: list[0].id, cell: list[0].cell, pos: 0 } });
+      return;
+    }
     const doc = getDoc();
     let ids = [];
     if (targets && targets.length) ids = Array.from(new Set(targets.map(t => t.id)));
@@ -1562,6 +2465,86 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     btn.addEventListener('click', () => toggle(btn.dataset.mark));
   }
 
+  // ── 표 동작 — 커서가 표 안일 때만. 실제 텍스트 폭은 문서 여백에서 계산한다 ──
+  function textWidth(doc) {
+    const p = doc.page;
+    return p.width - p.margin.left - p.margin.right;
+  }
+  function tableCtx() {
+    const el = activeBlockEl(pagesEl);
+    if (!el || !el.classList.contains('blk-table')) return null;
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === el.dataset.id);
+    if (!b || b.type !== 'table') return null;
+    const td = activeCellEl(el);
+    const cell = td ? [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] : null;
+    return { doc, b, cell };
+  }
+  function commitTable(doc, b, next, caret) {
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id,
+      { cols: next.cols, head: next.head, rows: next.rows }) }));
+    redraw({ caret });
+  }
+  for (const btn of barEl.querySelectorAll('.tb[data-table]')) {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', () => {
+      const kind = btn.dataset.table;
+      if (kind === 'insert') {
+        const doc = getDoc();
+        const el = activeBlockEl(pagesEl);
+        const t = normalizeWidths(createBlock('table', { ncols: 3, nrows: 3 }), textWidth(doc));
+        const blocks = el ? insertAfter(doc.blocks, el.dataset.id, t) : doc.blocks.concat([t]);
+        setDoc(Object.assign({}, doc, { blocks }));
+        redraw({ caret: { id: t.id, cell: ['h', 0], pos: 0 } });
+        return;
+      }
+      const ctx = tableCtx();
+      if (!ctx) return;
+      const { doc, b, cell } = ctx;
+      const r = cell && cell[0] !== 'h' ? cell[0] : 0;
+      const c = cell ? cell[1] : 0;
+      if (kind === 'del') {
+        // 확인창 없음(D15) — Ctrl+Z 한 번에 통째로 돌아온다
+        setDoc(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, b.id) }));
+        redraw({});
+      } else if (kind === 'row+') {
+        commitTable(doc, b, addRow(b, r + 1), { id: b.id, cell: [r + 1, 0], pos: 0 });
+      } else if (kind === 'row-') {
+        const next = delRow(b, r);
+        if (next === b) return;
+        commitTable(doc, b, next, { id: b.id, cell: [Math.min(r, next.rows.length - 1), 0], pos: 0 });
+      } else if (kind === 'col+') {
+        commitTable(doc, b, addCol(b, c + 1, textWidth(doc)), { id: b.id, cell: [r, c + 1], pos: 0 });
+      } else if (kind === 'col-') {
+        const next = delCol(b, c, textWidth(doc));
+        if (next === b) return;
+        commitTable(doc, b, next, { id: b.id, cell: [r, Math.min(c, next.cols.length - 1)], pos: 0 });
+      } else if (kind === 'merge') {
+        const cells = (lastSels || []).concat(targetsIn(pagesEl))
+          .filter(t => t.cell && t.id === b.id && t.cell[0] !== 'h');
+        if (cells.length < 2) return;                     // 몸통 칸 2개 이상을 골라야 한다(R10)
+        const rs = cells.map(t => t.cell[0]);
+        const cs = cells.map(t => t.cell[1]);
+        const next = mergeCells(b, Math.min(...rs), Math.min(...cs), Math.max(...rs), Math.max(...cs));
+        commitTable(doc, b, next, { id: b.id, cell: [Math.min(...rs), Math.min(...cs)], pos: 0 });
+      } else if (kind === 'split') {
+        if (!cell || cell[0] === 'h') return;
+        const [ar, ac] = anchorOf(b, cell[0], cell[1]);
+        commitTable(doc, b, splitCell(b, cell[0], cell[1]), { id: b.id, cell: [ar, ac], pos: 0 });
+      } else if (kind === 'splitx') {
+        if (!cell || cell[0] === 'h') return;                    // 머리글은 나누지 않는다(R16)
+        const [ar, ac] = anchorOf(b, cell[0], cell[1]);
+        commitTable(doc, b, splitCellAcross(b, cell[0], cell[1], textWidth(doc)),
+                    { id: b.id, cell: [ar, ac], pos: 0 });
+      } else if (kind === 'splity') {
+        if (!cell || cell[0] === 'h') return;
+        const [ar, ac] = anchorOf(b, cell[0], cell[1]);
+        commitTable(doc, b, splitCellDown(b, cell[0], cell[1]),
+                    { id: b.id, cell: [ar, ac], pos: 0 });
+      }
+    });
+  }
+
   document.addEventListener('selectionchange', refresh);
   pagesEl.addEventListener('keyup', refresh);
 
@@ -1599,6 +2582,16 @@ function demoDoc() {
     createBlock('heading', { text: '신청 모델의 세부 사양서' }),
     createBlock('section', { no: '01', title: '제어반 적용 범위 및 제품 특기사항' }),
   ];
+  const cell = (s) => ({ runs: s ? [{ t: s }] : [] });
+  doc.blocks.push(createBlock('table', {
+    cols: [{ w: 200, align: 'left' }, { w: 240, align: 'left' }, { w: 234, align: 'center' }],
+    head: [[cell('기판 구분'), cell('인쇄회로기판명'), cell('Revision')]],
+    rows: [
+      [cell('안전회로기판'), cell('UCMP-600'), cell('Rev1.0')],
+      [cell('주 제어기판'), cell('UMCB-4000Zi-B'), cell('Rev5.0')],
+      [cell('안전회로 경유기판'), cell('EMR-100R'), cell('Rev5.0')],
+    ],
+  }));
   for (let i = 1; i <= 60; i++) {
     doc.blocks.push(createBlock('para', {
       text: i + '. 안전회로의 전압은 AC 110V 를 사용하며, 브레이크 및 도어 모터 전압은 따로 분기한다.',
@@ -1615,14 +2608,20 @@ function draw(opt = {}) {
   // 이전 항목 끝과 다음 항목 처음이 같은 번호가 되어, 커서가 이전 항목으로 붙는다(실기기 지적 1).
   let keepId = null;
   let keepItem = null;
+  let keepCell = null;
   let keepPos = 0;
   if (opt.keepCaret) {
     const blk = activeBlockEl(pagesEl);
     const sel = window.getSelection();
     if (blk && sel && sel.anchorNode) {
       keepId = blk.dataset.id;
-      const li = activeItemEl(blk);
-      if (li) {
+      const td = activeCellEl(blk);
+      const li = td ? null : activeItemEl(blk);
+      if (td) {
+        keepItem = null;
+        keepCell = [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)];
+        keepPos = offsetIn(td, sel.anchorNode, sel.anchorOffset);
+      } else if (li) {
         keepItem = li.dataset.i;
         keepPos = offsetIn(li, sel.anchorNode, sel.anchorOffset);
       } else {
@@ -1633,35 +2632,38 @@ function draw(opt = {}) {
 
   const r = renderPages(state.doc, pagesEl, document.getElementById('gauge'));
 
-  // sel.item 이 있으면 그 목록 항목 안에서 고른다 (도구모음이 목록 항목 서식에 쓴다)
-  const hostIn = (el, item) => (item === null || item === undefined)
-    ? el : el.querySelector('.lst li[data-i="' + item + '"]');
+  // p = { id, item?, cell? } — 커서·선택을 되돌릴 편집 칸(문단/목록 항목/표 칸)을 찾는다.
+  // ⚠ 표 칸은 pagesEl 전체에서 찾는다 — 장을 넘은 표는 같은 id 의 .blk 조각이 여러 개라,
+  //   첫 조각만 봐서는 뒷장의 칸을 못 찾는다.
+  const hostOf = (p) => {
+    if (p.cell) {
+      return pagesEl.querySelector('.blk[data-id="' + p.id + '"] td[data-r="' + p.cell[0]
+        + '"][data-c="' + p.cell[1] + '"]');
+    }
+    const el = pagesEl.querySelector('.blk[data-id="' + p.id + '"]');
+    if (!el) return null;
+    if (p.item === null || p.item === undefined) return el;
+    return el.querySelector('.lst li[data-i="' + p.item + '"]');
+  };
 
   if (opt.sel && opt.sel.multi) {
     // 여러 블록에 걸친 선택 복원 — 양 끝 좌표만 있으면 브라우저가 사이를 채운다
-    const resolve = (p) => {
-      const el = pagesEl.querySelector('.blk[data-id="' + p.id + '"]');
-      const host = el && hostIn(el, p.item);
-      return host ? nodeAt(host, p.pos) : null;
-    };
+    const resolve = (p) => { const host = hostOf(p); return host ? nodeAt(host, p.pos) : null; };
     const na = resolve(opt.sel.a);
     const nb = resolve(opt.sel.b);
     if (na && nb) window.getSelection().setBaseAndExtent(na.node, na.offset, nb.node, nb.offset);
   } else if (opt.sel) {
-    const el = pagesEl.querySelector('.blk[data-id="' + opt.sel.id + '"]');
-    const host = el && hostIn(el, opt.sel.item);
+    const host = hostOf(opt.sel);
     if (host) selectRange(host, opt.sel.from, opt.sel.to);
   } else if (opt.caret) {
-    // 정확한 자리(블록·목록 항목·글자 번호)로 커서를 놓는다 — 걸침 지우기가 쓴다
-    const el = pagesEl.querySelector('.blk[data-id="' + opt.caret.id + '"]');
-    const host = el && (hostIn(el, opt.caret.item) || el);
+    // 정확한 자리(블록·목록 항목·표 칸·글자 번호)로 커서를 놓는다 — 걸침 지우기가 쓴다
+    const host = hostOf(opt.caret) || pagesEl.querySelector('.blk[data-id="' + opt.caret.id + '"]');
     if (host) caretTo(host, opt.caret.pos);
   } else if (opt.caretId) {
     const el = pagesEl.querySelector('.blk[data-id="' + opt.caretId + '"]');
     if (el) caretTo(el, opt.caretEnd ? Number.MAX_SAFE_INTEGER : 0);
   } else if (keepId) {
-    const el = pagesEl.querySelector('.blk[data-id="' + keepId + '"]');
-    const host = el && (hostIn(el, keepItem) || el);
+    const host = hostOf({ id: keepId, item: keepItem, cell: keepCell });
     if (host) caretTo(host, keepPos);
   }
   return r;
@@ -1682,18 +2684,54 @@ function markDirty() {
   }, 5000);
 }
 
+// 지금 화면의 선택(커서·드래그)을 모델 좌표로 뜬다 — 되돌리기가 이 자리를 되살린다.
+// setDoc(=applyDoc) 은 항상 다시 그리기 «전»에 불리므로 이 순간의 선택이 곧 편집 자리다.
+function selSnapshot() {
+  const pagesEl = document.getElementById('pages');
+  if (!pagesEl) return null;
+  const parts = targetsIn(pagesEl);
+  if (parts.length === 1) return parts[0];
+  if (parts.length > 1) {
+    const a = parts[0];
+    const b = parts[parts.length - 1];
+    return { multi: 1, a: { id: a.id, item: a.item, cell: a.cell, pos: a.from },
+             b: { id: b.id, item: b.item, cell: b.cell, pos: b.to } };
+  }
+  const blk = activeBlockEl(pagesEl);
+  const s = window.getSelection();
+  if (!blk || !s || !s.anchorNode) return null;
+  const td = activeCellEl(blk);
+  if (td) {
+    return { caret: 1, id: blk.dataset.id, item: null,
+             cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)],
+             pos: offsetIn(td, s.anchorNode, s.anchorOffset) };
+  }
+  const li = activeItemEl(blk);
+  const host = li || blk;
+  return { caret: 1, id: blk.dataset.id, item: li ? Number(li.dataset.i) : null,
+           pos: offsetIn(host, s.anchorNode, s.anchorOffset) };
+}
+
 // 편집이 문서를 바꿀 때는 항상 이 문으로 들어와 기록이 쌓인다
-const applyDoc = (d) => { state.doc = d; history.push(d.blocks); markDirty(); };
+const applyDoc = (d) => { state.doc = d; history.push(d.blocks, selSnapshot()); markDirty(); };
+
+// 되돌린 편집의 선택을 되살린다. 그 블록이 이 상태에 없으면(문단 가르기 되돌림 등)
+// 조용히 선택 없이 그린다 — 못 찾으면 커서를 안 놓을 뿐, 글은 정상이다.
+function drawWithSel(sel) {
+  if (!sel) { draw(); return; }
+  if (sel.caret) { draw({ caret: { id: sel.id, item: sel.item, cell: sel.cell, pos: sel.pos } }); return; }
+  draw({ sel });
+}
 
 document.addEventListener('keydown', (e) => {
   const ctrl = e.ctrlKey || e.metaKey;
   if (!ctrl) return;
   if (e.key === 'z' && !e.shiftKey) {
-    const b = history.undo();
-    if (b) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: b }); draw(); }
+    const r = history.undo();
+    if (r) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: r.blocks }); drawWithSel(r.sel); }
   } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-    const b = history.redo();
-    if (b) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: b }); draw(); }
+    const r = history.redo();
+    if (r) { e.preventDefault(); state.doc = Object.assign({}, state.doc, { blocks: r.blocks }); drawWithSel(r.sel); }
   }
 });
 
@@ -1758,6 +2796,37 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     await writeDoc(state.dir, name, serialize(state.doc));
     state.name = name;
     msg('저장함: ' + name);
+    await refreshList();
+  } catch (e) { msg('저장하지 못했다: ' + e.message); }
+});
+
+// 새 문서 — 빈 문단 하나로 시작한다. 저장 전에는 파일이 없다(워드와 같다).
+document.getElementById('btn-new').addEventListener('click', () => {
+  state.doc = createDocument();
+  state.name = null;
+  history.push(state.doc.blocks);
+  draw({ caretId: state.doc.blocks[0].id });
+  refreshList();
+  msg('새 문서 — 저장하면 파일이 생깁니다');
+});
+
+// 다른 이름으로 저장 — 지금 열린 폴더에 새 파일을 만든다(R15).
+// 같은 이름이 이미 있으면 물어본다 — 다른 문서가 조용히 사라지면 안 된다(데이터 안전).
+document.getElementById('btn-saveas').addEventListener('click', async () => {
+  if (!state.dir) { msg('먼저 문서 폴더를 여세요'); return; }
+  const cur = (state.name || ((state.doc.meta.title || '새 문서') + DOC_EXT)).replace(DOC_EXT, '');
+  const input = window.prompt('다른 이름으로 저장 — 새 파일 이름:', cur);
+  if (input === null) return;                                    // 사람이 취소한 것
+  const name = input.trim().replace(/[\\/:*?"<>|]/g, '').replace(DOC_EXT, '');
+  if (!name) { msg('이름이 비었습니다'); return; }
+  const full = name + DOC_EXT;
+  try {
+    const names = await listDocs(state.dir);
+    if (full !== state.name && names.includes(full)
+        && !window.confirm('「' + name + '」 문서가 이미 있습니다. 덮어쓸까요?')) return;
+    await writeDoc(state.dir, full, serialize(state.doc));
+    state.name = full;
+    msg('저장함: ' + full);
     await refreshList();
   } catch (e) { msg('저장하지 못했다: ' + e.message); }
 });
