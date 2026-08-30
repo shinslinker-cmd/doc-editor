@@ -122,6 +122,9 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .colgrip { position:absolute; top:0; bottom:0; width:7px; cursor:col-resize; z-index:3; }
 .colgrip-fixed { cursor:default; pointer-events:none; }   /* 이어진 장의 것은 보기 전용 */
 .colgrip:hover, .colgrip.on { background:rgba(84,144,255,.35); }
+/* 칸을 끄는 동안에는 손잡이가 파래지지 않는다 — 열 너비를 바꾸는 중이 아니다(2026-08-30 SKY).
+   실제로 끄는 손잡이는 .on 이 붙어 있어 그대로 파랗다. */
+#pages.picking .colgrip:hover { background:transparent; }
 /* 표에 마우스를 올리면 칸 경계가 세로 눈금으로 보인다 — 세로선이 없어 열 구분이 안 되던 것.
    ⭐ 눈금은 «격자 열»이 아니라 «실제 칸»의 오른쪽에 그린다(2026-08-30 SKY 지적) —
       한 칸만 옆으로 나눴을 때, 안 나뉜 다른 행까지 선이 가로지르면 안 된다.
@@ -246,12 +249,6 @@ body { margin:0; background:var(--desk); color:var(--ink);
       </span>
       <span class="tb-sep"></span>
       <span class="tbg">
-      <button class="tb tb-ic" data-align="left" title="왼쪽 정렬"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 5h10M1 8.5h16M1 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-align="center" title="가운데 정렬"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M4 5h10M1 8.5h16M4 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-align="right" title="오른쪽 정렬"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M7 5h10M1 8.5h16M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      </span>
-      <span class="tb-sep"></span>
-      <span class="tbg">
       <button class="tb" data-list="0" title="글머리표 목록">• 목록</button>
       <button class="tb" data-list="1" title="번호 목록">1. 목록</button>
       </span>
@@ -268,6 +265,11 @@ body { margin:0; background:var(--desk); color:var(--ink);
       <button class="tb" data-table="split" title="병합 풀기">분할</button>
       <button class="tb" data-table="splitx" title="이 칸을 옆으로 둘로">옆 나누기</button>
       <button class="tb" data-table="splity" title="이 칸을 아래로 둘로">아래 나누기</button>
+      <!-- 가로 정렬도 이 묶음 안에 둔다 (2026-08-30 SKY) — 세로 맞춤과 짝이라 함께 있어야
+           표를 고칠 때 손이 안 멀어진다. ⚠ 표 밖 문단 정렬도 여전히 이 버튼이다. -->
+      <button class="tb tb-ic" data-align="left" title="왼쪽 정렬 (표 밖 문단에도 쓴다)"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 5h10M1 8.5h16M1 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="tb tb-ic" data-align="center" title="가운데 정렬 (표 밖 문단에도 쓴다)"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M4 5h10M1 8.5h16M4 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="tb tb-ic" data-align="right" title="오른쪽 정렬 (표 밖 문단에도 쓴다)"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M7 5h10M1 8.5h16M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb tb-ic" data-valign="top" title="위쪽 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 1.5h14M5 4.5h8M5 7.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb tb-ic" data-valign="middle" title="가운데 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M5 3.5h8M2 7h14M5 10.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb tb-ic" data-valign="bottom" title="아래쪽 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M5 6.5h8M5 9.5h8M2 12.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
@@ -2338,6 +2340,17 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     redraw({ caret: r.caret });
     return true;
   }
+
+  // 칸을 끄는 동안에는 열 손잡이의 파란 강조를 끈다 (2026-08-30 SKY) —
+  // 그때는 열 너비를 바꾸는 게 아니라 칸을 고르는 중이라, 손끝이 손잡이 위를 지날 때마다
+  // 파래지면 «지금 열을 끌고 있나?» 하고 헷갈린다. 열 손잡이에서 «시작»한 끌기는 예외다.
+  pagesEl.addEventListener('pointerdown', (e) => {
+    if (e.target.closest && e.target.closest('.colgrip')) return;
+    pagesEl.classList.add('picking');
+  });
+  const endPick = () => pagesEl.classList.remove('picking');
+  document.addEventListener('pointerup', endPick);
+  document.addEventListener('pointercancel', endPick);
 
   // ── 열 너비 끌기 — 끄는 동안은 colgroup 만 미리보기로 바꾸고, 놓으면 모델에 적는다 ──
   let grip = null;   // { id, col, startX, startW, pairW, cols:[colgroup,…] }
