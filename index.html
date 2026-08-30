@@ -41,8 +41,10 @@ body { margin:0; background:var(--desk); color:var(--ink);
    (실측 2026-08-30: 화면 800px 인데 main 이 884px). 이게 있어야 안쪽 max-width 가 통한다. */
 #main { flex:1; min-width:0; padding:0 0 60px; }
 /* 입력판(D16) — 문서 전체가 하나의 contenteditable 이라 초점 테두리를 끈다 */
+/* position:relative 는 그림 크기 손잡이(#imgui)의 좌표 기준이다 — 없으면 손잡이가
+   엉뚱한 곳(화면 왼쪽 위)에 뜬다 */
 #pages { display:flex; flex-direction:column; align-items:center; gap:28px; padding-top:28px;
-         outline:none; caret-color:var(--ink); }
+         outline:none; caret-color:var(--ink); position:relative; }
 
 /* 위쪽 도구모음 — 화면에 붙어 있고 문서와 함께 스크롤되지 않는다 */
 /* 줄 사이는 조금 넓게 — 표 묶음의 「표」 이름표가 윗줄에 붙어 답답해 보였다(캡처 실측) */
@@ -191,8 +193,45 @@ body { margin:0; background:var(--desk); color:var(--ink);
         line-height:1.7; padding:14px 18px; }
 
 @page { size: A4 portrait; margin: 0; }
+/* ── 그림 (설계_그림.md) ── */
+/* position:relative 는 아래 캡션 안내글(::before)의 좌표 기준이다 — 없으면 안내글이
+   종이 왼쪽 위 구석에 뜬다 */
+.blk-image { margin:6px 0; position:relative; }
+.blk-image img.bimg { display:inline-block; }
+.blk-image .cap { font-size:10.5px; color:#5a5e6a; text-align:center; }
+/* 캡션이 비면 높이 0 — 화면과 인쇄의 장 나눔이 같아야 한다.
+   ⚠ min-height:0 으로는 안 된다(실측 2026-08-31: 그래도 15px). 크롬이 «글자를 칠 수 있는
+   빈 칸»에는 커서 놓을 자리를 한 줄 강제로 만들어 주기 때문이다 — CSS 여백이 아니라
+   편집 기능이 만드는 높이다. 그래서 접어 둔다(height:0). 커서가 들어오면 편다. */
+.blk-image .cap:empty:not(:focus) { height:0; overflow:hidden; }
+.blk-image .cap:focus { min-height:1.4em; overflow:visible; }
+.blk-image .cap:focus:empty::before {
+  content:'그림 설명 (비우면 안 보임)'; color:#aeb0b8; position:absolute; left:0; right:0; }
+/* 그림을 고르면 빈 캡션이 펴진다 — 안 그러면 새로 넣은 그림에 설명을 달 길이 없다
+   (접혀 있어 누를 수가 없다). 인쇄에서는 고른 상태가 의미 없으므로 다시 접는다. */
+.blk-image img.imgsel ~ .cap:empty { height:auto; overflow:visible; min-height:1.4em; }
+.blk-image img.imgsel ~ .cap:empty::before {
+  content:'그림 설명 (비우면 안 보임)'; color:#aeb0b8; }
+#pages img.ri, #gauge img.ri { vertical-align:middle; max-width:100%; height:auto; }
+#pages img.imgsel { outline:2px solid #5490ff; outline-offset:1px; }
+/* 크기 손잡이 — 편집 화면 전용, 인쇄에 안 찍힌다.
+   ⚠ #imgui 자체는 pointer-events:none 이라 밑에 있는 글자를 가리지 않는다(2B 함정 재발 방지) */
+#imgui { position:absolute; z-index:30; pointer-events:none; }
+#imgui .imgh { position:absolute; width:10px; height:10px; background:#fff;
+  border:1.5px solid #5490ff; border-radius:2px; pointer-events:auto; }
+#imgui .imgh[data-c="nw"] { left:-5px; top:-5px; cursor:nwse-resize; }
+#imgui .imgh[data-c="ne"] { right:-5px; top:-5px; cursor:nesw-resize; }
+#imgui .imgh[data-c="sw"] { left:-5px; bottom:-5px; cursor:nesw-resize; }
+#imgui .imgh[data-c="se"] { right:-5px; bottom:-5px; cursor:nwse-resize; }
+
 @media print {
   #side, #gauge, #folder-msg { display:none !important; }
+  #imgui { display:none !important; }
+  #pages img.imgsel { outline:none !important; }
+  /* 인쇄에서는 «고른 그림»이 의미가 없다 — 펴 뒀던 빈 캡션을 도로 접는다 */
+  .blk-image .cap:empty { height:0 !important; overflow:hidden !important;
+                          min-height:0 !important; }
+  .blk-image .cap:empty::before { content:none !important; }
   body { background:#fff; }
   /* ⛔ 확대/축소가 인쇄에 남으면 A4 밖으로 잘린다 (설계서 §12-10) */
   #main { padding:0 !important; transform:none !important; zoom:1 !important; }
@@ -292,19 +331,30 @@ body { margin:0; background:var(--desk); color:var(--ink);
       <button class="tb tb-ic" data-valign="bottom" title="아래쪽 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M5 6.5h8M5 9.5h8M2 12.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb" data-table="del" title="표 지우기 (Ctrl+Z 로 복구)">표 지우기</button>
       </span>
+      <span class="tb-sep"></span>
+      <span class="tbg tbg-table" data-label="그림">
+      <button class="tb" data-image="block" title="그림 넣기 — 표 칸 안이면 칸 안에, 본문이면 한 줄짜리 그림으로">🖼 그림</button>
+      <button class="tb" data-image="inline" title="커서 자리에 글자처럼 들어가는 작은 그림">글안 그림</button>
+      </span>
     </div>
     <!-- ⭐ 문서 전체가 하나의 입력판이다 (D16) — 선택·커서·조합·터치는 브라우저가 한다 -->
     <div id="pages" contenteditable="true" spellcheck="false"></div>
   </main>
 </div>
 <div id="gauge" aria-hidden="true"></div>
+<!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
+<input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-30 23:49";
+window.__BUILD = "2026-08-31 08:48";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
 // ⛔ 이 파일은 DOM 을 모른다. 토막을 제자리에서 고치지 않고 항상 새 배열·새 객체를 만든다.
 const MARK_KEYS = ['b', 'i', 'u', 's', 'sz', 'c', 'mono'];
+
+const OBJ = '￼';   // 물건자리 글자 — 그림 토막의 t 는 항상 이 1글자다(설계 R5)
+
+function imgRun(id, w, h) { return { t: OBJ, img: id, w, h }; }
 
 function markOf(run) {
   const m = {};
@@ -313,6 +363,21 @@ function markOf(run) {
   }
   return m;
 }
+
+// 토막의 «몸» = 서식 + 그림. 토막을 다시 만들 때는 서식만이 아니라 몸을 통째로 나른다(R2).
+// ⚠ markAt(서식 상속)은 그대로 markOf 를 쓴다 — 그림이 상속되면 친 글자가 그림이 된다(R3).
+// src$ 는 화면에서 되읽은 «아직 보관함에 안 담긴 그림»의 임시 표기다(ui/runs-dom.js).
+function bodyOf(run) {
+  const m = markOf(run);
+  if (run && run.img) { m.img = run.img; m.w = run.w; m.h = run.h; }
+  if (run && run.src$) { m.src$ = run.src$; m.w = run.w; m.h = run.h; }
+  return m;
+}
+
+// 그림을 품은 토막인가 — 합침 금지 판정에 쓴다(R1).
+// ⛔ src$ 도 함께 막는다. 안 막으면 그림 두 장을 잇달아 붙일 때 서식이 같아 한 토막으로
+//    합쳐지고, t 가 2글자가 되어 그림 한 장이 조용히 사라진다.
+function hasImg(r) { return !!(r && (r.img || r.src$)); }
 
 function sameMark(a, b) {
   for (const k of MARK_KEYS) {
@@ -339,8 +404,9 @@ function normalizeRuns(runs) {
   for (const r of runs || []) {
     if (!r || !r.t) continue;
     const last = out[out.length - 1];
-    if (last && sameMark(last, r)) out[out.length - 1] = Object.assign({}, last, { t: last.t + r.t });
-    else out.push(Object.assign({ t: r.t }, markOf(r)));
+    if (last && sameMark(last, r) && !hasImg(last) && !hasImg(r)) {
+      out[out.length - 1] = Object.assign({}, last, { t: last.t + r.t });
+    } else out.push(Object.assign({ t: r.t }, bodyOf(r)));
   }
   return out;
 }
@@ -356,7 +422,7 @@ function sliceRuns(runs, from, to) {
     if (!t || end <= from || start >= to) continue;
     const a = Math.max(from, start) - start;
     const b = Math.min(to, end) - start;
-    out.push(Object.assign({ t: t.slice(a, b) }, markOf(r)));
+    out.push(Object.assign({ t: t.slice(a, b) }, bodyOf(r)));
   }
   return normalizeRuns(out);
 }
@@ -376,13 +442,16 @@ function applyMark(runs, from, to, key, value) {
     const end = pos + t.length;
     pos = end;
     if (!t) continue;
-    if (end <= a || start >= b) { out.push(Object.assign({ t }, markOf(r))); continue; }
-    if (start < a) out.push(Object.assign({ t: t.slice(0, a - start) }, markOf(r)));
+    if (end <= a || start >= b) { out.push(Object.assign({ t }, bodyOf(r))); continue; }
+    // 그림 토막은 서식을 조용히 건너뛴다(R4). t 가 1글자라 «반쪽 겹침»이 없다 —
+    // 겹쳤으면 통째로 겹친 것이므로 그대로 내보내면 된다.
+    if (hasImg(r)) { out.push(Object.assign({ t }, bodyOf(r))); continue; }
+    if (start < a) out.push(Object.assign({ t: t.slice(0, a - start) }, bodyOf(r)));
     const m = markOf(r);
     if (value === null || value === undefined || value === false) delete m[key];
     else m[key] = value;
     out.push(Object.assign({ t: t.slice(Math.max(0, a - start), Math.min(t.length, b - start)) }, m));
-    if (end > b) out.push(Object.assign({ t: t.slice(b - start) }, markOf(r)));
+    if (end > b) out.push(Object.assign({ t: t.slice(b - start) }, bodyOf(r)));
   }
   return normalizeRuns(out);
 }
@@ -413,13 +482,33 @@ function insertText(runs, pos, text, mark) {
 // 모든 토막에 똑같이 붙어 있는 서식만 준다. 목록 표식(•·번호)이 이것을 따라간다 —
 // 항목 전체가 같은 서식일 때만 표식이 바뀌는 것이 워드의 동작이다.
 function uniformMark(runs) {
-  const rs = (runs || []).filter(r => r && r.t);
+  const rs = (runs || []).filter(r => r && r.t && !hasImg(r));
   if (!rs.length) return {};
   const out = {};
   for (const k of MARK_KEYS) {
     const v = rs[0][k];
     if (v === undefined || v === null || v === false) continue;
     if (rs.every(r => r[k] === v)) out[k] = v;
+  }
+  return out;
+}
+
+// 커서 자리에 토막 하나를 끼운다 — 서식 상속 없음(그림 넣기가 쓴다)
+function insertRun(runs, pos, run) {
+  const len = runsLength(runs);
+  const p = Math.max(0, Math.min(pos, len));
+  return normalizeRuns(sliceRuns(runs, 0, p).concat([run], sliceRuns(runs, p, len)));
+}
+
+// pos 자리 그림 토막의 표시 크기를 바꾼다. 그림이 아니면 그대로 둔다.
+function setImgSize(runs, pos, w, h) {
+  const out = [];
+  let p = 0;
+  for (const r of runs || []) {
+    const start = p;
+    p += (r && r.t ? r.t.length : 0);
+    if (r && r.img && start === pos) out.push(Object.assign({}, r, { w, h }));
+    else out.push(r);
   }
   return out;
 }
@@ -827,7 +916,7 @@ function toggleHead(t) {
 
 
 
-const BLOCK_TYPES = ['heading', 'section', 'para', 'list', 'table'];
+const BLOCK_TYPES = ['heading', 'section', 'para', 'list', 'table', 'image'];
 
 let seq = 0;
 function resetIds(n = 0) { seq = n; }
@@ -843,6 +932,14 @@ function createBlock(type, props = {}) {
   if (!BLOCK_TYPES.includes(type)) throw new Error('알 수 없는 블록 종류: ' + type);
   const base = { id: newId(), type, variants: null };
   if (type === 'section') return Object.assign(base, { no: props.no || '', title: props.title || '' });
+  if (type === 'image') {
+    return Object.assign(base, {
+      src: props.src || '',
+      w: props.w || 0,                       // 표시 폭 px. 높이는 원본 비율로 계산(설계 §2-4)
+      align: props.align || 'center',
+      caption: props.caption ? normalizeRuns(props.caption) : [],
+    });
+  }
   if (type === 'table') {
     const ncols = props.cols ? props.cols.length : (props.ncols || 3);
     const empty = () => ({ runs: [] });
@@ -870,16 +967,131 @@ function blockText(b) {
   if (!b) return '';
   if (b.type === 'section') return [b.no, b.title].filter(Boolean).join(' ');
   if (b.type === 'table') return tableText(b);
+  if (b.type === 'image') return runsText(b.caption || []);
   if (b.type === 'list') return (b.items || []).map(runsText).join('\n');
   if (Array.isArray(b.runs)) return runsText(b.runs);
   return b.text || '';
+}
+
+/* assets.js */
+// 그림 보관함 — 문서 안 assets 칸을 다스린다. DOM 을 모른다(core 규칙).
+// 담기(중복 제거)·청소(참조 없는 그림 제거)·되읽기 입양·읽기 복구.
+// ⛔ 최상위 이름 주의: 빌드가 모듈을 한 덩어리로 합친다 — aseq 는 이 파일만 쓴다.
+
+
+let aseq = 0;
+function resetAssetIds(n = 0) { aseq = n; }
+function adoptAssetIds(assets) {
+  for (const k of Object.keys(assets || {})) {
+    const m = /^a(\d+)$/.exec(k);
+    if (m) aseq = Math.max(aseq, Number(m[1]));
+  }
+}
+
+// djb2 — 빠른 지문. 충돌 대비로 data 문자열도 비교한다(설계 §2-1)
+function hashData(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36) + '-' + s.length;
+}
+
+function addAsset(assets, data, w, h) {
+  const hash = hashData(data);
+  for (const id of Object.keys(assets || {})) {
+    const a = assets[id];
+    if (a && a.hash === hash && a.data === data) return { assets, id };
+  }
+  aseq += 1;
+  const id = 'a' + aseq;
+  const one = {};
+  one[id] = { data, w, h, hash };
+  return { assets: Object.assign({}, assets, one), id };
+}
+
+// 블록 하나가 품은 모든 토막 배열에 fn 을 부른다 — 문단·목록·표(머리글+몸통)·캡션
+function eachRuns(b, fn) {
+  if (!b) return;
+  if (Array.isArray(b.runs)) fn(b.runs);
+  if (Array.isArray(b.items)) for (const it of b.items) fn(it);
+  if (Array.isArray(b.caption)) fn(b.caption);
+  for (const rows of [b.head, b.rows]) {
+    if (!Array.isArray(rows)) continue;
+    for (const row of rows) for (const c of row || []) if (c && Array.isArray(c.runs)) fn(c.runs);
+  }
+}
+
+function collectAssetIds(blocks) {
+  const used = new Set();
+  for (const b of blocks || []) {
+    if (b && b.type === 'image' && b.src) used.add(b.src);
+    eachRuns(b, (runs) => { for (const r of runs || []) if (r && r.img) used.add(r.img); });
+  }
+  return used;
+}
+
+// 저장·읽기 때만 부른다(설계 §2-3). blocksLists = [지금 blocks, …되돌리기 기록의 blocks들]
+function sweepAssets(assets, blocksLists) {
+  const used = new Set();
+  for (const blocks of blocksLists || []) {
+    for (const id of collectAssetIds(blocks)) used.add(id);
+  }
+  const next = {};
+  let changed = false;
+  for (const id of Object.keys(assets || {})) {
+    if (used.has(id)) next[id] = assets[id];
+    else changed = true;
+  }
+  return changed ? next : (assets || {});
+}
+
+// 되읽은 토막의 임시 그림(src$)을 보관함에 담아 img 번호로 바꾼다(중복이면 기존 번호).
+// http 주소·모르는 번호는 버린다 — 조용한 네트워크 의존 금지(설계 §5).
+function adoptImages(runs, assets) {
+  let a = assets || {};
+  let changed = false;
+  const out = [];
+  for (const r of runs || []) {
+    if (!r || (!r.src$ && !r.img)) { out.push(r); continue; }
+    if (r.img && !r.src$) {
+      if (a[r.img]) out.push(r);
+      else changed = true;                                   // 미아 — 버린다
+      continue;
+    }
+    const src = r.src$;
+    changed = true;
+    if (typeof src !== 'string' || src.indexOf('data:image/') !== 0) continue;
+    const got = addAsset(a, src, r.w || 0, r.h || 0);
+    a = got.assets;
+    out.push({ t: OBJ, img: got.id, w: r.w || a[got.id].w, h: r.h || a[got.id].h });
+  }
+  return { runs: out, assets: a, changed };
+}
+
+// 읽기 복구(R5): img 토막의 t 를 OBJ 1글자로 강제하고, 보관함에 없는 그림 토막은 뺀다.
+function repairBlocks(blocks, assets) {
+  const fix = (runs) => (runs || []).filter(r => !(r && r.img && !(assets || {})[r.img]))
+    .map(r => (r && r.img && r.t !== OBJ ? Object.assign({}, r, { t: OBJ }) : r));
+  return (blocks || []).map((b) => {
+    if (!b) return b;
+    const next = Object.assign({}, b);
+    if (Array.isArray(b.runs)) next.runs = fix(b.runs);
+    if (Array.isArray(b.items)) next.items = b.items.map(fix);
+    if (Array.isArray(b.caption)) next.caption = fix(b.caption);
+    for (const key of ['head', 'rows']) {
+      if (!Array.isArray(b[key])) continue;
+      next[key] = b[key].map(row => (row || []).map(c =>
+        (c && Array.isArray(c.runs) ? Object.assign({}, c, { runs: fix(c.runs) }) : c)));
+    }
+    return next;
+  });
 }
 
 /* document.js */
 
 
 
-const DOC_VERSION = 3;
+
+const DOC_VERSION = 4;   // 3→4: 그림 보관함(assets)·그림 블록·그림 토막 (설계_그림.md)
 
 const DEFAULT_PAGE = {
   width: 794, height: 1123,
@@ -891,6 +1103,7 @@ function createDocument(meta = {}) {
     version: DOC_VERSION,
     meta: Object.assign({ title: '', subtitle: '', category: '', doc: '', rev: '', date: '' }, meta),
     variants: [],
+    assets: {},
     page: JSON.parse(JSON.stringify(DEFAULT_PAGE)),
     blocks: [createBlock('para')],
   };
@@ -902,7 +1115,8 @@ function serialize(doc) { return JSON.stringify(doc, null, 1); }
 // ⛔ text 를 남겨 두지 않는다 — 둘이 남으면 어느 쪽이 참인지 알 수 없어진다.
 function migrateBlock(b) {
   if (!b || typeof b !== 'object') return b;
-  if (b.type === 'section' || Array.isArray(b.runs)) return b;
+  // 그림 블록은 runs 가 없다 — 가드가 없으면 빈 runs 가 붙어 «글 칸»으로 오해받는다
+  if (b.type === 'section' || b.type === 'image' || Array.isArray(b.runs)) return b;
   const next = Object.assign({}, b, { runs: runsFromText(b.text || '') });
   delete next.text;
   return next;
@@ -918,12 +1132,23 @@ function deserialize(text) {
   if (!Array.isArray(o.blocks)) throw new Error('문서 파일을 읽을 수 없다 — blocks 가 배열이 아니다');
   const blocks = o.blocks.map(migrateBlock);
   adoptIds(blocks);
+  // 그림(버전 4): 보관함을 위생 처리하고, 미아 토막을 복구하고, 안 쓰는 그림을 청소한다
+  const rawAssets = (o.assets && typeof o.assets === 'object') ? o.assets : {};
+  const assets0 = {};
+  for (const k of Object.keys(rawAssets)) {
+    const a = rawAssets[k];
+    if (a && typeof a.data === 'string' && a.data.indexOf('data:image/') === 0) assets0[k] = a;
+  }
+  adoptAssetIds(assets0);
+  const blocks2 = repairBlocks(blocks, assets0);
+  const assets = sweepAssets(assets0, [blocks2]);
   return {
     version: DOC_VERSION,
     meta: Object.assign({ title: '', subtitle: '', category: '', doc: '', rev: '', date: '' }, o.meta || {}),
     variants: Array.isArray(o.variants) ? o.variants : [],
+    assets,
     page: Object.assign(JSON.parse(JSON.stringify(DEFAULT_PAGE)), o.page || {}),
-    blocks,
+    blocks: blocks2,
   };
 }
 
@@ -1247,10 +1472,29 @@ function measureAll(blocks, gaugeEl, makeEl) {
 //    웹에서 복사해 붙여넣은 이상한 서식이 문서에 들어오지 못하게 하는 문이다.
 const WRAP = [['s', 'S'], ['u', 'U'], ['i', 'I'], ['b', 'B']];
 
+// 그리기 전에 문서의 그림 보관함을 등록한다 — renderPages 와 editor 의 되그리기가 부른다.
+// (인자로 다 나르면 호출부 6곳의 서명이 늘어난다 — UI 층 한정의 등록 방식을 쓴다)
+let ASSETS = {};
+function useAssets(a) { ASSETS = a || {}; }
+function assetOf(id) { return ASSETS[id] || null; }
+
 function runsToNodes(runs) {
   const out = [];
   for (const r of runs || []) {
     if (!r || !r.t) continue;
+    if (r.img) {
+      const a = ASSETS[r.img];
+      if (!a) continue;                        // 미아는 안 그린다(읽기 복구가 이미 막지만 방어)
+      const img = document.createElement('img');
+      img.className = 'ri';
+      img.src = a.data;
+      img.dataset.img = r.img;
+      // ⭐ width·height 를 박아 두어야 높이 재기가 그림 로딩을 안 기다린다(설계 §4-1)
+      img.width = r.w || a.w;
+      img.height = r.h || a.h;
+      out.push(img);
+      continue;
+    }
     let node = document.createTextNode(r.t);
     for (const pair of WRAP) {
       if (r[pair[0]]) { const e = document.createElement(pair[1]); e.appendChild(node); node = e; }
@@ -1283,6 +1527,16 @@ function walk(node, mark, out) {
     }
     if (child.nodeType !== 1) continue;          // 주석 따위는 버린다
     const tag = child.tagName;
+    if (tag === 'IMG') {
+      // 살아 있는 DOM 의 우리 그림은 data-img 를 갖고 있다. 밖에서 붙여 들어온 그림은
+      // src$ 로 임시 표기해 두면 flush 의 adoptImages 가 보관함에 담는다.
+      const run = { t: OBJ, w: Number(child.getAttribute('width')) || 0,
+                    h: Number(child.getAttribute('height')) || 0 };
+      if (child.dataset && child.dataset.img) run.img = child.dataset.img;
+      else run.src$ = child.getAttribute('src') || '';
+      out.push(run);
+      continue;
+    }
     if (tag === 'BR') { out.push(Object.assign({ t: '\n' }, mark)); continue; }
     const next = Object.assign({}, mark);
     if (tag === 'B' || tag === 'STRONG') next.b = 1;
@@ -1311,13 +1565,15 @@ function domToRuns(el) {
 
 
 
+
 // ⭐ 입력판은 #pages 하나다(D16 — 한 장의 입력판). 블록은 그냥 그림이고,
 //    섹션 줄·쪽 번호처럼 글이 아닌 것만 편집 불가 섬(contenteditable=false)으로 막는다.
-function blockEl(block) {
+function blockEl(block, page) {
   const el = document.createElement('div');
   el.className = 'blk blk-' + block.type;
   el.dataset.id = block.id;
   if (block.type === 'table') return tableEl(block, null);
+  if (block.type === 'image') return imageEl(block, page);
   if (block.type === 'section') {
     el.setAttribute('contenteditable', 'false');
     const n = document.createElement('span'); n.className = 'n'; n.textContent = block.no || '';
@@ -1346,8 +1602,42 @@ function blockEl(block) {
   return el;
 }
 
+// 그림 블록 — 몸통은 편집 불가 섬, 캡션만 안쪽 입력 칸이다(설계 §4-1).
+// ⭐ 표시 크기는 모델(w)과 종이 크기에서 «계산으로» 정해진다 — 숨은 상자(gauge)와
+//   실제 장이 같은 값을 쓰므로 장 나눔이 어긋날 수 없다. 그림 로딩도 안 기다린다.
+function imageEl(block, page) {
+  const el = document.createElement('div');
+  el.className = 'blk blk-image';
+  el.dataset.id = block.id;
+  el.setAttribute('contenteditable', 'false');
+  if (block.align) el.style.textAlign = block.align;
+  const a = assetOf(block.src);
+  if (a) {
+    const pg = page || DEFAULT_PAGE;
+    const maxW = pg.width - pg.margin.left - pg.margin.right;
+    const maxH = (pg.height - pg.margin.top - pg.margin.bottom) - 60;  // 캡션·여백 몫(설계 §6)
+    let w = Math.min(block.w || a.w, maxW);
+    let h = Math.max(1, Math.round(w * a.h / Math.max(1, a.w)));
+    if (h > maxH) { h = maxH; w = Math.max(1, Math.round(h * a.w / Math.max(1, a.h))); }
+    const img = document.createElement('img');
+    img.className = 'bimg';
+    img.src = a.data;
+    img.dataset.img = block.src;
+    img.width = w;
+    img.height = h;
+    el.appendChild(img);
+  }
+  const cap = document.createElement('div');
+  cap.className = 'cap';
+  cap.setAttribute('contenteditable', 'true');
+  for (const n of runsToNodes(block.caption || [])) cap.appendChild(n);
+  el.appendChild(cap);
+  return el;
+}
+
 function renderPages(doc, pagesEl, gaugeEl) {
-  const heights = measureAll(doc.blocks, gaugeEl, blockEl);
+  useAssets(doc.assets);
+  const heights = measureAll(doc.blocks, gaugeEl, (b) => blockEl(b, doc.page));
   const pages = paginate(doc.blocks, heights, { contentHeight: contentHeightOf(doc.page) });
   const byId = new Map(doc.blocks.map(b => [b.id, b]));
 
@@ -1361,7 +1651,7 @@ function renderPages(doc, pagesEl, gaugeEl) {
       const b = byId.get(ent.id);
       if (!b) continue;
       if (b.type === 'table') body.appendChild(tableEl(b, ent));
-      else body.appendChild(blockEl(b));
+      else body.appendChild(blockEl(b, doc.page));
     }
     const no = document.createElement('div');
     no.className = 'pgno';
@@ -1579,6 +1869,7 @@ function deleteMixed(blocks, targets) {
       continue;
     }
     if (b.type === 'section') continue;                    // 물린 섹션 줄은 없어진다
+    if (b.type === 'image') continue;                      // 물린 그림 블록도 없어진다(캡션째)
     if (Array.isArray(b.items)) {
       const hit = new Map(ts.filter(t => t.item !== null && t.item !== undefined).map(t => [t.item, t]));
       const items = [];
@@ -1651,7 +1942,8 @@ function removeBlock(blocks, id) {
 function textLen(node) {
   if (!node) return 0;
   if (node.nodeType === 3) return (node.nodeValue || '').length;
-  if (node.nodeType === 1 && node.tagName === 'BR') return 1;
+  // 그림(IMG)도 BR 처럼 «글자 1개»다 — 그래야 그림 토막(U+FFFC 1글자)과 셈이 맞는다
+  if (node.nodeType === 1 && (node.tagName === 'BR' || node.tagName === 'IMG')) return 1;
   let n = 0;
   for (const c of node.childNodes || []) n += textLen(c);
   return n;
@@ -1672,7 +1964,7 @@ function offsetIn(el, node, offset) {
     }
     if (cur.nodeType === 3) { count += (cur.nodeValue || '').length; return; }
     if (cur.nodeType !== 1) return;
-    if (cur.tagName === 'BR') { count += 1; return; }
+    if (cur.tagName === 'BR' || cur.tagName === 'IMG') { count += 1; return; }
     for (const c of cur.childNodes || []) { scan(c); if (done) return; }
   };
   scan(el);
@@ -1693,7 +1985,7 @@ function nodeAt(el, pos) {
       return;
     }
     if (cur.nodeType !== 1) return;
-    if (cur.tagName === 'BR') { left = Math.max(0, left - 1); return; }
+    if (cur.tagName === 'BR' || cur.tagName === 'IMG') { left = Math.max(0, left - 1); return; }
     for (const c of cur.childNodes || []) { scan(c); if (done) return; }
   };
   scan(el);
@@ -1759,10 +2051,12 @@ function activeBlockEl(pagesEl) {
 // 화면의 글 칸(문단·제목 블록, 목록 항목)을 문서 순서대로.
 // 입력판이 하나가 된 뒤(D16)에는 속성이 아니라 블록 종류로 찾는다 — 섹션 줄은 글이 아니다.
 // ⚠ .blk-table 래퍼가 문단 선택자에 걸리면 표 전체가 «한 칸»으로 잡힌다 — 반드시 뺀다.
+// ⚠ 그림 블록(.blk-image)도 같은 이유로 뺀다 — 몸통은 글 칸이 아니다.
+//    대신 그 «캡션»(.cap)만 글 칸으로 넣는다(목록 항목·표 칸과 같은 정신).
 function editableEls(pagesEl) {
   return Array.from(pagesEl.querySelectorAll(
-    '.blk[data-id]:not(.blk-section):not(.blk-list):not(.blk-table), '
-    + '.blk-list .lst li[data-i], .blk-table td[data-r]'));
+    '.blk[data-id]:not(.blk-section):not(.blk-list):not(.blk-table):not(.blk-image), '
+    + '.blk-list .lst li[data-i], .blk-table td[data-r], .blk-image .cap'));
 }
 
 // 지금 선택이 걸쳐 있는 편집 칸들을 문서 순서대로 [{el, from, to}] 로 준다.
@@ -1865,6 +2159,12 @@ function targetsIn(pagesEl) {
       const r = td.dataset.r === 'h' ? 'h' : Number(td.dataset.r);
       return { id: blk.dataset.id, item: null, cell: [r, Number(td.dataset.c)], from: p.from, to: p.to };
     }
+    // 그림 캡션 — 블록 안의 저만의 글 칸이라 cap:1 로 표시한다(toolbar·editor 가 본다)
+    const cap = p.el.matches('.blk-image .cap') ? p.el : null;
+    if (cap) {
+      const blk2 = cap.closest('.blk[data-id]');
+      return { id: blk2.dataset.id, item: null, cap: 1, from: p.from, to: p.to };
+    }
     const li = p.el.matches('.lst li[data-i]') ? p.el : null;
     const blk = li ? li.closest('.blk[data-id]') : p.el;
     return { id: blk.dataset.id, item: li ? Number(li.dataset.i) : null, from: p.from, to: p.to };
@@ -1895,6 +2195,18 @@ function activeCellEl(blkEl) {
   return td && blkEl.contains(td) ? td : null;
 }
 
+// 선택이 그림 캡션 안이면 그 .cap 을 준다. 캡션은 저만의 편집 칸이라(중첩 편집 호스트)
+// 글자 번호를 «캡션 안»에서 세야 어긋나지 않는다(표 칸·목록 항목과 같은 이유).
+function activeCapEl(blkEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !blkEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const cap = e.closest('.blk-image .cap');
+  return cap && blkEl.contains(cap) ? cap : null;
+}
+
 /* editor.js */
 // 편집을 다스린다 (D16 — 한 장의 입력판).
 // 선택·커서·한글 조합·터치는 브라우저가 한다. 우리는 «구조를 바꾸는 동작»만
@@ -1911,6 +2223,7 @@ function activeCellEl(blkEl) {
 
 
 
+
 function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
   let composing = false;
   let pending = null;   // { id, runs } 또는 목록 항목이면 { id, itemIndex, runs }
@@ -1919,9 +2232,13 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
 
   function flush(redrawAfter) {
     if (!pending) return;
-    const p = pending;
+    let p = pending;
     pending = null;
     const doc = getDoc();
+    // 되읽은 토막에 밖에서 온 그림(src$)이 있으면 보관함에 담는다(중복이면 기존 번호)
+    const got = Array.isArray(p.runs) ? adoptImages(p.runs, doc.assets) : null;
+    if (got) p = Object.assign({}, p, { runs: got.runs });
+    const assets = got && got.changed ? got.assets : doc.assets;
     let patch;
     if (p.cell) {
       const b = doc.blocks.find(x => x.id === p.id);
@@ -1937,6 +2254,8 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
         rows[p.cell[0]] = row;
         patch = { rows };
       }
+    } else if (p.cap) {
+      patch = { caption: p.runs };
     } else if (p.itemIndex === undefined) {
       patch = { runs: p.runs };
     } else {
@@ -1946,7 +2265,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
       items[p.itemIndex] = p.runs;
       patch = { items };
     }
-    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, p.id, patch) }));
+    setDoc(Object.assign({}, doc, { assets, blocks: replaceBlock(doc.blocks, p.id, patch) }));
     if (redrawAfter) redraw({ caretId: p.id, caretEnd: true });
   }
 
@@ -1954,6 +2273,8 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
   function capture() {
     const blk = activeBlockEl(pagesEl);
     if (!blk) return;
+    const cap = activeCapEl(blk);
+    if (cap) { pending = { id: blk.dataset.id, cap: 1, runs: domToRuns(cap) }; return; }
     const td = activeCellEl(blk);
     if (td) {
       pending = { id: blk.dataset.id,
@@ -2013,8 +2334,9 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     return targets;
   }
 
+  // 섹션 줄·그림 블록 — 글 칸이 아닌 «통짜 섬»은 걸침 선택에 물리면 통째로 없어진다
   function coveredSections(r) {
-    return Array.from(pagesEl.querySelectorAll('.blk-section[data-id]'))
+    return Array.from(pagesEl.querySelectorAll('.blk-section[data-id], .blk-image[data-id]'))
       .filter(el => r.intersectsNode(el) && !el.contains(r.startContainer) && !el.contains(r.endContainer))
       .map(el => ({ id: el.dataset.id, item: null, from: 0, to: 0 }));
   }
@@ -2174,6 +2496,8 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     if (t === 'insertParagraph') {
       e.preventDefault();
       const blk2 = activeBlockEl(pagesEl);
+      const cap2 = blk2 && activeCapEl(blk2);
+      if (cap2) { enterInCap(blk2, cap2); return; }   // 캡션 Enter = 캡션 안 줄바꿈
       const td = blk2 && activeCellEl(blk2);
       if (td) { enterInCell(blk2, td); return; }   // 칸 안 Enter = 줄바꿈(계획 R1)
       enterAt();
@@ -2194,10 +2518,13 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
           e.preventDefault();
           flush(false);
           const doc = getDoc();
-          setDoc(Object.assign({}, doc, { blocks: insertAfter(doc.blocks, blkT.dataset.id, t2) }));
+          const got = adoptTable(t2, doc.assets);
+          const made = got.block;
+          setDoc(Object.assign({}, doc, { assets: got.assets,
+            blocks: insertAfter(doc.blocks, blkT.dataset.id, made) }));
           cancelIdle();
-          const first = t2.head && t2.head.length ? ['h', 0] : (t2.rows.length ? [0, 0] : null);
-          redraw(first ? { caret: { id: t2.id, cell: first, pos: 0 } } : {});
+          const first = made.head && made.head.length ? ['h', 0] : (made.rows.length ? [0, 0] : null);
+          redraw(first ? { caret: { id: made.id, cell: first, pos: 0 } } : {});
           return;
         }
       }
@@ -2385,6 +2712,22 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     redraw({ caret: { id: b.id, cell, pos: r.from + 1 } });
   }
 
+  // 캡션 안 Enter — 새 블록이 아니라 캡션 «안» 줄바꿈이다(표 칸과 같은 규칙)
+  function enterInCap(blk, capEl) {
+    flush(false);
+    const r = rangeIn(capEl);
+    if (!r) return;
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === blk.dataset.id);
+    if (!b || b.type !== 'image') return;
+    const src = b.caption || [];
+    const len = runsLength(src);
+    const runs = sliceRuns(src, 0, r.from).concat([{ t: '\n' }], sliceRuns(src, r.to, len));
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id, { caption: runs }) }));
+    cancelIdle();
+    redraw({ caret: { id: b.id, cap: 1, pos: r.from + 1 } });
+  }
+
   // Tab — 다음/이전 칸으로. 마지막 칸에서 Tab 은 행을 늘린다(계획 R2, 워드와 같다).
   function moveCell(blk, td, dir) {
     flush(false);
@@ -2420,6 +2763,14 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     if (!s.rangeCount) return false;
     const blk = activeBlockEl(pagesEl);
     if (!blk) return false;
+    const capH = activeCapEl(blk);
+    if (capH) {
+      // 캡션 경계 — 캡션 밖으로 새 나가는 병합은 없다(표 칸과 같은 규칙)
+      const p = offsetIn(capH, s.anchorNode, s.anchorOffset);
+      if (dir < 0 && p === 0) return true;
+      if (dir > 0 && p >= textLen(capH)) return true;
+      return false;                                      // 캡션 안 지우기 — 브라우저가 한다
+    }
     const tdHost = activeCellEl(blk);
     if (tdHost) {
       // 칸 경계 지우기 — 칸 밖으로 새 나가는 병합은 하지 않는다(계획 R3, 워드와 같다).
@@ -2455,6 +2806,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const other = els[i + dir];
     if (!other) return true;
     if (other.matches && other.matches('td[data-r]')) return true;   // 경계 너머가 표 칸 — 병합 금지
+    if (other.matches && other.matches('.cap')) return true;         // 경계 너머가 캡션 — 병합 금지
     const at = (el, end) => {
       const l = el.matches('.lst li[data-i]') ? el : null;
       const bk = l ? l.closest('.blk[data-id]') : el;
@@ -2640,7 +2992,16 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
         const rs = Math.max(1, Number(td.getAttribute('rowspan')) || 1);
         const txt = (td.innerText !== undefined ? td.innerText : td.textContent) || '';
         // 눈에 안 보이는 «붙는 공백»(nbsp)은 보통 공백으로 — 워드·엑셀이 그걸로 채워 보낸다
-        const cell = { runs: runsFromText(txt.replace(/\u00a0/g, ' ').trim()) };
+        const runs = runsFromText(txt.replace(/\u00a0/g, ' ').trim());
+        // 칸 속 그림 — 글자와 격자만 받는 방침 그대로, 그림은 임시 표기로 얹어
+        // 붙여넣는 쪽(adoptTable)이 보관함에 담는다. 원격 주소는 버린다(설계 5장).
+        for (const im of Array.from(td.querySelectorAll('img'))) {
+          const isrc = im.getAttribute('src') || '';
+          if (isrc.indexOf('data:image/') !== 0) continue;
+          runs.push({ t: OBJ, src$: isrc,
+            w: Number(im.getAttribute('width')) || 0, h: Number(im.getAttribute('height')) || 0 });
+        }
+        const cell = { runs };
         if (cs > 1) cell.cs = cs;
         if (rs > 1) cell.rs = rs;
         put(r, c, cell);
@@ -2670,6 +3031,19 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     return Object.assign(made, normalizeWidths(made, pg.width - pg.margin.left - pg.margin.right));
   }
 
+  // 붙여넣은 표의 그림(임시 표기)을 보관함에 담는다 — 칸마다 adoptImages
+  function adoptTable(t2, assets0) {
+    let assets = assets0;
+    const fix = (row) => row.map((cell) => {
+      if (!cell || !Array.isArray(cell.runs)) return cell;
+      const got = adoptImages(cell.runs, assets);
+      assets = got.assets;
+      return Object.assign({}, cell, { runs: got.runs });
+    });
+    return { block: Object.assign({}, t2,
+      { head: (t2.head || []).map(fix), rows: (t2.rows || []).map(fix) }), assets };
+  }
+
   // 고른 표 칸들을 «표 모양»으로도 담는다 (2026-08-30 SKY: "표 자체도 복사 되게").
   // 글자만 담으면 워드·엑셀에 붙일 때 줄글이 된다 — text/html 로 <table> 을 같이 담으면
   // 워드·엑셀·이 편집기 모두 «표»로 받는다. 표 밖 대상이 섞이면 표로 안 담는다.
@@ -2695,6 +3069,15 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     }
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+    // 칸 속 그림도 함께 담아야 «복사 → 붙여넣기» 왕복이 된다. 글자는 esc, 그림은 <img>.
+    const runsHtml = (rs) => rs.map((r) => {
+      if (r && r.img) {
+        const a = getDoc().assets[r.img];
+        if (!a) return '';
+        return '<img src="' + a.data + '" width="' + (r.w || a.w) + '" height="' + (r.h || a.h) + '">';
+      }
+      return esc((r && r.t) || '');
+    }).join('');
     const tr = (list, tag) => {
       list.sort((x, y) => x.cell[1] - y.cell[1]);
       return '<tr>' + list.map((t) => {
@@ -2703,7 +3086,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
         const runs = cell ? cell.runs : null;
         const span = (cell && cell.cs > 1 ? ' colspan="' + cell.cs + '"' : '')
                    + (cell && cell.rs > 1 ? ' rowspan="' + cell.rs + '"' : '');
-        return '<' + tag + span + '>' + esc(runsText(sliceRuns(runs || [], t.from, t.to)))
+        return '<' + tag + span + '>' + runsHtml(sliceRuns(runs || [], t.from, t.to))
              + '</' + tag + '>';
       }).join('') + '</tr>';
     };
@@ -2785,6 +3168,8 @@ function createHistory(limit = 200) {
       past.push(next);
       return { blocks: next.blocks, sel: next.sel };
     },
+    // 그림 청소(sweepAssets)가 «기록이 아직 가리키는 그림»을 지키는 데 쓴다(설계 §2-3)
+    blocksLists() { return past.concat(future).map(x => x.blocks); },
     canUndo() { return past.length >= 2; },
     canRedo() { return future.length > 0; },
     size() { return past.length; },
@@ -2822,6 +3207,7 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       const cell = row && row[at.cell[1]];
       return cell && !cell.cov && Array.isArray(cell.runs) ? cell.runs : null;
     }
+    if (at.cap) return Array.isArray(b.caption) ? b.caption : null;
     if (at.item === null || at.item === undefined) return Array.isArray(b.runs) ? b.runs : null;
     return Array.isArray(b.items) && Array.isArray(b.items[at.item]) ? b.items[at.item] : null;
   }
@@ -2838,6 +3224,7 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       rows[at.cell[0]] = row;
       return { rows };
     }
+    if (at.cap) return { caption: runs };
     if (at.item === null || at.item === undefined) return { runs };
     const items = b.items.slice();
     items[at.item] = runs;
@@ -2902,13 +3289,19 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     let caretAt = null;
     let caretHost = null;
     if (el) {
-      const td = activeCellEl(el);
-      const li = td ? null : activeItemEl(el);
-      caretHost = td || li || el;
-      caretAt = td
-        ? { id: el.dataset.id, item: null,
-            cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] }
-        : { id: el.dataset.id, item: li ? Number(li.dataset.i) : null };
+      const capB = activeCapEl(el);
+      if (capB) {
+        caretHost = capB;
+        caretAt = { id: el.dataset.id, item: null, cap: 1 };
+      } else {
+        const td = activeCellEl(el);
+        const li = td ? null : activeItemEl(el);
+        caretHost = td || li || el;
+        caretAt = td
+          ? { id: el.dataset.id, item: null,
+              cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] }
+          : { id: el.dataset.id, item: li ? Number(li.dataset.i) : null };
+      }
     }
     for (const btn of buttons) {
       const key = btn.dataset.mark;
@@ -3212,7 +3605,350 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   refresh();
 }
 
+/* image.js */
+// 그림 넣기·고르기·크기 조절 (설계_그림.md §4·§5). UI 전용 — 모델 규칙은 core 에 있다.
+// ⛔ 최상위 이름 주의(빌드가 한 덩어리로 합친다): MAXPX·fileToAsset·attachImages 만 쓴다.
+
+
+
+
+
+
+const MAXPX = 2000;   // 붙일 때 긴 변 한도 — A4 인쇄 200dpi 상당(설계 §2-2)
+
+// 파일 → { data(dataURL), w, h }. 긴 변이 MAXPX 를 넘으면 줄여 담는다.
+// 안 넘으면 원본 바이트를 그대로 담는다(재압축으로 화질을 깎지 않는다). bmp 는 png 로.
+async function fileToAsset(file) {
+  const bmp = await createImageBitmap(file);
+  const w0 = bmp.width;
+  const h0 = bmp.height;
+  const long = Math.max(w0, h0);
+  if (long <= MAXPX && /^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
+    bmp.close();
+    const data = await new Promise((res, rej) => {
+      const rd = new FileReader();
+      rd.onload = () => res(rd.result);
+      rd.onerror = () => rej(new Error('그림 파일을 읽지 못했다'));
+      rd.readAsDataURL(file);
+    });
+    return { data, w: w0, h: h0 };
+  }
+  const k = Math.min(1, MAXPX / long);
+  const w = Math.max(1, Math.round(w0 * k));
+  const h = Math.max(1, Math.round(h0 * k));
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  bmp.close();
+  const jpeg = file.type === 'image/jpeg';
+  return { data: jpeg ? cv.toDataURL('image/jpeg', 0.9) : cv.toDataURL('image/png'), w, h };
+}
+
+function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
+  function textWidth(doc) {
+    const p = doc.page;
+    return p.width - p.margin.left - p.margin.right;
+  }
+
+  // 지금 커서 문맥을 좌표로 뜬다 — 파일을 읽는 사이 선택이 바뀌어도 붙는 곳이 안 바뀐다
+  function caretCtx() {
+    const blk = activeBlockEl(pagesEl);
+    if (!blk) return null;
+    const td = activeCellEl(blk);
+    const li = td ? null : activeItemEl(blk);
+    const host = td || li || blk;
+    const rg = rangeIn(host);
+    return {
+      id: blk.dataset.id,
+      cell: td ? [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] : null,
+      item: li ? Number(li.dataset.i) : null,
+      pos: rg ? rg.from : 0,
+    };
+  }
+
+  function cellRunsOf(b, cell) {
+    const row = cell[0] === 'h' ? (b.head && b.head[0]) : (b.rows && b.rows[cell[0]]);
+    return row && row[cell[1]] ? row[cell[1]].runs || [] : null;
+  }
+  function cellPatch(b, cell, runs) {
+    if (cell[0] === 'h') {
+      const head = [b.head[0].slice()];
+      head[0][cell[1]] = Object.assign({}, head[0][cell[1]], { runs });
+      return { head };
+    }
+    const rows = b.rows.slice();
+    const row = rows[cell[0]].slice();
+    row[cell[1]] = Object.assign({}, row[cell[1]], { runs });
+    rows[cell[0]] = row;
+    return { rows };
+  }
+
+  // 자산 하나를 문맥에 맞게 넣는다. at 을 다음 그림이 이어 붙도록 고쳐 준다.
+  function insertOne(a, at, mode) {
+    const doc = getDoc();
+    const got = addAsset(doc.assets, a.data, a.w, a.h);
+    const b = at ? doc.blocks.find(x => x.id === at.id) : null;
+    const asInline = mode === 'inline' || (at && at.cell);
+    if (asInline && b) {
+      const src = at.cell ? cellRunsOf(b, at.cell)
+        : (at.item !== null && at.item !== undefined ? b.items[at.item] : b.runs);
+      if (!Array.isArray(src)) return;
+      let w;
+      let h;
+      if (at.cell) {
+        // 표 칸 — 칸 안폭에 맞춘다(부품 사진 용도, 설계 §4-2). 패딩 몫 18px.
+        const cw = (b.cols[at.cell[1]] ? b.cols[at.cell[1]].w : 200) - 18;
+        w = Math.max(24, Math.min(a.w, cw));
+        h = Math.max(1, Math.round(w * a.h / Math.max(1, a.w)));
+      } else {
+        // 글자 사이 — 그 자리 글자 높이에 맞춘다(기호·아이콘 용도)
+        const sz = markAt(src, at.pos).sz || 12.5;
+        h = Math.max(12, Math.round(sz * 1.4));
+        w = Math.max(1, Math.round(h * a.w / Math.max(1, a.h)));
+      }
+      const runs = insertRun(src, at.pos, imgRun(got.id, w, h));
+      const patch = at.cell ? cellPatch(b, at.cell, runs)
+        : (at.item !== null && at.item !== undefined
+          ? (() => { const items = b.items.slice(); items[at.item] = runs; return { items }; })()
+          : { runs });
+      setDoc(Object.assign({}, doc, { assets: got.assets,
+        blocks: replaceBlock(doc.blocks, b.id, patch) }));
+      redraw({ caret: { id: b.id, item: at.item, cell: at.cell, pos: at.pos + 1 } });
+      at.pos += 1;
+      return;
+    }
+    // 독립 블록 — 빈 문단이면 그 자리를 차지, 아니면 바로 다음(설계 §5)
+    const w = Math.min(a.w, textWidth(doc));
+    const fresh = createBlock('image', { src: got.id, w });
+    let blocks;
+    if (b && b.type === 'para' && !runsLength(b.runs || [])) {
+      blocks = doc.blocks.slice();
+      blocks[blocks.findIndex(x => x.id === b.id)] = fresh;
+    } else if (b) {
+      blocks = insertAfter(doc.blocks, b.id, fresh);
+    } else {
+      blocks = doc.blocks.concat([fresh]);
+    }
+    setDoc(Object.assign({}, doc, { assets: got.assets, blocks }));
+    redraw({});
+    if (at) { at.id = fresh.id; at.cell = null; at.item = null; at.pos = 0; }
+    // 붙인 그림을 고른 상태로 둔다 — 손잡이가 바로 보이고 빈 캡션이 펴진다
+    const el = pagesEl.querySelector('.blk-image[data-id="' + fresh.id + '"] img.bimg');
+    if (el) selectImg(el);
+  }
+
+  async function insertFiles(files, mode) {
+    const list = Array.from(files || []).filter(f => /^image\//.test(f.type || ''));
+    if (!list.length) return;
+    const at = caretCtx();
+    for (const f of list) {
+      let a;
+      try { a = await fileToAsset(f); }
+      catch (e) { console.warn('그림을 못 읽었다:', f.name, e.message); continue; }
+      insertOne(a, at, mode);
+    }
+  }
+
+  // ── 도구모음 버튼 → 숨은 파일 입력 ──
+  const fileEl = document.getElementById('imgfile');
+  for (const btn of barEl.querySelectorAll('.tb[data-image]')) {
+    btn.addEventListener('mousedown', (e) => e.preventDefault());   // 선택이 안 풀리게
+    btn.addEventListener('click', () => {
+      fileEl.dataset.mode = btn.dataset.image === 'inline' ? 'inline' : 'auto';
+      fileEl.click();
+    });
+  }
+  fileEl.addEventListener('change', () => {
+    insertFiles(fileEl.files, fileEl.dataset.mode || 'auto');
+    fileEl.value = '';
+  });
+
+  // ── 붙여넣기(그림 데이터만 든 클립보드) — 글·HTML 이 함께면 기존 길이 맡는다 ──
+  pagesEl.addEventListener('paste', (e) => {
+    const dt = e.clipboardData;
+    if (!dt || !dt.files || !dt.files.length) return;
+    if (dt.getData('text/html')) return;
+    e.preventDefault();
+    insertFiles(dt.files, 'auto');
+  });
+
+  // ── 파일 끌어다 놓기 — 놓은 자리에 커서를 옮기고 같은 규칙으로 ──
+  pagesEl.addEventListener('dragover', (e) => {
+    const ts = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
+    if (ts.indexOf('Files') >= 0) e.preventDefault();
+  });
+  pagesEl.addEventListener('drop', (e) => {
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    e.preventDefault();
+    if (document.caretRangeFromPoint) {
+      const r = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (r) {
+        const s = window.getSelection();
+        s.removeAllRanges();
+        s.addRange(r);
+      }
+    }
+    insertFiles(files, 'auto');
+  });
+
+  // ── 그림 고르기 + 크기 손잡이 (Task 10) ──
+  let picked = null;   // 고른 <img> (다시 그리면 DOM 이 없어지므로 isConnected 로 확인)
+  const ui = document.createElement('div');
+  ui.id = 'imgui';
+  ui.setAttribute('contenteditable', 'false');
+  for (const c of ['nw', 'ne', 'sw', 'se']) {
+    const hd = document.createElement('div');
+    hd.className = 'imgh';
+    hd.dataset.c = c;
+    ui.appendChild(hd);
+  }
+
+  // #main 이 확대(transform)돼 있어도 맞도록 화면 좌표를 입력판 눈금으로 바꾼다
+  function place() {
+    if (!picked || !picked.isConnected) return;
+    const pr = pagesEl.getBoundingClientRect();
+    const ir = picked.getBoundingClientRect();
+    const k = pr.width / pagesEl.offsetWidth;   // 확대 배율
+    ui.style.left = ((ir.left - pr.left) / k) + 'px';
+    ui.style.top = ((ir.top - pr.top) / k) + 'px';
+    ui.style.width = (ir.width / k) + 'px';
+    ui.style.height = (ir.height / k) + 'px';
+  }
+  function deselect() {
+    if (picked && picked.isConnected) picked.classList.remove('imgsel');
+    picked = null;
+    if (ui.parentNode) ui.parentNode.removeChild(ui);
+  }
+  function selectImg(img) {
+    deselect();
+    picked = img;
+    img.classList.add('imgsel');
+    pagesEl.appendChild(ui);
+    place();
+  }
+
+  pagesEl.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t && t.matches && t.matches('img.ri, img.bimg')) { selectImg(t); return; }
+    if (!(t && t.closest && t.closest('#imgui'))) deselect();
+  });
+  document.addEventListener('selectionchange', () => {
+    if (picked && !picked.isConnected) deselect();          // 다시 그려져 사라졌다
+  });
+
+  // 고른 그림의 모델 좌표를 찾는다 → { kind:'block', b } 또는 { kind:'run', b, cell|item|cap, pos }
+  function pickedTarget() {
+    if (!picked || !picked.isConnected) return null;
+    const blkEl = picked.closest('.blk[data-id]');
+    if (!blkEl) return null;
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === blkEl.dataset.id);
+    if (!b) return null;
+    if (picked.classList.contains('bimg')) return { kind: 'block', b };
+    const td = picked.closest('td[data-r]');
+    const li = picked.closest('.lst li[data-i]');
+    const cap = picked.closest('.blk-image .cap');
+    const host = td || li || cap || blkEl;
+    const parent = picked.parentNode;
+    const idx = Array.prototype.indexOf.call(parent.childNodes, picked);
+    const pos = offsetIn(host, parent, idx);
+    return { kind: 'run', b, pos,
+      cell: td ? [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] : null,
+      item: li ? Number(li.dataset.i) : null,
+      cap: cap ? 1 : 0 };
+  }
+  function runsAtTarget(at) {
+    if (at.cell) return cellRunsOf(at.b, at.cell);
+    if (at.cap) return at.b.caption || [];
+    if (at.item !== null && at.item !== undefined) return at.b.items[at.item];
+    return at.b.runs;
+  }
+  function patchAtTarget(at, runs) {
+    if (at.cell) return cellPatch(at.b, at.cell, runs);
+    if (at.cap) return { caption: runs };
+    if (at.item !== null && at.item !== undefined) {
+      const items = at.b.items.slice();
+      items[at.item] = runs;
+      return { items };
+    }
+    return { runs };
+  }
+
+  // ── 손잡이 끌기 — 끄는 동안은 화면(img 속성)만, 놓으면 모델에 1회 기록 ──
+  let rz = null;   // { startX, startW, ratio, max, dir }
+  ui.addEventListener('pointerdown', (e) => {
+    const hd = e.target.closest && e.target.closest('.imgh');
+    if (!hd || !picked || !picked.isConnected) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const host = picked.closest('td[data-r], .lst li[data-i], .blk-image, .blk[data-id]');
+    rz = { startX: e.clientX, startW: picked.width,
+           ratio: picked.height / Math.max(1, picked.width),
+           max: Math.max(24, (host ? host.clientWidth : pagesEl.clientWidth) - 4),
+           dir: (hd.dataset.c === 'nw' || hd.dataset.c === 'sw') ? -1 : 1 };
+    try { hd.setPointerCapture(e.pointerId); } catch (err) { /* 합성 이벤트에는 없다 */ }
+  });
+  ui.addEventListener('pointermove', (e) => {
+    if (!rz || !picked || !picked.isConnected) return;
+    const w = Math.max(24, Math.min(rz.max, rz.startW + rz.dir * (e.clientX - rz.startX)));
+    picked.width = w;
+    picked.height = Math.max(1, Math.round(w * rz.ratio));
+    place();
+  });
+  ui.addEventListener('pointerup', () => {
+    if (!rz || !picked || !picked.isConnected) { rz = null; return; }
+    const w = picked.width;
+    const h = picked.height;
+    rz = null;
+    const at = pickedTarget();
+    if (!at) return;
+    const doc = getDoc();
+    if (at.kind === 'block') {
+      setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, at.b.id, { w }) }));
+    } else {
+      const runs = setImgSize(runsAtTarget(at), at.pos, w, h);
+      setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, at.b.id, patchAtTarget(at, runs)) }));
+    }
+    redraw({ keepCaret: true });
+    // 다시 그린 화면에서 같은 그림을 다시 고른다 — 이어서 또 조절할 수 있게
+    const again = at.kind === 'block'
+      ? pagesEl.querySelector('.blk-image[data-id="' + at.b.id + '"] img.bimg')
+      : null;
+    if (again) selectImg(again);
+  });
+
+  // ── 고른 그림 지우기 — Delete·Backspace. Esc 는 해제 ──
+  document.addEventListener('keydown', (e) => {
+    if (!picked || !picked.isConnected) return;
+    if (e.key === 'Escape') { deselect(); return; }
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+    e.preventDefault();
+    const at = pickedTarget();
+    deselect();
+    if (!at) return;
+    const doc = getDoc();
+    if (at.kind === 'block') {
+      setDoc(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, at.b.id) }));
+      redraw({});
+      return;
+    }
+    const src = runsAtTarget(at);
+    // ⚠ normalizeRuns 로 감싼다 — 그냥 이으면 그림 양옆의 같은 서식이 안 합쳐져
+    //   토막이 계속 늘어난다
+    const runs = normalizeRuns(
+      sliceRuns(src, 0, at.pos).concat(sliceRuns(src, at.pos + 1, runsLength(src))));
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, at.b.id, patchAtTarget(at, runs)) }));
+    redraw({ caret: { id: at.b.id, item: at.item, cell: at.cell, cap: at.cap, pos: at.pos } });
+  });
+
+  return { insertFiles };
+}
+
 /* main.js */
+
+
 
 
 
@@ -3262,15 +3998,20 @@ function draw(opt = {}) {
   let keepId = null;
   let keepItem = null;
   let keepCell = null;
+  let keepCap = 0;
   let keepPos = 0;
   if (opt.keepCaret) {
     const blk = activeBlockEl(pagesEl);
     const sel = window.getSelection();
     if (blk && sel && sel.anchorNode) {
       keepId = blk.dataset.id;
-      const td = activeCellEl(blk);
-      const li = td ? null : activeItemEl(blk);
-      if (td) {
+      const cap = activeCapEl(blk);
+      const td = cap ? null : activeCellEl(blk);
+      const li = (cap || td) ? null : activeItemEl(blk);
+      if (cap) {
+        keepCap = 1;
+        keepPos = offsetIn(cap, sel.anchorNode, sel.anchorOffset);
+      } else if (td) {
         keepItem = null;
         keepCell = [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)];
         keepPos = offsetIn(td, sel.anchorNode, sel.anchorOffset);
@@ -3293,6 +4034,7 @@ function draw(opt = {}) {
       return pagesEl.querySelector('.blk[data-id="' + p.id + '"] td[data-r="' + p.cell[0]
         + '"][data-c="' + p.cell[1] + '"]');
     }
+    if (p.cap) return pagesEl.querySelector('.blk[data-id="' + p.id + '"] .cap');
     const el = pagesEl.querySelector('.blk[data-id="' + p.id + '"]');
     if (!el) return null;
     if (p.item === null || p.item === undefined) return el;
@@ -3316,7 +4058,7 @@ function draw(opt = {}) {
     const el = pagesEl.querySelector('.blk[data-id="' + opt.caretId + '"]');
     if (el) caretTo(el, opt.caretEnd ? Number.MAX_SAFE_INTEGER : 0);
   } else if (keepId) {
-    const host = hostOf({ id: keepId, item: keepItem, cell: keepCell });
+    const host = hostOf({ id: keepId, item: keepItem, cell: keepCell, cap: keepCap });
     if (host) caretTo(host, keepPos);
   }
   return r;
@@ -3332,9 +4074,18 @@ let snapTimer = null;
 function markDirty() {
   clearTimeout(snapTimer);
   snapTimer = setTimeout(async () => {
-    try { await saveSnapshot(serialize(state.doc), state.name || '(이름 없음)'); }
+    try { await saveSnapshot(serializeSwept(), state.name || '(이름 없음)'); }
     catch (e) { console.warn('자동 보관 실패:', e.message); }
   }, 5000);
+}
+
+// 저장 직전에만 참조 없는 그림을 청소한다(설계 §2-3) — 되돌리기 기록이 가리키면 남긴다.
+// ⛔ 화면 갱신마다 하지 않는다. 저장·읽기 때만이면 충분하고, 매번 하면 되돌리기가
+//    아직 쓰는 그림을 지울 위험만 커진다.
+function serializeSwept() {
+  const assets = sweepAssets(state.doc.assets, [state.doc.blocks].concat(history.blocksLists()));
+  if (assets !== state.doc.assets) state.doc = Object.assign({}, state.doc, { assets });
+  return serialize(state.doc);
 }
 
 // 지금 화면의 선택(커서·드래그)을 모델 좌표로 뜬다 — 되돌리기가 이 자리를 되살린다.
@@ -3353,6 +4104,11 @@ function selSnapshot() {
   const blk = activeBlockEl(pagesEl);
   const s = window.getSelection();
   if (!blk || !s || !s.anchorNode) return null;
+  const cap = activeCapEl(blk);
+  if (cap) {
+    return { caret: 1, id: blk.dataset.id, item: null, cap: 1,
+             pos: offsetIn(cap, s.anchorNode, s.anchorOffset) };
+  }
   const td = activeCellEl(blk);
   if (td) {
     return { caret: 1, id: blk.dataset.id, item: null,
@@ -3372,7 +4128,7 @@ const applyDoc = (d) => { state.doc = d; history.push(d.blocks, selSnapshot()); 
 // 조용히 선택 없이 그린다 — 못 찾으면 커서를 안 놓을 뿐, 글은 정상이다.
 function drawWithSel(sel) {
   if (!sel) { draw(); return; }
-  if (sel.caret) { draw({ caret: { id: sel.id, item: sel.item, cell: sel.cell, pos: sel.pos } }); return; }
+  if (sel.caret) { draw({ caret: { id: sel.id, item: sel.item, cell: sel.cell, cap: sel.cap, pos: sel.pos } }); return; }
   draw({ sel });
 }
 
@@ -3398,7 +4154,7 @@ document.addEventListener('keydown', (e) => {
 
 // 검사 도구가 들여다보는 창구다(tools/*.js). 화면 동작에는 쓰지 않는다.
 window.__app = { state, draw, DEFAULT_PAGE, history, saveSnapshot, listSnapshots,
-                 rememberDir, recallDir, forgetDir, docExists };
+                 rememberDir, recallDir, forgetDir, docExists, serializeSwept };
 draw();
 
 attachEditor({
@@ -3409,6 +4165,14 @@ attachEditor({
 });
 
 attachToolbar({
+  barEl: document.getElementById('bar'),
+  pagesEl: document.getElementById('pages'),
+  getDoc: () => state.doc,
+  setDoc: applyDoc,
+  redraw: draw,
+});
+
+attachImages({
   barEl: document.getElementById('bar'),
   pagesEl: document.getElementById('pages'),
   getDoc: () => state.doc,
@@ -3543,7 +4307,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
         msg('저장 권한을 받지 못했다'); return;
       }
       const w = await state.fileHandle.createWritable();
-      await w.write(serialize(state.doc));
+      await w.write(serializeSwept());
       await w.close();
       msg('저장함: ' + state.fileHandle.name);
     } catch (e) { msg('저장하지 못했다: ' + e.message); }
@@ -3552,7 +4316,7 @@ document.getElementById('btn-save').addEventListener('click', async () => {
   if (!state.dir) { msg(NEED_DIR); return; }
   const name = state.name || ((state.doc.meta.title || '새 문서') + DOC_EXT);
   try {
-    await writeDoc(state.dir, name, serialize(state.doc));
+    await writeDoc(state.dir, name, serializeSwept());
     state.name = name;
     msg('저장함: ' + name);
     await refreshList();
@@ -3585,7 +4349,7 @@ document.getElementById('btn-saveas').addEventListener('click', async () => {
     //   사라지는 것을 막는 자리다. 한글 이름은 docExists 가 NFC 로 맞춰 비교한다.
     if (await docExists(state.dir, full)
         && !window.confirm('「' + name + '」 문서가 이미 있습니다. 덮어쓸까요?')) return;
-    await writeDoc(state.dir, full, serialize(state.doc));
+    await writeDoc(state.dir, full, serializeSwept());
     state.name = full;
     state.fileHandle = null;          // 이제 폴더의 이 파일이 «지금 문서»다
     msg('저장함: ' + full);
