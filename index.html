@@ -2092,9 +2092,10 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
         let text = '';
         if (t === 'insertText' && e.data) text = e.data;
         if (t === 'insertFromPaste' && e.dataTransfer) text = e.dataTransfer.getData('text/plain') || '';
-        if (text) insertAtCaret(r.caret, text);
+        const c = text ? insertLinesAt(r.caret, text)
+                       : Object.assign({}, r.caret, { pos: r.caret.pos });
         cancelIdle();
-        redraw({ caret: Object.assign({}, r.caret, { pos: r.caret.pos + text.length }) });
+        redraw({ caret: c });
         return;
       }
       // 여러 칸에 걸친 편집 — 브라우저가 블록을 제멋대로 병합하기 전에 우리가 지운다.
@@ -2111,9 +2112,10 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
       let text = '';
       if (t === 'insertText' && e.data) text = e.data;
       if (t === 'insertFromPaste' && e.dataTransfer) text = e.dataTransfer.getData('text/plain') || '';
-      if (text) insertAtCaret(r.caret, text);
+      const c2 = text ? insertLinesAt(r.caret, text)
+                      : { id: r.caret.id, item: r.caret.item, pos: r.caret.pos };
       cancelIdle();
-      redraw({ caret: { id: r.caret.id, item: r.caret.item, pos: r.caret.pos + text.length } });
+      redraw({ caret: c2 });
       return;
     }
 
@@ -2145,8 +2147,76 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     }
     if (t === 'deleteContentBackward' && collapsed) { if (mergeAt(-1)) e.preventDefault(); return; }
     if (t === 'deleteContentForward' && collapsed) { if (mergeAt(1)) e.preventDefault(); return; }
+
+    // 여러 줄 붙여넣기 — 줄마다 문단이 되도록 우리가 넣는다(브라우저에 맡기면 한 문단에
+    // 통째로 들어가 그 덩어리가 다음 장으로 밀린다). 표 칸 안은 줄바꿈이 정상이라 그대로.
+    if (t === 'insertFromPaste' && e.dataTransfer) {
+      const raw = e.dataTransfer.getData('text/plain') || '';
+      if (raw.indexOf('\n') >= 0 || raw.indexOf('\r') >= 0) {
+        const blk3 = activeBlockEl(pagesEl);
+        const td3 = blk3 && activeCellEl(blk3);
+        if (blk3 && !td3) {
+          e.preventDefault();
+          flush(false);
+          const li3 = activeItemEl(blk3);
+          const host3 = li3 || blk3;
+          const rg3 = rangeIn(host3);
+          if (!rg3) return;
+          const c3 = insertLinesAt({ id: blk3.dataset.id, item: li3 ? Number(li3.dataset.i) : null,
+                                     pos: rg3.from, end: rg3.to }, raw);
+          cancelIdle();
+          redraw({ caret: c3 });
+          return;
+        }
+      }
+    }
     // 그 밖(칸 안 타자·지우기·붙여넣기·Shift+Enter 줄바꿈)은 브라우저가 하고 flush 가 되읽는다
   });
+
+  // 여러 줄 글을 넣는다 — 줄마다 문단(목록이면 항목)이 하나씩 된다. 워드와 같다.
+  // ⛔ 한 문단에 통째로 넣으면 그 블록이 아주 길어지고, 장 나눔은 «블록을 쪼개지 않는»
+  //    규칙이라 그 덩어리가 통째로 다음 장으로 밀린다 — 붙여넣은 글이 «사라진 것처럼»
+  //    보인다(2026-08-30 SKY). 표 칸 안에서는 줄바꿈이 «칸 안 줄바꿈»이라 그대로 둔다.
+  // caret.end 가 있으면 pos~end 구간을 덮어쓴다(칸 안에 고른 구간이 있을 때).
+  // 반환: 넣고 난 뒤의 커서 좌표.
+  function insertLinesAt(caret, text) {
+    const lines = String(text).split(/\r\n|\r|\n/);
+    const end = caret.end === undefined ? caret.pos : caret.end;
+    if (lines.length < 2 || caret.cell) {
+      insertAtCaret(caret, text);
+      return { id: caret.id, item: caret.item, cell: caret.cell, pos: caret.pos + text.length };
+    }
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === caret.id);
+    if (!b) return caret;
+    const isItem = caret.item !== null && caret.item !== undefined && Array.isArray(b.items);
+    const src = isItem ? b.items[caret.item] : b.runs;
+    if (!Array.isArray(src)) { insertAtCaret(caret, text); return caret; }
+    const len = runsLength(src);
+    const head = sliceRuns(src, 0, caret.pos);
+    const tail = sliceRuns(src, Math.min(end, len), len);
+    const lastLine = lines[lines.length - 1];
+    const first = normalizeRuns(head.concat(runsFromText(lines[0])));
+    const rest = lines.slice(1);
+
+    if (isItem) {
+      const items = b.items.slice();
+      items[caret.item] = first;
+      const made = rest.map((s, i) => (i === rest.length - 1
+        ? normalizeRuns(runsFromText(s).concat(tail)) : runsFromText(s)));
+      items.splice(caret.item + 1, 0, ...made);
+      setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, b.id, { items }) }));
+      return { id: b.id, item: caret.item + rest.length, pos: lastLine.length };
+    }
+    const fresh = rest.map((s, i) => createBlock('para', {
+      runs: i === rest.length - 1 ? normalizeRuns(runsFromText(s).concat(tail)) : runsFromText(s),
+    }));
+    let blocks = replaceBlock(doc.blocks, b.id, { runs: first });
+    const at = blocks.findIndex(x => x.id === b.id);
+    blocks = blocks.slice(0, at + 1).concat(fresh, blocks.slice(at + 1));
+    setDoc(Object.assign({}, doc, { blocks }));
+    return { id: fresh[fresh.length - 1].id, item: null, pos: lastLine.length };
+  }
 
   function insertAtCaret(caret, text) {
     const doc = getDoc();
