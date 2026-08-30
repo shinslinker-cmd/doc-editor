@@ -277,6 +277,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
       <button class="tb" data-table="row-" title="이 행 지우기">행−</button>
       <button class="tb" data-table="col+" title="오른쪽에 열 추가">열＋</button>
       <button class="tb" data-table="col-" title="이 열 지우기">열−</button>
+      <button class="tb" data-table="head" title="머리글 행 켜기/끄기 — 머리글을 안 쓰는 표도 있다">머리글</button>
       <button class="tb" data-table="merge" title="고른 칸 병합">병합</button>
       <button class="tb" data-table="split" title="병합 풀기">분할</button>
       <button class="tb" data-table="splitx" title="이 칸을 옆으로 둘로">옆 나누기</button>
@@ -298,7 +299,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 </div>
 <div id="gauge" aria-hidden="true"></div>
 <script>
-window.__BUILD = "2026-08-30 23:38";
+window.__BUILD = "2026-08-30 23:49";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -801,6 +802,25 @@ function splitCellDown(t, r, c) {
   const rows = cloneRows(base.rows);
   repave(rows, ar, ac, rs, cs, null, ar + Math.ceil(rs / 2), bare(cell));
   return Object.assign({}, base, { rows });
+}
+
+// 머리글 행을 켜고 끈다 (2026-08-30 SKY: "표에서 머리글도 안쓰는 표도 있어").
+// 켜기 = 첫 몸통 행을 머리글로 «올린다» · 끄기 = 머리글을 몸통 맨 앞으로 «내린다».
+// 글은 어느 쪽으로도 사라지지 않는다 — 자리만 옮긴다.
+// ⛔ 머리글은 세로 병합을 가질 수 없다 — 장을 넘을 때 머리글만 다시 그려야 하는데
+//    세로로 묶인 칸은 그 아래 행까지 딸려 와야 해서 성립하지 않는다(계획 R10·R11).
+//    그래서 올릴 행에 세로 병합이 걸려 있으면 그대로 둔다.
+function toggleHead(t) {
+  if (t.head && t.head.length) {
+    const down = t.head[0].map(c => Object.assign({}, c));
+    return Object.assign({}, t, { head: [], rows: [down].concat(cloneRows(t.rows)) });
+  }
+  if (!t.rows.length) return t;
+  if (t.rows[0].some(c => (c.rs || 1) > 1)) return t;
+  return Object.assign({}, t, {
+    head: [t.rows[0].map(c => Object.assign({}, c))],
+    rows: cloneRows(t.rows.slice(1)),
+  });
 }
 
 /* blocks.js */
@@ -2176,7 +2196,8 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
           const doc = getDoc();
           setDoc(Object.assign({}, doc, { blocks: insertAfter(doc.blocks, blkT.dataset.id, t2) }));
           cancelIdle();
-          redraw({ caret: { id: t2.id, cell: t2.head && t2.head.length ? ['h', 0] : [0, 0], pos: 0 } });
+          const first = t2.head && t2.head.length ? ['h', 0] : (t2.rows.length ? [0, 0] : null);
+          redraw(first ? { caret: { id: t2.id, cell: first, pos: 0 } } : {});
           return;
         }
       }
@@ -2632,12 +2653,17 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const ncols = grid.reduce((n, row) => Math.max(n, row.length), 0);
     if (!ncols) return null;
     for (const row of grid) for (let c = 0; c < ncols; c++) if (!row[c]) row[c] = { runs: [] };
-    // 첫 줄은 머리글로 쓴다(워드·엑셀 표도 대개 첫 줄이 제목줄이다)
-    const head = [grid[0].slice(0, ncols)];
-    const rows = grid.slice(1).map(r => r.slice(0, ncols));
+    // ⭐ «복사한 그대로» 붙인다(2026-08-30 SKY) — <thead> 가 있을 때만 머리글이 된다.
+    //    몸통 한 행만 복사했으면 머리글 없는 표가 되고, 빈 행을 억지로 만들지 않는다.
+    //    머리글이 필요하면 도구모음 「머리글」 버튼으로 언제든 켠다.
+    //    ⚠ 엑셀·워드가 담은 표에는 <thead> 가 없다 — 그때도 머리글 없이 들어온다.
+    const hasHead = !!tbl.querySelector('thead tr');
+    const head = hasHead ? [grid[0].slice(0, ncols)] : [];
+    const rows = (hasHead ? grid.slice(1) : grid).map(r => r.slice(0, ncols));
+    if (!head.length && !rows.length) return null;
     const made = createBlock('table', {
       cols: Array.from({ length: ncols }, () => ({ w: Math.floor(674 / ncols) })),
-      head, rows: rows.length ? rows : [Array.from({ length: ncols }, () => ({ runs: [] }))],
+      head, rows,
     });
     // 열 너비 합을 텍스트 폭에 맞춘다 — 안 맞추면 표가 종이 밖으로 나간다
     const pg = getDoc().page;
@@ -2655,28 +2681,38 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw }) {
     const doc = getDoc();
     const b = doc.blocks.find(x => x.id === id);
     if (!b || b.type !== 'table') return '';
-    const rows = new Map();                               // 행 번호 → 그 행의 칸들
+    // ⭐ 머리글 칸은 <thead> 로 담는다 — «복사한 그대로» 붙이려면 그 행이 머리글이었는지가
+    //    함께 실려야 한다(2026-08-30 SKY). 몸통 한 행만 복사하면 머리글 없는 표가 된다.
+    const headRow = [];
+    const bodyRows = new Map();
     for (const t of cells) {
-      const key = String(t.cell[0]);
-      if (!rows.has(key)) rows.set(key, []);
-      rows.get(key).push(t);
+      if (t.cell[0] === 'h') headRow.push(t);
+      else {
+        const key = String(t.cell[0]);
+        if (!bodyRows.has(key)) bodyRows.set(key, []);
+        bodyRows.get(key).push(t);
+      }
     }
     const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/\n/g, '<br>');
-    const trs = [];
-    for (const [, list] of rows) {
+    const tr = (list, tag) => {
       list.sort((x, y) => x.cell[1] - y.cell[1]);
-      const tds = list.map((t) => {
+      return '<tr>' + list.map((t) => {
         const row = t.cell[0] === 'h' ? (b.head && b.head[0]) : (b.rows && b.rows[t.cell[0]]);
         const cell = row && row[t.cell[1]];
         const runs = cell ? cell.runs : null;
         const span = (cell && cell.cs > 1 ? ' colspan="' + cell.cs + '"' : '')
                    + (cell && cell.rs > 1 ? ' rowspan="' + cell.rs + '"' : '');
-        return '<td' + span + '>' + esc(runsText(sliceRuns(runs || [], t.from, t.to))) + '</td>';
-      }).join('');
-      trs.push('<tr>' + tds + '</tr>');
+        return '<' + tag + span + '>' + esc(runsText(sliceRuns(runs || [], t.from, t.to)))
+             + '</' + tag + '>';
+      }).join('') + '</tr>';
+    };
+    const parts = [];
+    if (headRow.length) parts.push('<thead>' + tr(headRow, 'th') + '</thead>');
+    if (bodyRows.size) {
+      parts.push('<tbody>' + Array.from(bodyRows.values()).map(l => tr(l, 'td')).join('') + '</tbody>');
     }
-    return '<table border="1">' + trs.join('') + '</table>';
+    return '<table border="1">' + parts.join('') + '</table>';
   }
 
   // 클립보드에 담는다 — 글자(text/plain)는 늘, 표면 표 모양(text/html)도 함께.
@@ -3138,6 +3174,13 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
         if (!cell || cell[0] === 'h') return;
         const [ar, ac] = anchorOf(b, cell[0], cell[1]);
         commitTable(doc, b, splitCell(b, cell[0], cell[1]), { id: b.id, cell: [ar, ac], pos: 0 });
+      } else if (kind === 'head') {
+        // 머리글 켜고 끄기 — 글은 사라지지 않고 자리만 옮긴다(2026-08-30 SKY)
+        const next = toggleHead(b);
+        if (next === b) return;                          // 세로 병합이 걸린 행은 못 올린다
+        const 켜졌나 = next.head && next.head.length;
+        commitTable(doc, b, next,
+          { id: b.id, cell: 켜졌나 ? ['h', 0] : [0, 0], pos: 0 });
       } else if (kind === 'splitx') {
         if (!cell || cell[0] === 'h') return;                    // 머리글은 나누지 않는다(R16)
         const [ar, ac] = anchorOf(b, cell[0], cell[1]);
