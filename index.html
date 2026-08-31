@@ -397,6 +397,9 @@ body { margin:0; background:var(--desk); color:var(--ink);
 @media print { #ctxmenu, #minibar, .mtoast { display:none !important; } }
 
 @media print {
+  /* ⛔ 좁은 화면에서 줄여 보여 주던 배율은 인쇄에서 반드시 1 이어야 한다 —
+     줄어든 채로 인쇄되면 A4 한복판에 작게 찍힌다(ui/fit.js) */
+  #pages { zoom:1 !important; }
   #side, #gauge, #folder-msg { display:none !important; }
   #imgui { display:none !important; }
   /* ⛔ box-shadow 도 함께 꺼야 한다 — outline 만 끄면 파란 테가 종이에 그대로 찍힌다 */
@@ -527,7 +530,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 14:14";
+window.__BUILD = "2026-08-31 14:31";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -2503,6 +2506,19 @@ function activeCapEl(blkEl) {
   return cap && blkEl.contains(cap) ? cap : null;
 }
 
+// 화면 배율 — «눈에 보이는 폭 ÷ 자리 폭». 좁은 화면에서 종이를 줄여 보여 줄 때
+// (main.js 의 자동 축소) 1 보다 작아진다.
+// ⭐ 마우스·손가락 좌표(clientX)는 «눈에 보이는» 눈금이고, 모델에 적는 크기는 «자리» 눈금이다.
+//    둘을 섞으면 축소된 화면에서 손잡이를 끌 때 그림이 끈 것보다 덜(또는 더) 커진다.
+//    그래서 화면 좌표의 «차이»를 모델 크기로 옮길 때는 이 값으로 나눈다.
+function scaleOf(pagesEl) {
+  if (!pagesEl) return 1;
+  const w = pagesEl.offsetWidth;
+  if (!w) return 1;
+  const k = pagesEl.getBoundingClientRect().width / w;
+  return (Number.isFinite(k) && k > 0.05) ? k : 1;
+}
+
 /* editor.js */
 // 편집을 다스린다 (D16 — 한 장의 입력판).
 // 선택·커서·한글 조합·터치는 브라우저가 한다. 우리는 «구조를 바꾸는 동작»만
@@ -4306,7 +4322,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     const spot = dropSpot(x, y);
     if (!spot || !spot.blk) { hideMark(); return; }
     const pr = pagesEl.getBoundingClientRect();
-    const k = pr.width / pagesEl.offsetWidth;      // 태블릿에서 화면이 축소돼 있어도 맞게
+    const k = scaleOf(pagesEl);                    // 화면이 축소돼 있어도 맞게
     const r = (spot.td || spot.blk).getBoundingClientRect();
     if (spot.td) {                                  // 표 칸 — 그 칸을 테두리로 감싼다
       mark.className = 'cell';
@@ -4411,7 +4427,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     if (!picked || !picked.isConnected) return;
     const pr = pagesEl.getBoundingClientRect();
     const ir = dispBoxOf(picked).getBoundingClientRect();
-    const k = pr.width / pagesEl.offsetWidth;   // 확대 배율
+    const k = scaleOf(pagesEl);                 // 확대·축소 배율
     ui.style.left = ((ir.left - pr.left) / k) + 'px';
     ui.style.top = ((ir.top - pr.top) / k) + 'px';
     ui.style.width = (ir.width / k) + 'px';
@@ -4617,7 +4633,14 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   });
   ui.addEventListener('pointermove', (e) => {
     if (!rz || !picked || !picked.isConnected) return;
-    const w = Math.max(24, Math.min(rz.max, rz.startW + rz.dir * (e.clientX - rz.startX)));
+    // ⛔ 손가락이 움직인 거리는 «눈에 보이는» 눈금이고, 그림 폭은 «자리» 눈금이다.
+    //    좁은 화면에서 종이를 줄여 보여 줄 때 이 둘이 다르므로 배율로 나눠 준다 —
+    //    안 그러면 100px 끌었는데 그림은 130px 커지는 식으로 손과 따로 논다.
+    // ⚠ 반올림한다 — 배율로 나누면 소수가 나오고, 그대로 두면 저장 파일에 299.2 같은
+    //    어중간한 값이 남는다(폭은 언제나 정수 px 다).
+    const k = scaleOf(pagesEl);
+    const w = Math.round(
+      Math.max(24, Math.min(rz.max, rz.startW + rz.dir * ((e.clientX - rz.startX) / k))));
     setDispW(picked, w);
     place();
   });
@@ -4875,6 +4898,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
 // 단위 규칙(S1): 저장·모델은 px, 사람이 보고 치는 칸만 mm. 변환은 core/imgfmt.js 만 안다.
 
 
+
 function attachFormat({ barEl, pagesEl, imageApi }) {
   const panel = document.createElement('div');
   panel.id = 'imgpanel';
@@ -5086,7 +5110,11 @@ function attachFormat({ barEl, pagesEl, imageApi }) {
     // 창이 원본 전체와 같으면 «자르기 해제»로 적는다 — crop:null 이 남으면 안 된다
     const full = Math.abs(r.left - s.gx) < 1.5 && Math.abs(r.top - s.gy) < 1.5
       && Math.abs(r.width - s.gw) < 1.5 && Math.abs(r.height - s.gh) < 1.5;
-    const w = Math.round(r.width);
+    // ⛔ 덮개 좌표는 «눈에 보이는» 눈금이고 모델에 적는 폭은 «자리» 눈금이다.
+    //    좁은 화면에서 종이를 줄여 보여 줄 때 이 둘이 다르므로 배율로 나눈다 —
+    //    안 나누면 축소된 화면에서 자를 때마다 그림이 그만큼 작아진다.
+    //    ⚠ crop(원본 좌표)은 s.k 가 «화면 폭 ÷ 잘린 폭»이라 둘 다 화면 눈금이어서 저절로 맞는다.
+    const w = Math.round(r.width / scaleOf(pagesEl));
     const crop = full ? null : clampCrop({ x: (r.left - s.gx) / s.k, y: (r.top - s.gy) / s.k,
                                            w: r.width / s.k, h: r.height / s.k }, s.a);
     const wasPanel = s.wasPanel;
@@ -5723,7 +5751,57 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
   return { openMenuAt, closeMenu, quickStrip, showMini, hideMini, menuOpen, miniOpen };
 }
 
+/* fit.js */
+// 좁은 화면에서 종이를 «화면에 맞게 줄여» 보여 준다 (2026-08-31 SKY).
+// ⛔ 최상위 이름은 attachFit 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합친다.
+//
+// 왜 필요한가: A4 종이는 794px 이라 태블릿을 반으로 나눠 쓰면 자리에 안 들어간다.
+// 전에는 종이가 그대로 넘쳐서 좌우로 밀어야 했다. 이제 자리에 맞게 줄여 보여 준다.
+//
+// ⭐ «줄이기»만 한다 — 자리가 넉넉하면 원래 크기 그대로다. 크게 키우지는 않는다.
+//    글자가 못 읽을 만큼 작아지지 않게 바닥(MINZOOM)을 둔다. 그보다 좁으면 거기서 멈추고
+//    나머지는 좌우로 밀어 본다.
+//
+// ⚠ transform 이 아니라 zoom 을 쓴다. transform 은 «자리»를 그대로 두고 그림만 줄여서
+//   종이 아래에 빈 자리가 그만큼 남는다. zoom 은 자리까지 함께 줄어 그런 일이 없다.
+// ⛔ 인쇄에서는 반드시 1 이어야 한다 — 줄어든 채로 인쇄되면 A4 한복판에 작게 찍힌다.
+//   (styles.css 의 @media print 에서 zoom 을 1 로 되돌린다.)
+
+const MINZOOM = 0.55;   // 이보다 작아지면 글자를 못 읽는다 — 거기서 멈춘다
+const SLACK = 10;       // 종이 옆에 남기는 숨통(px). 0 이면 그림자가 잘려 답답하다
+
+function attachFit({ mainEl, pagesEl, getDoc }) {
+  let last = -1;
+
+  function fit() {
+    const doc = getDoc && getDoc();
+    const paper = (doc && doc.page && doc.page.width) || 794;
+    // 자리 폭은 «지금 배율을 뺀» 값이어야 한다. zoom 이 걸린 채로 clientWidth 를 재면
+    // 줄인 만큼 넓게 나와서, 재고 → 줄이고 → 다시 재면 또 넓어 보이는 되먹임이 생긴다.
+    pagesEl.style.zoom = '';
+    const room = mainEl.clientWidth;
+    if (!room) return;
+    let z = (room - SLACK) / paper;
+    if (z >= 1) z = 1;                       // 자리가 넉넉하면 손대지 않는다
+    else if (z < MINZOOM) z = MINZOOM;
+    z = Math.round(z * 1000) / 1000;
+    if (z === last && z === 1) { pagesEl.style.zoom = ''; return; }
+    last = z;
+    pagesEl.style.zoom = z === 1 ? '' : String(z);
+  }
+
+  // 화면 크기가 바뀔 때마다. ⚠ 리본이 한 줄 늘고 주는 것은 «세로»라 여기와 무관하다.
+  window.addEventListener('resize', fit);
+  if (typeof ResizeObserver === 'function') {
+    // 사이드바가 접히거나 하면 window resize 없이도 자리가 바뀐다
+    new ResizeObserver(fit).observe(mainEl);
+  }
+  fit();
+  return { fit, zoomNow: () => (Number(pagesEl.style.zoom) || 1) };
+}
+
 /* main.js */
+
 
 
 
@@ -5986,6 +6064,14 @@ const menuApi = attachMenu({
   formatApi,
 });
 window.__app.menuApi = menuApi;
+
+// 좁은 화면에서 종이를 화면에 맞게 줄여 보여 준다(2026-08-31 SKY). 자리가 넉넉하면 그대로.
+const fitApi = attachFit({
+  mainEl: document.getElementById('main'),
+  pagesEl: document.getElementById('pages'),
+  getDoc: () => state.doc,
+});
+window.__app.fitApi = fitApi;
 
 // ---- 문서 폴더 열기·저장 ----
 state.dir = null;
