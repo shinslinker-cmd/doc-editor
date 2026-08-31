@@ -80,6 +80,11 @@ body { margin:0; background:var(--desk); color:var(--ink);
            text-align:center; letter-spacing:0; }
 @media print { #ver { display:none !important; } }
 .tbg { display:flex; gap:6px; align-items:center; flex:none; }
+/* ⛔ 이 한 줄이 없으면 상황 묶음의 hidden 이 «아무 일도 안 한다» — 위의 display:flex 가
+   브라우저 기본 [hidden]{display:none} 을 이기기 때문이다. 코드는 hidden 을 제대로 켜고
+   끄는데 화면은 그대로여서 «안 되는 것처럼» 보인다(2026-08-31 실측: 리본 높이가
+   글만 칠 때도 그림 고를 때도 317px 로 똑같았다). */
+.tbg[hidden] { display:none !important; }
 /* 표 묶음 — 「표」 이름표가 붙은 한 덩어리로 보이게 (2026-08-30 SKY).
    ⚠ 버튼이 13개라 태블릿 폭에서는 묶음 자체가 화면보다 넓어져 «가로 스크롤»이 생겼다(실측).
       묶음은 하나로 두되 «묶음 안에서» 접히게 한다 — 상자는 하나로 보이고 줄만 늘어난다. */
@@ -213,7 +218,29 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .blk-image img.imgsel ~ .cap:empty::before {
   content:'그림 설명 (비우면 안 보임)'; color:#aeb0b8; }
 #pages img.ri, #gauge img.ri { vertical-align:middle; max-width:100%; height:auto; }
-#pages img.imgsel { outline:2px solid #5490ff; outline-offset:1px; }
+/* 여러 장 고르기(Ctrl+클릭) — 함께 고른 것은 연하게, «기준»(손잡이가 붙고 서식 창이
+   값을 보여 주는 그 한 장)만 진하게. 어느 것이 기준인지 눈으로 알아야 한다. */
+#pages img.imgsel { outline:2px solid #9db9e8; outline-offset:1px; }
+#pages img.imgsel.imgbase { outline-color:#5490ff; }
+/* ── 자르기 감싸개(.iclip) — 표시 크기를 박아 두는 «창» (설계_서식과우클릭.md §4-3) ──
+   안쪽 img 는 «원본 전체»를 배율로 키운 것이라 감싸개보다 크고 음수 마진으로 밀려 있다.
+   ⛔ max-width 를 풀지 않으면 그 img 가 감싸개 폭으로 눌려 자르기가 통째로 무너진다
+      (#pages img.ri 의 max-width:100% 가 감싸개 안에서는 «감싸개 폭»을 뜻하기 때문). */
+#pages .iclip, #gauge .iclip { display:inline-block; overflow:hidden;
+  vertical-align:middle; line-height:0; }
+#pages .iclip img, #gauge .iclip img { max-width:none; }
+/* 자른 그림은 «감싸개»가 곧 눈에 보이는 네모다 — 선택 테두리도 거기 그린다.
+   안쪽 img 에 그리면 overflow:hidden 에 잘려 안 보인다. */
+#pages .iclip:has(img.imgsel) { outline:2px solid #9db9e8; outline-offset:1px;
+  touch-action:none; }
+#pages .iclip:has(img.imgbase) { outline-color:#5490ff; }
+#pages .iclip img.imgsel { outline:none; }
+/* 빈 캡션 펴기도 감싸개를 건너 이어져야 한다 — img 가 span 안으로 들어가면서
+   기존 «img.imgsel ~ .cap» 형제 규칙이 안 닿는다 */
+.blk-image .iclip:has(img.imgsel) ~ .cap:empty {
+  height:auto; overflow:visible; min-height:1.4em; }
+.blk-image .iclip:has(img.imgsel) ~ .cap:empty::before {
+  content:'그림 설명 (비우면 안 보임)'; color:#aeb0b8; }
 /* 크기 손잡이 — 편집 화면 전용, 인쇄에 안 찍힌다.
    ⚠ #imgui 자체는 pointer-events:none 이라 밑에 있는 글자를 가리지 않는다(2B 함정 재발 방지) */
 #imgui { position:absolute; z-index:30; pointer-events:none; }
@@ -239,10 +266,112 @@ body { margin:0; background:var(--desk); color:var(--ink);
   border-radius:3px; box-shadow:none; }
 @media print { #imgdrop { display:none !important; } }
 
+/* ── 그림 서식 창 (설계_서식과우클릭.md §4-1) ──
+   body 에 살면서 기준 그림 옆에 fixed 로 떠 있는 작은 카드다. 종이 위가 아니라
+   «화면 위»에 있어야 페이지가 넘어가거나 다시 그려져도 자리가 안 흔들린다(M6). */
+#imgpanel { position:fixed; z-index:100; width:206px; background:#fff;
+  border:1px solid var(--line); border-radius:10px; padding:10px 12px 12px;
+  box-shadow:0 6px 24px rgba(20,22,30,.16); font-size:12px; color:var(--ink); }
+#imgpanel .fp-ttl { display:flex; align-items:center; justify-content:space-between;
+  font-weight:800; font-size:12.5px; padding-bottom:8px; margin-bottom:8px;
+  border-bottom:1px solid var(--line-soft); }
+#imgpanel .fp-x { border:0; background:none; cursor:pointer; color:var(--dim);
+  font-size:13px; line-height:1; padding:2px 4px; }
+#imgpanel .fp-x:hover { color:var(--ink); }
+#imgpanel .fp-n { display:none; color:var(--sub); font-size:11px; line-height:1.45;
+  margin-bottom:8px; }
+/* ⚠ 라벨 글자 길이가 제각각(「폭」·「둥근 모서리」)이라 flex 로 두면 입력칸 폭이 줄마다
+   달라져 들쭉날쭉해 보인다(캡처 실측). 격자로 칸을 «세로로 맞춰» 놓는다. */
+#imgpanel label { display:grid; grid-template-columns:62px 1fr auto; align-items:center;
+  gap:6px; margin-bottom:7px; color:var(--sub); }
+#imgpanel label input { min-width:0; width:100%; height:28px; padding:0 6px;
+  border:1px solid var(--line); border-radius:6px; font:inherit; color:var(--ink); }
+#imgpanel label i { font-style:normal; color:var(--dim); }
+#imgpanel .fp-btns { display:flex; gap:6px; margin-top:9px; }
+#imgpanel .fp-btns button { flex:1; min-width:0; height:30px; padding:0 6px;
+  border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink);
+  font:inherit; cursor:pointer; white-space:nowrap; }
+#imgpanel .fp-btns button:hover { background:#f5f6f8; }
+#imgpanel .fp-align { display:flex; }
+#imgpanel .fp-align button.on { border-color:var(--ink); font-weight:700; }
+@media print { #imgpanel { display:none !important; } }
+
+/* ── 자르기 덮개 (설계_서식과우클릭.md §4-2) ──
+   유령(.cg)이 «원본 전체»를 지금 배율로 깔고, 창(.cw)이 보여 줄 자리다.
+   ⭐ 창 밖을 어둡게 하는 것은 칸 4개가 아니라 창의 box-shadow 하나다 — 창을 옮기면
+      어두운 부분이 저절로 따라오므로 어긋날 데가 없다. */
+#cropui { position:fixed; inset:0; z-index:110; overflow:hidden; }
+#cropui .cg { position:fixed; max-width:none; user-select:none; -webkit-user-drag:none; }
+#cropui .cw { position:fixed; box-shadow:0 0 0 9999px rgba(20,22,28,.45);
+  outline:1.5px solid #5490ff; cursor:move; touch-action:none; }
+/* ⛔ 잡히는 영역은 26px(손가락용), 눈에 보이는 네모는 그 안의 11px 이다 —
+   #imgui 손잡이와 같은 방식이다. touch-action:none 이 없으면 태블릿에서
+   크롬이 «화면 넘기기»로 채 가서 조절이 통째로 죽는다(2026-08-31 실측). */
+#cropui .ch { position:absolute; width:26px; height:26px; touch-action:none;
+  display:flex; align-items:center; justify-content:center; }
+#cropui .ch::before { content:''; width:11px; height:11px; background:#fff;
+  border:1.5px solid #5490ff; border-radius:2px; }
+#cropui .ch[data-c="nw"] { left:-13px; top:-13px; cursor:nwse-resize; }
+#cropui .ch[data-c="n"]  { left:50%; margin-left:-13px; top:-13px; cursor:ns-resize; }
+#cropui .ch[data-c="ne"] { right:-13px; top:-13px; cursor:nesw-resize; }
+#cropui .ch[data-c="e"]  { right:-13px; top:50%; margin-top:-13px; cursor:ew-resize; }
+#cropui .ch[data-c="se"] { right:-13px; bottom:-13px; cursor:nwse-resize; }
+#cropui .ch[data-c="s"]  { left:50%; margin-left:-13px; bottom:-13px; cursor:ns-resize; }
+#cropui .ch[data-c="sw"] { left:-13px; bottom:-13px; cursor:nesw-resize; }
+#cropui .ch[data-c="w"]  { left:-13px; top:50%; margin-top:-13px; cursor:ew-resize; }
+/* 안내 줄 — 화면 위 가운데. 태블릿에는 Enter·Esc 키가 없어 단추가 유일한 «취소» 길이다. */
+#cropui .ctip { position:fixed; left:50%; top:14px; transform:translateX(-50%);
+  display:flex; align-items:center; gap:10px; max-width:calc(100vw - 24px);
+  padding:8px 10px 8px 14px; background:#fff; border-radius:10px;
+  box-shadow:0 6px 24px rgba(20,22,30,.28); font-size:12.5px; color:var(--ink); }
+#cropui .ctip span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#cropui .ctip button { flex:none; height:32px; padding:0 14px; border-radius:7px;
+  border:1px solid var(--line); background:#fff; color:var(--ink); font:inherit; cursor:pointer; }
+#cropui .ctip .ct-ok { border-color:var(--ink); background:var(--ink); color:#fff; font-weight:700; }
+@media print { #cropui { display:none !important; } }
+
+/* ── 우클릭 문맥 메뉴 · 미니 패널 (설계_서식과우클릭.md §5-2·§5-3) ──
+   ⭐ 맨 위 «뱃지»가 지금 무엇을 고른 상태인지 말해 준다 — 「▦ 표 · 3칸 고름」처럼.
+      메뉴가 왜 이 모습인지 알려 주는 한 줄이라 이것부터 읽게 크기를 잡았다. */
+#ctxmenu, #minibar { position:fixed; z-index:120; background:#fff; color:var(--ink);
+  border:1px solid var(--line); border-radius:10px; padding:8px;
+  box-shadow:0 8px 28px rgba(20,22,30,.20); font-size:12px; }
+#minibar { z-index:115; }
+#ctxmenu { width:264px; }
+#ctxmenu .mbadge, #minibar .mbadge { font-size:10.5px; color:var(--dim); letter-spacing:.2px;
+  padding:0 2px 6px; }
+/* 빠른 줄 — 기호만 쓴 작은 단추. 뜻이 같은 것끼리(.qg) 줄을 나눈다:
+   글자꼴(B I U A＋ A−) / 색(■■■ ✕) / 정렬·맞춤. 한 줄로 죽 늘어놓으면 폭에 따라
+   아무 데서나 접혀 «7개, 7개, 1개»처럼 갈라진다(캡처 실측). */
+.qs { display:flex; flex-direction:column; gap:3px; padding-bottom:6px; }
+.qs .qg { display:flex; flex-wrap:wrap; gap:3px; }
+.qs .q { width:30px; height:30px; padding:0; flex:none; display:flex; align-items:center;
+  justify-content:center; border:1px solid transparent; border-radius:6px;
+  background:#fff; color:var(--ink); font:inherit; cursor:pointer; }
+.qs .q:hover { background:#f2f3f6; border-color:var(--line); }
+.qs .q-b { font-weight:900; }
+.qs .q-i { font-style:italic; }
+.qs .q-u { text-decoration:underline; }
+/* 목록은 2열이다 — 세로로 길면 손이 아래까지 내려가야 해서 태블릿에서 특히 나빴다 */
+#ctxmenu .mlist { display:grid; grid-template-columns:1fr 1fr; gap:3px;
+  border-top:1px solid var(--line-soft); padding-top:6px; }
+#ctxmenu .mlist button { height:31px; padding:0 8px; text-align:left; border:1px solid transparent;
+  border-radius:6px; background:#fff; color:var(--ink); font:inherit; cursor:pointer;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#ctxmenu .mlist button:hover { background:#f2f3f6; border-color:var(--line); }
+#minibar { padding:6px; }
+#minibar .qs { padding-bottom:0; max-width:200px; }
+/* 알림 — 붙여넣기가 브라우저에 막혔을 때 «막혔다»고 말해 준다. 조용히 삼키지 않는다. */
+.mtoast { position:fixed; z-index:130; max-width:300px; padding:9px 12px; border-radius:8px;
+  background:var(--ink); color:#fff; font-size:12px; line-height:1.5;
+  box-shadow:0 6px 20px rgba(20,22,30,.28); }
+@media print { #ctxmenu, #minibar, .mtoast { display:none !important; } }
+
 @media print {
   #side, #gauge, #folder-msg { display:none !important; }
   #imgui { display:none !important; }
   #pages img.imgsel { outline:none !important; }
+  #pages .iclip:has(img.imgsel) { outline:none !important; }
   /* 인쇄에서는 «고른 그림»이 의미가 없다 — 펴 뒀던 빈 캡션을 도로 접는다 */
   .blk-image .cap:empty { height:0 !important; overflow:hidden !important;
                           min-height:0 !important; }
@@ -318,15 +447,27 @@ body { margin:0; background:var(--desk); color:var(--ink);
       <button class="tb tb-c" data-color="" title="색 지우기">✕</button>
       </span>
       <span class="tb-sep"></span>
+      <!-- 정렬은 «언제나» 쓰는 것이라 항상 묶음에 둔다 — 문단·표 칸·고른 그림에 모두 붙는다.
+           ⚠ data-align 셀렉터는 그대로다(toolbar.js·format.js 코드 무변). -->
+      <span class="tbg">
+      <button class="tb tb-ic" data-align="left" title="왼쪽 정렬 — 문단·표 칸·고른 그림"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 5h10M1 8.5h16M1 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="tb tb-ic" data-align="center" title="가운데 정렬 — 문단·표 칸·고른 그림"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M4 5h10M1 8.5h16M4 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="tb tb-ic" data-align="right" title="오른쪽 정렬 — 문단·표 칸·고른 그림"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M7 5h10M1 8.5h16M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      </span>
       <span class="tbg">
       <button class="tb" data-list="0" title="글머리표 목록">• 목록</button>
       <button class="tb" data-list="1" title="번호 목록">1. 목록</button>
       </span>
       <span class="tb-sep"></span>
-      <!-- 표에 관한 것은 전부 이 한 묶음 안에 둔다 (2026-08-30 SKY) — 이름표가 붙어 있어
-           «여기부터 표 기능»이 한눈에 보인다. 좁은 화면에서도 묶음째 같이 내려간다. -->
-      <span class="tbg tbg-table" data-label="표">
+      <!-- 넣기는 «지금 무엇을 골랐든» 쓰므로 항상 보인다 -->
+      <span class="tbg tbg-table" data-label="넣기">
       <button class="tb" data-table="insert" title="표 넣기 (3×3)">▦ 표</button>
+      <button class="tb" data-image="auto" title="그림 넣기 — 커서가 어디 있는지 보고 알아서 넣는다. 표 칸 안이면 칸 폭에 맞춰 칸 안에, 글자 사이면 글자 크기로, 그 밖에는 한 줄짜리 그림으로">🖼 그림</button>
+      </span>
+      <!-- ⭐ 여기부터는 «상황 묶음»이다 — 지금 고른 것에 따라서만 나타난다(설계 §5-4 S3).
+           리본 «끝»에 두는 것이 핵심이다. 가운데에 두면 나타났다 사라질 때마다
+           왼쪽 단추들이 좌우로 밀려 손이 기억한 자리를 잃는다. -->
+      <span class="tbg tbg-table" data-label="표" data-ctx="table" hidden>
       <button class="tb" data-table="row+" title="아래에 행 추가">행＋</button>
       <button class="tb" data-table="row-" title="이 행 지우기">행−</button>
       <button class="tb" data-table="col+" title="오른쪽에 열 추가">열＋</button>
@@ -336,19 +477,15 @@ body { margin:0; background:var(--desk); color:var(--ink);
       <button class="tb" data-table="split" title="병합 풀기">분할</button>
       <button class="tb" data-table="splitx" title="이 칸을 옆으로 둘로">옆 나누기</button>
       <button class="tb" data-table="splity" title="이 칸을 아래로 둘로">아래 나누기</button>
-      <!-- 가로 정렬도 이 묶음 안에 둔다 (2026-08-30 SKY) — 세로 맞춤과 짝이라 함께 있어야
-           표를 고칠 때 손이 안 멀어진다. ⚠ 표 밖 문단 정렬도 여전히 이 버튼이다. -->
-      <button class="tb tb-ic" data-align="left" title="왼쪽 정렬 (표 밖 문단에도 쓴다)"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 5h10M1 8.5h16M1 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-align="center" title="가운데 정렬 (표 밖 문단에도 쓴다)"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M4 5h10M1 8.5h16M4 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-align="right" title="오른쪽 정렬 (표 밖 문단에도 쓴다)"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M7 5h10M1 8.5h16M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb tb-ic" data-valign="top" title="위쪽 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 1.5h14M5 4.5h8M5 7.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb tb-ic" data-valign="middle" title="가운데 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M5 3.5h8M2 7h14M5 10.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb tb-ic" data-valign="bottom" title="아래쪽 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M5 6.5h8M5 9.5h8M2 12.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <button class="tb" data-table="del" title="표 지우기 (Ctrl+Z 로 복구)">표 지우기</button>
       </span>
-      <span class="tb-sep"></span>
-      <span class="tbg tbg-table" data-label="그림">
-      <button class="tb" data-image="auto" title="그림 넣기 — 커서가 어디 있는지 보고 알아서 넣는다. 표 칸 안이면 칸 폭에 맞춰 칸 안에, 글자 사이면 글자 크기로, 그 밖에는 한 줄짜리 그림으로">🖼 그림</button>
+      <span class="tbg tbg-table" data-label="그림" data-ctx="image" hidden>
+      <button class="tb" data-imgfmt="panel" title="그림 서식 — 크기(mm)·둥근 모서리·정렬. 그림을 더블클릭해도 열린다">서식</button>
+      <button class="tb" data-imgfmt="crop" title="그림 자르기 — 원본은 그대로 남고 «보이는 창»만 바뀐다. 언제든 처음 상태로 되돌릴 수 있다">자르기</button>
+      <button class="tb" data-imgfmt="reset" title="크기·자르기·둥근 모서리를 처음 상태로 되돌린다">처음 상태로</button>
       </span>
     </div>
     <!-- ⭐ 문서 전체가 하나의 입력판이다 (D16) — 선택·커서·조합·터치는 브라우저가 한다 -->
@@ -359,7 +496,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 10:07";
+window.__BUILD = "2026-08-31 13:28";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -385,6 +522,12 @@ function bodyOf(run) {
   const m = markOf(run);
   if (run && run.img) { m.img = run.img; m.w = run.w; m.h = run.h; }
   if (run && run.src$) { m.src$ = run.src$; m.w = run.w; m.h = run.h; }
+  // 자르기 창(crop)·둥근 모서리(rad)도 «몸»이다(설계_서식과우클릭.md M1).
+  // ⛔ 서식(markOf)에 넣으면 안 된다 — 걸침 서식 한 번에 조용히 풀린다.
+  if (run && (run.img || run.src$)) {
+    if (run.crop) m.crop = run.crop;
+    if (run.rad) m.rad = run.rad;
+  }
   return m;
 }
 
@@ -524,6 +667,27 @@ function setImgSize(runs, pos, w, h) {
     if (r && r.img && start === pos) out.push(Object.assign({}, r, { w, h }));
     else out.push(r);
   }
+  return out;
+}
+
+// pos 자리 «그림 토막»에 서식 patch 를 얹는다. 값이 null 이면 그 칸을 뗀다(자르기 해제 등).
+// 그림이 아니면 원본 배열을 그대로 돌려준다 — 부른 쪽이 «안 바뀌었다»를 싸게 알아본다.
+// ⛔ 제자리에서 고치지 않는다(설계 §5) — 새 객체·새 배열이라야 되돌리기가 산다.
+function patchImgAt(runs, pos, patch) {
+  let p = 0;
+  let hit = -1;
+  (runs || []).forEach((r, i) => {
+    if (r && r.img && p === pos) hit = i;
+    p += (r && r.t ? r.t.length : 0);
+  });
+  if (hit < 0) return runs;
+  const next = Object.assign({}, runs[hit]);
+  for (const k of Object.keys(patch || {})) {
+    if (patch[k] === null || patch[k] === undefined) delete next[k];
+    else next[k] = patch[k];
+  }
+  const out = runs.slice();
+  out[hit] = next;
   return out;
 }
 
@@ -1479,7 +1643,51 @@ function measureAll(blocks, gaugeEl, makeEl) {
   return out;
 }
 
+/* imgfmt.js */
+// 그림 서식의 «계산 한 곳»(설계_서식과우클릭.md M3). DOM 을 모른다.
+// 단위 규칙(S1): 저장·모델은 px, 입력·표시만 mm. 변환은 이 파일만 안다.
+// ⛔ 최상위 이름 주의: 빌드가 모듈을 한 덩어리로 합친다 — 여기 이름은 이 파일만 쓴다.
+const PX_PER_MM = 96 / 25.4;
+
+function mmOf(px) { return Math.round((px / PX_PER_MM) * 10) / 10; }
+function pxOf(mm) { return Math.max(1, Math.round(mm * PX_PER_MM)); }
+
+// 표시 비율의 근원 — crop 이 있으면 crop, 없으면 저장 원본(M2·M3)
+function ratioOf(obj, asset) {
+  const c = obj && obj.crop;
+  const w = c ? c.w : (asset ? asset.w : 1);
+  const h = c ? c.h : (asset ? asset.h : 1);
+  return h / Math.max(1, w);
+}
+
+function dispHeight(w, obj, asset) {
+  return Math.max(1, Math.round(w * ratioOf(obj, asset)));
+}
+
+// 감싸개(.iclip) 안에 «원본 전체»를 넣고 자르기 창만 보이게 미는 배치.
+// 표시폭 w 기준 배율 k = w / crop.w — 원본 img 크기와 음수 마진을 돌려준다.
+function clipLayout(w, obj, asset) {
+  const c = obj.crop;
+  const k = w / Math.max(1, c.w);
+  return {
+    iw: Math.max(1, Math.round(asset.w * k)),
+    ih: Math.max(1, Math.round(asset.h * k)),
+    ml: -Math.round(c.x * k),
+    mt: -Math.round(c.y * k),
+  };
+}
+
+// 자르기 창을 원본 안으로 바로잡는다. 최소 8px — 0 이 되면 나누기가 깨진다.
+function clampCrop(crop, asset) {
+  const w = Math.max(8, Math.min(Math.round(crop.w), asset.w));
+  const h = Math.max(8, Math.min(Math.round(crop.h), asset.h));
+  const x = Math.max(0, Math.min(Math.round(crop.x), asset.w - w));
+  const y = Math.max(0, Math.min(Math.round(crop.y), asset.h - h));
+  return { x, y, w, h };
+}
+
 /* runs-dom.js */
+
 
 
 // ⛔ 여기 적힌 태그·속성만 인정한다. 나머지는 껍데기를 버리고 글자만 가져온다.
@@ -1492,6 +1700,45 @@ let ASSETS = {};
 function useAssets(a) { ASSETS = a || {}; }
 function assetOf(id) { return ASSETS[id] || null; }
 
+// 그림 하나를 DOM 으로 — crop·rad 대응(설계_서식과우클릭.md §4-3).
+// cls = 'ri'(토막) 또는 'bimg'(블록). obj = { w, crop?, rad? } (w = 표시 폭 px).
+// ⭐ 크기를 박아 두어야 높이 재기가 그림 로딩을 안 기다린다(설계 §4-1) — 감싸개가 생겨도
+//   감싸개에 폭·높이를 박으므로 그 원칙이 유지된다.
+// ⚠ 되읽기(domToRuns)용 «진실»은 data-* 에 적는다: crop 이 있으면 img 의 width 속성은
+//   «원본을 배율로 키운 크기»라서 표시 폭이 아니다. 그걸로 되읽으면 그림이 폭발한다.
+function imgNode(assetId, a, obj, cls) {
+  const w = obj.w || a.w;
+  const h = dispHeight(w, obj, a);
+  const img = document.createElement('img');
+  img.className = cls;
+  img.src = a.data;
+  if (assetId) img.dataset.img = assetId;
+  img.dataset.dw = String(w);
+  img.dataset.dh = String(h);
+  if (obj.rad) img.dataset.rad = String(obj.rad);
+  if (!obj.crop) {
+    img.width = w;
+    img.height = h;
+    if (obj.rad) img.style.borderRadius = obj.rad + 'px';
+    return img;
+  }
+  img.dataset.crop = [obj.crop.x, obj.crop.y, obj.crop.w, obj.crop.h].join(',');
+  const c = clipLayout(w, obj, a);
+  img.width = c.iw;
+  img.height = c.ih;
+  img.style.marginLeft = c.ml + 'px';
+  img.style.marginTop = c.mt + 'px';
+  img.style.display = 'block';
+  const box = document.createElement('span');
+  box.className = 'iclip';
+  box.setAttribute('contenteditable', 'false');
+  box.style.width = w + 'px';
+  box.style.height = h + 'px';
+  if (obj.rad) box.style.borderRadius = obj.rad + 'px';
+  box.appendChild(img);
+  return box;
+}
+
 function runsToNodes(runs) {
   const out = [];
   for (const r of runs || []) {
@@ -1499,14 +1746,7 @@ function runsToNodes(runs) {
     if (r.img) {
       const a = ASSETS[r.img];
       if (!a) continue;                        // 미아는 안 그린다(읽기 복구가 이미 막지만 방어)
-      const img = document.createElement('img');
-      img.className = 'ri';
-      img.src = a.data;
-      img.dataset.img = r.img;
-      // ⭐ width·height 를 박아 두어야 높이 재기가 그림 로딩을 안 기다린다(설계 §4-1)
-      img.width = r.w || a.w;
-      img.height = r.h || a.h;
-      out.push(img);
+      out.push(imgNode(r.img, a, r, 'ri'));
       continue;
     }
     let node = document.createTextNode(r.t);
@@ -1544,9 +1784,23 @@ function walk(node, mark, out) {
     if (tag === 'IMG') {
       // 살아 있는 DOM 의 우리 그림은 data-img 를 갖고 있다. 밖에서 붙여 들어온 그림은
       // src$ 로 임시 표기해 두면 flush 의 adoptImages 가 보관함에 담는다.
-      const run = { t: OBJ, w: Number(child.getAttribute('width')) || 0,
-                    h: Number(child.getAttribute('height')) || 0 };
-      if (child.dataset && child.dataset.img) run.img = child.dataset.img;
+      // ⛔ 크기는 data-dw/dh 가 먼저다 — 자른 그림은 width 속성이 «원본 확대 크기»라
+      //    그걸로 되읽으면 표시 폭이 배율만큼 뻥튀기된다(설계_서식과우클릭.md §4-3).
+      const ds = child.dataset || {};
+      const run = { t: OBJ,
+                    w: Number(ds.dw) || Number(child.getAttribute('width')) || 0,
+                    h: Number(ds.dh) || Number(child.getAttribute('height')) || 0 };
+      if (ds.crop) {
+        const p = ds.crop.split(',').map(Number);
+        if (p.length === 4 && p.every(n => Number.isFinite(n))) {
+          run.crop = { x: p[0], y: p[1], w: p[2], h: p[3] };
+        }
+      }
+      if (ds.rad) {
+        const rad = Number(ds.rad) || 0;
+        if (rad > 0) run.rad = rad;
+      }
+      if (ds.img) run.img = ds.img;
       else run.src$ = child.getAttribute('src') || '';
       out.push(run);
       continue;
@@ -1574,6 +1828,7 @@ function domToRuns(el) {
 }
 
 /* render.js */
+
 
 
 
@@ -1630,16 +1885,12 @@ function imageEl(block, page) {
     const pg = page || DEFAULT_PAGE;
     const maxW = pg.width - pg.margin.left - pg.margin.right;
     const maxH = (pg.height - pg.margin.top - pg.margin.bottom) - 60;  // 캡션·여백 몫(설계 §6)
+    // ⭐ 비율의 근원은 crop 이 있으면 crop 이다(M3) — 자동 축소도 그 비율을 따라야
+    //   화면과 장 나눔(숨은 상자)이 안 어긋난다.
     let w = Math.min(block.w || a.w, maxW);
-    let h = Math.max(1, Math.round(w * a.h / Math.max(1, a.w)));
-    if (h > maxH) { h = maxH; w = Math.max(1, Math.round(h * a.w / Math.max(1, a.h))); }
-    const img = document.createElement('img');
-    img.className = 'bimg';
-    img.src = a.data;
-    img.dataset.img = block.src;
-    img.width = w;
-    img.height = h;
-    el.appendChild(img);
+    let h = dispHeight(w, block, a);
+    if (h > maxH) { h = maxH; w = Math.max(1, Math.round(h / Math.max(0.0001, ratioOf(block, a)))); }
+    el.appendChild(imgNode(block.src, a, { w, crop: block.crop, rad: block.rad }, 'bimg'));
   }
   const cap = document.createElement('div');
   cap.className = 'cap';
@@ -3203,7 +3454,9 @@ function allMarked(runs, from, to, key) {
   return part.length > 0 && part.every(r => !!r[key]);
 }
 
-function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
+// alignPicked(align) → boolean : «고른 그림이 있으면 그것을 정렬하고 참을 돌려주는» 함수.
+// 그림 쪽(image.js)이 만들어 주고 main.js 가 넘긴다. 없으면 지금까지와 똑같이 돈다.
+function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw, alignPicked }) {
   const buttons = Array.from(barEl.querySelectorAll('.tb[data-mark]'));
   let lastSels = null;  // [{ id, item, from, to }, …] — 도구모음을 누르면 선택이 풀리므로 기억해 둔다
 
@@ -3353,6 +3606,10 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
 
   // 정렬은 토막이 아니라 블록 전체에 붙는다 — 걸침 선택이면 걸친 블록 전부에
   function setAlign(align) {
+    // ⛔ 그림을 «골라 놓은» 상태가 먼저다. 그림 블록은 편집 불가 통짜 섬이라 그 안에 커서가
+    //    없어 아래의 «커서가 있는 블록» 길에 절대 안 걸린다 — 그래서 그림을 고르고 정렬을
+    //    눌러도 아무 일도 안 났다(2026-08-31 실측). 그림 서식 창의 정렬도 이 단추를 대행한다.
+    if (alignPicked && alignPicked(align)) return;
     const targets = targetRanges();
     const parts = targets && targets.length ? targets : null;
     const cellTs = (parts || []).filter(t => t.cell);
@@ -3629,6 +3886,7 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
 
 
 
+
 const MAXPX = 2000;   // 붙일 때 긴 변 한도 — A4 인쇄 200dpi 상당(설계 §2-2)
 
 // 파일 → { data(dataURL), w, h }. 긴 변이 MAXPX 를 넘으면 줄여 담는다.
@@ -3863,31 +4121,34 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   //    다음 다시 그리기가 그 <img> 를 통째로 쓸어 버린다 —
   //    잘라내기 뒤 붙여넣기가 «아무 일도 안 일어남»으로 보이던 진짜 원인이다.
   //    그래서 그림이 든 클립보드는 우리가 직접 받는다.
-  pagesEl.addEventListener('paste', (e) => {
-    const dt = e.clipboardData;
-    if (!dt) return;
-    const html = dt.getData('text/html') || '';
-    if (html.indexOf('<table') >= 0) return;          // 표 붙여넣기는 편집기가 맡는다
-    const files = dt.files ? Array.from(dt.files).filter(f => /^image\//.test(f.type || '')) : [];
-    if (files.length) { e.preventDefault(); insertFiles(files); return; }
-    const text = (dt.getData('text/plain') || '').trim();
+  // 붙여넣을 내용을 «우리가» 넣는다 — 이벤트 없이도 부를 수 있게 몸을 함수로 뽑았다
+  // (우클릭 메뉴의 「붙여넣기」가 이것을 쓴다. 합성 paste 이벤트는 만들지 않는다 —
+  //  브라우저 기본 글 넣기가 합성 이벤트로는 안 일어난다).
+  // 돌려주는 값 = «우리가 처리했다». false 면 부른 쪽이 브라우저 기본에 맡긴다.
+  // ⚠ textOnly:true 로 부르면 «글만»도 우리가 넣는다 — 메뉴에는 맡길 기본 동작이 없어서다.
+  function pasteData({ html, text, files, textOnly } = {}) {
+    const h = html || '';
+    if (h.indexOf('<table') >= 0) return false;        // 표 붙여넣기는 편집기가 맡는다
+    const fs = (files || []).filter(f => /^image\//.test((f && f.type) || ''));
+    if (fs.length) { insertFiles(fs); return true; }
+    const t = (text || '').trim();
     // ⛔ 글과 그림이 «섞인» 붙여넣기도 우리가 받아야 한다. 브라우저에 맡기면 크롬이
     //    그림과 «그 뒤의 모든 것»을 문단 밖으로 밀어내고 커서까지 밖에 놓는다 —
     //    우리 코드는 «커서가 있는 문단»을 읽으므로 읽을 문단을 못 찾고, 다음 다시 그리기가
     //    밖에 나와 있던 것을 통째로 쓸어 버린다. 글까지 함께 사라진다(2026-08-31 실측).
-    if (text && html.indexOf('data:image') >= 0) {
-      const list = runsFromHtml(html);
-      if (list.some(r => r && (r.img || r.src$))) {
-        e.preventDefault();
-        insertRunsAt(list, caretCtx());
-        return;
-      }
+    if (t && h.indexOf('data:image') >= 0) {
+      const list = runsFromHtml(h);
+      if (list.some(r => r && (r.img || r.src$))) { insertRunsAt(list, caretCtx()); return true; }
     }
-    if (text) return;                                  // 글만이면 기존 길이 맡는다
+    if (t) {
+      if (!textOnly) return false;                     // 글만이면 브라우저 기본이 더 낫다
+      const list = h ? runsFromHtml(h) : [];
+      return insertRunsAt(list.length ? list : [{ t: text }], caretCtx());
+    }
     // 태그를 통째로 집어 src 와 width 를 함께 읽는다 — 속성 차례는 앱마다 다르다
     const items = [];
     const re = /<img\b[^>]*>/gi;
-    let m = re.exec(html);
+    let m = re.exec(h);
     while (m) {
       const tag = m[0];
       const src = /src=["'](data:image\/[^"']+)["']/i.exec(tag);
@@ -3895,11 +4156,20 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
         const wm = /width=["']?(\d+)/i.exec(tag);
         items.push({ url: src[1], w: wm ? Number(wm[1]) : 0 });
       }
-      m = re.exec(html);
+      m = re.exec(h);
     }
-    if (!items.length) return;
-    e.preventDefault();
+    if (!items.length) return false;
     insertDataUrls(items);
+    return true;
+  }
+
+  pagesEl.addEventListener('paste', (e) => {
+    const dt = e.clipboardData;
+    if (!dt) return;
+    const handled = pasteData({ html: dt.getData('text/html') || '',
+                                text: dt.getData('text/plain') || '',
+                                files: dt.files ? Array.from(dt.files) : [] });
+    if (handled) e.preventDefault();
   });
 
   // ── 끌어다 놓기 ──
@@ -3991,7 +4261,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     if (!(t && t.matches && t.matches('img.ri, img.bimg'))) return;
     const at = targetOf(t);
     if (!at) return;
-    moving = { at, w: t.width, h: t.height, img: t.dataset.img };
+    moving = { at, w: dispWOf(t), h: dispHOf(t), img: t.dataset.img };
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
   }, true);
   document.addEventListener('dragend', () => { moving = null; hideMark(); }, true);
@@ -4057,7 +4327,11 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   });
 
   // ── 그림 고르기 + 크기 손잡이 (Task 10) ──
-  let picked = null;   // 고른 <img> (다시 그리면 DOM 이 없어지므로 isConnected 로 확인)
+  // ⭐ 2026-08-31: 한 장이 아니라 «목록»이다(설계_서식과우클릭.md S2).
+  //   picks = 고른 순서, 맨 뒤가 «기준»(picked) — 손잡이·자르기·서식 창의 현재 값이 기준 것이다.
+  let picks = [];
+  let picked = null;   // = picks 의 마지막. 다시 그리면 DOM 이 없어지므로 isConnected 로 확인
+  const pickCbs = [];
   const ui = document.createElement('div');
   ui.id = 'imgui';
   ui.setAttribute('contenteditable', 'false');
@@ -4068,37 +4342,125 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     ui.appendChild(hd);
   }
 
+  // ⭐ 선택 네모·크기의 «기준»은 눈에 보이는 네모다. 자른 그림은 감싸개(.iclip)가 그것이고
+  //   안쪽 img 는 원본 전체를 배율로 키운 것이라 훨씬 크다 — img 로 재면 손잡이가
+  //   그림 밖 엉뚱한 데 붙는다(설계_서식과우클릭.md §4-3).
+  function dispBoxOf(img) { return (img && img.closest && img.closest('.iclip')) || img; }
+  function dispWOf(img) { return Number(img.dataset.dw) || img.width; }
+  function dispHOf(img) { return Number(img.dataset.dh) || img.height; }
+  function cropOf(img) {
+    if (!img.dataset.crop) return null;
+    const p = img.dataset.crop.split(',').map(Number);
+    if (p.length !== 4 || !p.every(n => Number.isFinite(n))) return null;
+    return { x: p[0], y: p[1], w: p[2], h: p[3] };
+  }
+
+  // 끄는 동안 «화면만» 표시 폭을 바꾼다 — 모델은 pointerup 에서 한 번만 기록한다.
+  // 자른 그림은 감싸개와 안쪽 원본을 함께 다시 계산해야 잘린 자리가 안 어긋난다.
+  function setDispW(img, w) {
+    const a = getDoc().assets[img.dataset.img];
+    if (!a) return;
+    const crop = cropOf(img);
+    const h = dispHeight(w, { crop }, a);
+    img.dataset.dw = String(w);
+    img.dataset.dh = String(h);
+    const box = img.closest('.iclip');
+    if (!box) { img.width = w; img.height = h; return; }
+    const c = clipLayout(w, { crop }, a);
+    box.style.width = w + 'px';
+    box.style.height = h + 'px';
+    img.width = c.iw;
+    img.height = c.ih;
+    img.style.marginLeft = c.ml + 'px';
+    img.style.marginTop = c.mt + 'px';
+  }
+
   // #main 이 확대(transform)돼 있어도 맞도록 화면 좌표를 입력판 눈금으로 바꾼다
   function place() {
     if (!picked || !picked.isConnected) return;
     const pr = pagesEl.getBoundingClientRect();
-    const ir = picked.getBoundingClientRect();
+    const ir = dispBoxOf(picked).getBoundingClientRect();
     const k = pr.width / pagesEl.offsetWidth;   // 확대 배율
     ui.style.left = ((ir.left - pr.left) / k) + 'px';
     ui.style.top = ((ir.top - pr.top) / k) + 'px';
     ui.style.width = (ir.width / k) + 'px';
     ui.style.height = (ir.height / k) + 'px';
   }
+  // 다시 그려져 DOM 이 사라진 그림을 목록에서 뺀다 — 기준도 함께 다시 잡는다
+  function alive() {
+    const live = picks.filter(el => el.isConnected);
+    if (live.length !== picks.length) picks = live;
+    picked = picks[picks.length - 1] || null;
+    return picks;
+  }
+  function pickedImgs() { alive(); return picks.slice(); }
+  function onPick(cb) { if (typeof cb === 'function') pickCbs.push(cb); }
+  function firePick() {
+    for (const cb of pickCbs) {
+      try { cb(); } catch (err) { console.warn('선택 알림 처리기 오류:', err.message); }
+    }
+  }
+  // 기준 그림만 진한 테두리 — 손잡이가 어디 붙는지 눈으로 알아야 한다
+  function markBase() {
+    for (const el of picks) {
+      if (!el.isConnected) continue;
+      el.classList.add('imgsel');
+      if (el === picked) el.classList.add('imgbase');
+      else el.classList.remove('imgbase');
+    }
+  }
   function deselect() {
-    if (picked && picked.isConnected) picked.classList.remove('imgsel');
+    for (const el of picks) {
+      if (!el.isConnected) continue;
+      el.classList.remove('imgsel');
+      el.classList.remove('imgbase');
+    }
+    picks = [];
     picked = null;
     if (ui.parentNode) ui.parentNode.removeChild(ui);
+    firePick();
   }
-  function selectImg(img) {
-    deselect();
+  // add = Ctrl/⌘+클릭. 이미 고른 그림을 Ctrl+클릭하면 «뺀다»(워드·탐색기와 같다).
+  function selectImg(img, add) {
+    if (!img) return;
+    if (!add) {
+      for (const el of picks) {
+        if (el.isConnected && el !== img) { el.classList.remove('imgsel'); el.classList.remove('imgbase'); }
+      }
+      picks = picks.includes(img) ? [img] : [];
+    } else if (picks.includes(img)) {
+      picks = picks.filter(el => el !== img);
+      img.classList.remove('imgsel');
+      img.classList.remove('imgbase');
+      picked = picks[picks.length - 1] || null;
+      if (!picked) { if (ui.parentNode) ui.parentNode.removeChild(ui); }
+      else { markBase(); place(); }
+      firePick();
+      return;
+    }
+    if (!picks.includes(img)) picks.push(img);
     picked = img;
-    img.classList.add('imgsel');
+    markBase();
     pagesEl.appendChild(ui);
     place();
+    firePick();
   }
 
   pagesEl.addEventListener('click', (e) => {
     const t = e.target;
-    if (t && t.matches && t.matches('img.ri, img.bimg')) { selectImg(t); return; }
+    const add = e.ctrlKey || e.metaKey;
+    if (t && t.matches && t.matches('img.ri, img.bimg')) { selectImg(t, add); return; }
+    // 자른 그림은 감싸개가 위를 덮는 수가 있다 — 감싸개를 눌러도 안쪽 그림을 고른다
+    const ic = t && t.closest && t.closest('.iclip');
+    if (ic) { const im = ic.querySelector('img'); if (im) { selectImg(im, add); return; } }
     if (!(t && t.closest && t.closest('#imgui'))) deselect();
   });
   document.addEventListener('selectionchange', () => {
-    if (picked && !picked.isConnected) deselect();          // 다시 그려져 사라졌다
+    if (!picks.length) return;
+    const n = picks.length;
+    alive();
+    if (!picks.length) deselect();                          // 전부 다시 그려져 사라졌다
+    else if (picks.length !== n) { markBase(); place(); firePick(); }
   });
 
   // 고른 그림의 모델 좌표를 찾는다 → { kind:'block', b } 또는 { kind:'run', b, cell|item|cap, pos }
@@ -4123,6 +4485,73 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       cap: cap ? 1 : 0 };
   }
   function pickedTarget() { return targetOf(picked); }
+  // 고른 그림 전부의 모델 좌표 — DOM 이 사라져도 안전하게 «먼저» 다 뜬다.
+  // el·img(보관함 번호)를 함께 실어 두면 뒤 계산에서 화면을 다시 안 봐도 된다.
+  function pickedTargets() {
+    alive();
+    return picks.map((el) => {
+      const at = targetOf(el);
+      return at ? Object.assign(at, { el, img: el.dataset.img }) : null;
+    }).filter(Boolean);
+  }
+  // 다시 그린 화면에서 같은 자리의 그림을 찾아낸다 — 이어서 또 조절할 수 있게.
+  // 토막 그림은 «글자 번호»로 찾는다(같은 칸에 그림이 여럿일 수 있다).
+  function findImgAt(at) {
+    if (at.kind === 'block') {
+      return pagesEl.querySelector('.blk-image[data-id="' + at.b.id + '"] img.bimg');
+    }
+    const blkEl = pagesEl.querySelector('.blk[data-id="' + at.b.id + '"]');
+    if (!blkEl) return null;
+    const host = at.cell
+      ? pagesEl.querySelector('.blk[data-id="' + at.b.id + '"] td[data-r="' + at.cell[0]
+        + '"][data-c="' + at.cell[1] + '"]')
+      : (at.cap ? blkEl.querySelector('.cap')
+        : (at.item !== null && at.item !== undefined
+          ? blkEl.querySelector('.lst li[data-i="' + at.item + '"]') : blkEl));
+    if (!host) return null;
+    for (const im of host.querySelectorAll('img')) {
+      const parent = im.parentNode;
+      const idx = Array.prototype.indexOf.call(parent.childNodes, im);
+      if (offsetIn(host, parent, idx) === at.pos) return im;
+    }
+    return null;
+  }
+  function reselect(ats) {
+    const found = (ats || []).map(findImgAt).filter(Boolean);
+    deselect();
+    for (const im of found) selectImg(im, true);
+  }
+  // 블록에 patch 를 얹는다. 값이 null 이면 그 칸을 «뗀다».
+  // ⚠ replaceBlock 의 Object.assign 은 null 을 그대로 남겨 저장 파일에 "crop": null 이 낀다 —
+  //   그래서 여기서 직접 만든다.
+  function blockPatched(blocks, id, patch) {
+    const i = blocks.findIndex(x => x.id === id);
+    if (i < 0) return blocks;
+    const next = Object.assign({}, blocks[i]);
+    for (const k of Object.keys(patch || {})) {
+      if (patch[k] === null || patch[k] === undefined) delete next[k];
+      else next[k] = patch[k];
+    }
+    const out = blocks.slice();
+    out[i] = next;
+    return out;
+  }
+  // pos 자리의 그림 토막 자체 — crop 을 알아야 높이를 다시 잴 수 있다
+  function runAtPos(runs, pos) {
+    let p = 0;
+    for (const r of runs || []) {
+      if (r && r.img && p === pos) return r;
+      p += (r && r.t ? r.t.length : 0);
+    }
+    return null;
+  }
+  // 그 그림이 놓일 수 있는 최대 표시 폭 — 표 칸이면 칸 안폭(패딩 몫 18px), 아니면 본문 폭
+  function limitOf(at, b, doc) {
+    if (at.kind === 'run' && at.cell) {
+      return Math.max(24, ((b.cols[at.cell[1]] ? b.cols[at.cell[1]].w : 200) - 18));
+    }
+    return textWidth(doc);
+  }
   function runsAtTarget(at) {
     if (at.cell) return cellRunsOf(at.b, at.cell);
     if (at.cap) return at.b.caption || [];
@@ -4148,8 +4577,9 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     e.preventDefault();
     e.stopPropagation();
     const host = picked.closest('td[data-r], .lst li[data-i], .blk-image, .blk[data-id]');
-    rz = { startX: e.clientX, startW: picked.width,
-           ratio: picked.height / Math.max(1, picked.width),
+    // ⚠ 시작 폭은 «보이는 폭»(data-dw)이다 — 자른 그림의 img.width 는 원본 확대 크기라
+    //   그걸로 시작하면 손잡이를 잡는 순간 그림이 배율만큼 튄다.
+    rz = { startX: e.clientX, startW: dispWOf(picked),
            max: Math.max(24, (host ? host.clientWidth : pagesEl.clientWidth) - 4),
            dir: (hd.dataset.c === 'nw' || hd.dataset.c === 'sw') ? -1 : 1 };
     try { hd.setPointerCapture(e.pointerId); } catch (err) { /* 합성 이벤트에는 없다 */ }
@@ -4157,15 +4587,16 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   ui.addEventListener('pointermove', (e) => {
     if (!rz || !picked || !picked.isConnected) return;
     const w = Math.max(24, Math.min(rz.max, rz.startW + rz.dir * (e.clientX - rz.startX)));
-    picked.width = w;
-    picked.height = Math.max(1, Math.round(w * rz.ratio));
+    setDispW(picked, w);
     place();
   });
   ui.addEventListener('pointerup', () => {
     if (!rz || !picked || !picked.isConnected) { rz = null; return; }
-    const w = picked.width;
-    const h = picked.height;
+    const w = dispWOf(picked);
+    const h = dispHOf(picked);
     rz = null;
+    // 여러 장을 골랐으면 «전부 같은 폭»으로 — 손잡이는 기준 그림에 붙어 있었을 뿐이다(설계 §3)
+    if (picks.length > 1) { setPickedWidths(w); return; }
     const at = pickedTarget();
     if (!at) return;
     const doc = getDoc();
@@ -4183,37 +4614,191 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     if (again) selectImg(again);
   });
 
-  // 고른 그림을 모델에서 뺀다 — Delete·Backspace 와 잘라내기가 함께 쓴다.
+  // 고른 그림을 «전부» 모델에서 뺀다 — Delete·Backspace 와 잘라내기가 함께 쓴다.
+  // ⭐ 한 번의 setDoc 이라 Ctrl+Z 한 번에 통째로 돌아온다(설계 §3).
   function removePicked() {
-    const at = pickedTarget();
+    const ats = pickedTargets();
     deselect();
-    if (!at) return;
+    if (!ats.length) return;
     const doc = getDoc();
-    if (at.kind === 'block') {
-      setDoc(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, at.b.id) }));
-      redraw({});
-      return;
+    let blocks = doc.blocks;
+    // ① 토막 — 같은 자리(칸·항목·캡션·문단)끼리 묶어 «뒤 위치부터» 뺀다.
+    //    앞에서부터 빼면 뒤 그림의 글자 번호가 밀려 엉뚱한 글자가 지워진다.
+    const runTargets = ats.filter(a => a.kind === 'run');
+    const keyOf = (a) => a.b.id + '|' + JSON.stringify(a.cell) + '|' + a.item + '|' + a.cap;
+    const groups = new Map();
+    for (const a of runTargets) {
+      const k = keyOf(a);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(a);
     }
-    const src = runsAtTarget(at);
-    // ⚠ normalizeRuns 로 감싼다 — 그냥 이으면 그림 양옆의 같은 서식이 안 합쳐져
-    //   토막이 계속 늘어난다
-    const runs = normalizeRuns(
-      sliceRuns(src, 0, at.pos).concat(sliceRuns(src, at.pos + 1, runsLength(src))));
-    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, at.b.id, patchAtTarget(at, runs)) }));
-    redraw({ caret: { id: at.b.id, item: at.item, cell: at.cell, cap: at.cap, pos: at.pos } });
+    for (const list of groups.values()) {
+      list.sort((x, y) => y.pos - x.pos);
+      const b = blocks.find(x => x.id === list[0].b.id);
+      if (!b) continue;
+      const here = Object.assign({}, list[0], { b });
+      let src = runsAtTarget(here);
+      if (!Array.isArray(src)) continue;
+      for (const a of list) {
+        src = sliceRuns(src, 0, a.pos).concat(sliceRuns(src, a.pos + 1, runsLength(src)));
+      }
+      // ⚠ normalizeRuns 로 감싼다 — 그냥 이으면 그림 양옆의 같은 서식이 안 합쳐져
+      //   토막이 계속 늘어난다
+      blocks = replaceBlock(blocks, b.id, patchAtTarget(here, normalizeRuns(src)));
+    }
+    // ② 블록 그림 — 문서가 통째로 비면 빈 문단 하나를 남긴다
+    for (const a of ats.filter(x => x.kind === 'block')) {
+      if (blocks.some(x => x.id === a.b.id)) blocks = removeBlock(blocks, a.b.id);
+    }
+    if (!blocks.length) blocks = [createBlock('para')];
+    setDoc(Object.assign({}, doc, { blocks }));
+    // 한 장만 지웠으면 그 자리에 커서를 놓는다(지금까지의 감각 그대로).
+    // 여러 장이면 어디에 놓아도 엉뚱하므로 놓지 않는다.
+    const one = ats.length === 1 && ats[0].kind === 'run' ? ats[0] : null;
+    redraw(one ? { caret: { id: one.b.id, item: one.item, cell: one.cell, cap: one.cap, pos: one.pos } } : {});
+  }
+
+  // 고른 그림 전부를 «같은 표시 폭»으로 — 부품 사진 폭 통일이 핵심 용도(설계 §3).
+  // 표 칸 안 그림은 칸 안폭이 한도다. 한 번의 setDoc = Ctrl+Z 한 번.
+  function setPickedWidths(wPx) {
+    const ats = pickedTargets();
+    if (!ats.length) return;
+    const doc = getDoc();
+    let blocks = doc.blocks;
+    for (const at of ats) {
+      const b = blocks.find(x => x.id === at.b.id);
+      const a = doc.assets[at.img];
+      if (!b || !a) continue;
+      const w = Math.max(24, Math.min(Math.round(wPx), limitOf(at, b, doc)));
+      if (at.kind === 'block') { blocks = blockPatched(blocks, b.id, { w }); continue; }
+      const here = Object.assign({}, at, { b });
+      const src = runsAtTarget(here);
+      if (!Array.isArray(src)) continue;
+      const h = dispHeight(w, runAtPos(src, at.pos) || {}, a);
+      blocks = replaceBlock(blocks, b.id, patchAtTarget(here, patchImgAt(src, at.pos, { w, h })));
+    }
+    setDoc(Object.assign({}, doc, { blocks }));
+    redraw({});
+    reselect(ats);
+  }
+
+  // 그림 서식 칸(crop·rad)을 얹는다. 값이 null 이면 그 칸을 뗀다.
+  // ⚠ patch 에 w 가 있으면 토막의 h 도 함께 다시 계산해 싣는다 — 안 그러면 비율이 어긋난다.
+  function patchTargets(ats, patch) {
+    if (!ats.length) return;
+    const doc = getDoc();
+    let blocks = doc.blocks;
+    for (const at of ats) {
+      const b = blocks.find(x => x.id === at.b.id);
+      const a = doc.assets[at.img];
+      if (!b || !a) continue;
+      const p = Object.assign({}, patch);
+      if (p.w !== undefined && p.w !== null) {
+        p.w = Math.max(24, Math.min(Math.round(p.w), limitOf(at, b, doc)));
+      }
+      if (at.kind === 'block') {
+        delete p.h;                          // 블록은 높이를 저장하지 않는다 — 비율로 계산한다
+        blocks = blockPatched(blocks, b.id, p);
+        continue;
+      }
+      const here = Object.assign({}, at, { b });
+      const src = runsAtTarget(here);
+      if (!Array.isArray(src)) continue;
+      const cur = runAtPos(src, at.pos) || {};
+      // 자르기가 바뀌면 비율이 바뀐다 — 높이를 다시 잰다
+      const next = Object.assign({}, cur);
+      for (const k of Object.keys(p)) {
+        if (p[k] === null || p[k] === undefined) delete next[k];
+        else next[k] = p[k];
+      }
+      p.h = dispHeight(p.w !== undefined && p.w !== null ? p.w : (cur.w || a.w), next, a);
+      blocks = replaceBlock(blocks, b.id, patchAtTarget(here, patchImgAt(src, at.pos, p)));
+    }
+    setDoc(Object.assign({}, doc, { blocks }));
+    redraw({});
+    reselect(ats);
+  }
+  function patchPicked(patch) { patchTargets(pickedTargets(), patch); }
+  function patchBase(patch) {
+    const ats = pickedTargets();
+    if (ats.length) patchTargets([ats[ats.length - 1]], patch);
+  }
+
+  // ── 고른 그림 «블록»의 정렬 ──
+  // ⛔ 그림 블록은 편집 불가 «통짜 섬»이라 그 안에 커서가 없다. 그래서 리본의 정렬 단추가
+  //    쓰는 «커서가 있는 블록» 길로는 절대 닿지 않는다 — 그림을 골라 놓고 「가운데」를 눌러도
+  //    아무 일도 안 일어났다(2026-08-31 실측). 리본이 이것을 «먼저» 물어보게 해서 잇는다.
+  //    글줄 안 그림 토막은 정렬이 없다 — 그 자리는 문단 정렬이 정하므로 손대지 않는다.
+  //    돌려주는 값 = «우리가 처리했다».
+  function alignPicked(align) {
+    const ats = pickedTargets().filter(a => a.kind === 'block');
+    if (!ats.length) return false;
+    patchTargets(ats, { align });
+    return true;
+  }
+
+  // 서식 창이 보여 줄 «기준 그림»의 지금 값. 고른 게 없으면 null.
+  function pickedInfo() {
+    alive();
+    if (!picked) return null;
+    const at = targetOf(picked);
+    const doc = getDoc();
+    const a = at ? doc.assets[picked.dataset.img] : null;
+    if (!at || !a) return null;
+    const b = doc.blocks.find(x => x.id === at.b.id) || at.b;
+    return { kind: at.kind, n: picks.length,
+             w: dispWOf(picked), h: dispHOf(picked),
+             rad: Number(picked.dataset.rad) || 0, crop: cropOf(picked),
+             align: at.kind === 'block' ? (b.align || 'center') : null,
+             maxW: limitOf(at, b, doc), asset: { w: a.w, h: a.h } };
+  }
+
+  // 자른 그림은 «잘린 모습 그대로» 구워서 담는다(설계_서식과우클릭.md §4-4) —
+  // 워드·엑셀에 붙였을 때 잘리기 전 원본이 튀어나오면 안 된다.
+  // ⚠ 둥근 모서리는 굽지 않는다(워드도 안 굽는다). crop 이 없으면 원본을 그대로 담는다.
+  // ⚠ 그래서 밖에 나갔다 돌아온 그림은 «구워진 새 원본»이다 — 자르기 정보는 안 따라간다.
+  function bakedHtml(img) {
+    const a = getDoc().assets[img.dataset.img];
+    if (!a) return '';
+    const w = dispWOf(img) || a.w;
+    const h = dispHOf(img) || a.h;
+    const crop = cropOf(img);
+    if (!crop) {
+      return '<img src="' + a.data + '" width="' + w + '" height="' + h + '">';
+    }
+    try {
+      const cv = document.createElement('canvas');
+      cv.width = w;
+      cv.height = h;
+      cv.getContext('2d').drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, w, h);
+      return '<img src="' + cv.toDataURL('image/png') + '" width="' + w + '" height="' + h + '">';
+    } catch (err) {
+      // 굽기가 막히면(그림이 아직 안 실렸다 등) 원본이라도 담는다 — 빈 클립보드보다 낫다
+      console.warn('자른 그림을 굽지 못했다:', err.message);
+      return '<img src="' + a.data + '" width="' + w + '" height="' + h + '">';
+    }
+  }
+
+  // ⛔ 사람이 «칸에 글을 치고 있는» 중이면 그림 단축키가 끼어들면 안 된다.
+  //    서식 창의 폭 칸에서 숫자를 지우려고 Backspace 를 누르면 그림이 통째로 지워지고,
+  //    Ctrl+C 는 친 숫자 대신 그림을 클립보드에 담는다. 칸 안에서는 손을 뗀다.
+  //    ⚠ #pages 는 그 자체가 입력판(contenteditable)이라 여기 걸리지 않는다 — 지금까지대로 돈다.
+  function inField(el) {
+    return !!(el && el.closest && el.closest('input, textarea, select'));
   }
 
   // 고른 그림을 클립보드에 담는다. 담을 게 없으면 거짓.
+  // 여러 장이면 <img> 를 이어 담는다 — 워드·엑셀에 나란히 붙는다.
   function putPickedOnClipboard(e) {
-    if (!picked || !picked.isConnected) return false;
+    alive();
+    if (!picks.length) return false;
+    if (inField(e.target) || inField(document.activeElement)) return false;
     const s2 = window.getSelection();
     if (s2 && s2.rangeCount && !s2.getRangeAt(0).collapsed) return false;  // 글을 골랐으면 브라우저에
-    const a = getDoc().assets[picked.dataset.img];
-    if (!a || !e.clipboardData) return false;
-    const w = picked.width || a.w;
-    const h = picked.height || a.h;
-    e.clipboardData.setData('text/html',
-      '<img src="' + a.data + '" width="' + w + '" height="' + h + '">');
+    if (!e.clipboardData) return false;
+    const html = picks.map(bakedHtml).filter(Boolean).join('');
+    if (!html) return false;
+    e.clipboardData.setData('text/html', html);
     e.clipboardData.setData('text/plain', '');
     return true;
   }
@@ -4237,17 +4822,803 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
 
   // ── 고른 그림 지우기 — Delete·Backspace. Esc 는 해제 ──
   document.addEventListener('keydown', (e) => {
-    if (!picked || !picked.isConnected) return;
+    alive();
+    if (!picks.length) return;
+    if (inField(e.target)) return;          // 서식 창 칸에 숫자를 치는 중이면 손대지 않는다
     if (e.key === 'Escape') { deselect(); return; }
     if (e.key !== 'Delete' && e.key !== 'Backspace') return;
     e.preventDefault();
     removePicked();
   });
 
-  return { insertFiles };
+  // 검사·서식 창·메뉴가 쓰는 공개 창구. 화면 동작은 여기 안 기댄다(창구가 없어도 앱은 돈다).
+  return { insertFiles, pasteData, pickedImgs, onPick, selectImg, deselect,
+           patchPicked, patchBase, setPickedWidths, removePicked, pickedInfo, alignPicked };
+}
+
+/* format.js */
+// 그림 서식 창 — 설계_서식과우클릭.md §4. UI 전용이고 모델 규칙은 core 에 있다.
+// ⛔ 최상위 이름은 attachFormat 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    파일이 달라도 최상위 이름이 겹치면 «Identifier has already been declared»로
+//    화면이 통째로 안 뜬다(2026-08-30 실측).
+// 단위 규칙(S1): 저장·모델은 px, 사람이 보고 치는 칸만 mm. 변환은 core/imgfmt.js 만 안다.
+
+
+function attachFormat({ barEl, pagesEl, imageApi }) {
+  const panel = document.createElement('div');
+  panel.id = 'imgpanel';
+  panel.setAttribute('contenteditable', 'false');
+  panel.innerHTML = ''
+    + '<div class="fp-ttl">그림 서식<button class="fp-x" type="button" title="닫기">✕</button></div>'
+    + '<div class="fp-n"></div>'
+    + '<label>폭 <input class="fp-w" type="number" step="0.1" min="1"><i>mm</i></label>'
+    + '<label>높이 <input class="fp-h" type="number" step="0.1" min="1"><i>mm</i></label>'
+    + '<label>둥근 모서리 <input class="fp-r" type="number" step="0.5" min="0"><i>mm</i></label>'
+    + '<div class="fp-btns"><button class="fp-crop" type="button">자르기</button>'
+    + '<button class="fp-reset" type="button">처음 상태로</button></div>'
+    + '<div class="fp-btns fp-align"><button type="button" data-a="left">왼쪽</button>'
+    + '<button type="button" data-a="center">가운데</button>'
+    + '<button type="button" data-a="right">오른쪽</button></div>';
+
+  const inW = panel.querySelector('.fp-w');
+  const inH = panel.querySelector('.fp-h');
+  const inR = panel.querySelector('.fp-r');
+  const nEl = panel.querySelector('.fp-n');
+  const alignRow = panel.querySelector('.fp-align');
+
+  const isOpen = () => !!panel.parentNode;
+
+  // 눈에 보이는 네모 — 자른 그림은 감싸개(.iclip)가 곧 보이는 네모다
+  function baseBox() {
+    const list = imageApi.pickedImgs();
+    const img = list[list.length - 1];
+    if (!img) return null;
+    const box = (img.closest && img.closest('.iclip')) || img;
+    return box.getBoundingClientRect();
+  }
+
+  // 기준 그림 오른쪽에 붙인다. 오른쪽에 자리가 없으면 왼쪽으로 넘긴다(설계 §4-1).
+  function place() {
+    const r = baseBox();
+    if (!r) return;
+    const w = panel.offsetWidth || 200;
+    const h = panel.offsetHeight || 220;
+    let x = r.right + 12;
+    if (x + w > window.innerWidth - 8) x = r.left - 12 - w;
+    if (x < 8) x = 8;
+    let y = r.top;
+    if (y + h > window.innerHeight - 8) y = window.innerHeight - 8 - h;
+    if (y < 8) y = 8;
+    panel.style.left = Math.round(x) + 'px';
+    panel.style.top = Math.round(y) + 'px';
+  }
+
+  // 지금 고른 그림의 값을 칸에 채운다. 고른 게 없으면 창을 닫는다.
+  function fill() {
+    const info = imageApi.pickedInfo();
+    if (!info) { close(); return null; }
+    inW.value = String(mmOf(info.w));
+    inH.value = String(mmOf(info.h));
+    inR.value = String(mmOf(info.rad || 0));
+    // 여러 장을 골랐을 때 «무엇이 보이는 값인지» 헷갈리지 않게 한 줄로 알려 준다
+    nEl.textContent = info.n > 1 ? (info.n + '장 골랐습니다 — 값은 진한 테두리 그림 것입니다') : '';
+    nEl.style.display = info.n > 1 ? 'block' : 'none';
+    // 정렬은 «한 줄짜리 그림 블록»에만 있다. 글줄 안 그림은 문단 정렬을 따라간다.
+    alignRow.style.display = info.kind === 'block' ? 'flex' : 'none';
+    for (const b of alignRow.querySelectorAll('button')) {
+      b.classList.toggle('on', b.dataset.a === info.align);
+    }
+    return info;
+  }
+
+  function close() {
+    if (panel.parentNode) panel.parentNode.removeChild(panel);
+  }
+
+  function openPanel() {
+    if (!imageApi.pickedInfo()) return;      // 고른 그림이 없으면 아무 일도 안 한다
+    if (!panel.parentNode) document.body.appendChild(panel);
+    if (!fill()) return;
+    place();
+  }
+
+  // ── 자르기 모드 (S7 — 원본은 그대로, «보이는 창»만 바뀐다) ──
+  // ⭐ 자르기는 원본을 깎지 않는다. «원본의 어디를 보여 줄지»(crop)만 기록하므로
+  //    나중에 언제든 처음 상태로 돌아온다. 보관함의 원본은 손대지 않는다.
+  // 화면 구조: 유령(.cg)이 «원본 전체»를 지금 배율로 깔고, 창(.cw)이 보여 줄 자리다.
+  // 창 밖이 어두운 것은 칸 4개가 아니라 창의 box-shadow 하나다 — 어긋날 데가 없다.
+  const cropUi = document.createElement('div');
+  cropUi.id = 'cropui';
+  cropUi.setAttribute('contenteditable', 'false');
+  const ghost = document.createElement('img');
+  ghost.className = 'cg';
+  const cwin = document.createElement('div');
+  cwin.className = 'cw';
+  for (const c of ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']) {
+    const hd = document.createElement('div');
+    hd.className = 'ch';
+    hd.dataset.c = c;
+    cwin.appendChild(hd);
+  }
+  // ⛔ 안내 줄이 없으면 «어떻게 끝내는지» 알 길이 없다. 그리고 태블릿에는 Enter·Esc 키가
+  //    아예 없어 단추가 없으면 «취소»를 못 한다 — 키만 믿으면 태블릿에서 갇힌다.
+  const ctip = document.createElement('div');
+  ctip.className = 'ctip';
+  ctip.innerHTML = '<span>모서리를 끌어 보일 자리를 고르세요 · 원본은 그대로 남습니다</span>'
+    + '<button class="ct-ok" type="button">적용</button>'
+    + '<button class="ct-no" type="button">취소</button>';
+  cropUi.appendChild(ghost);
+  cropUi.appendChild(cwin);
+  cropUi.appendChild(ctip);
+
+  let cropState = null;    // { base, a, k, gx, gy, gw, gh, wasPanel }
+  let cropDrag = null;     // 끄는 중
+  const cropOpen = () => !!cropUi.parentNode;
+
+  function setWin(x, y, w, h) {
+    cwin.style.left = x + 'px';
+    cwin.style.top = y + 'px';
+    cwin.style.width = w + 'px';
+    cwin.style.height = h + 'px';
+  }
+
+  function closeCrop() {
+    if (cropUi.parentNode) cropUi.parentNode.removeChild(cropUi);
+    cropState = null;
+    cropDrag = null;
+  }
+
+  function openCrop() {
+    if (cropOpen()) return;
+    const info = imageApi.pickedInfo();
+    const list = imageApi.pickedImgs();
+    const base = list[list.length - 1];
+    if (!info || !base) return;
+    const box = ((base.closest && base.closest('.iclip')) || base).getBoundingClientRect();
+    const a = info.asset;
+    const c = info.crop || { x: 0, y: 0, w: a.w, h: a.h };
+    // 배율 k = «보이는 폭 ÷ 지금 잘라 놓은 폭». 유령을 이 배율로 깔면 창이 지금 그림과 딱 겹친다.
+    const k = box.width / Math.max(1, c.w);
+    const s = { base, a, k, gx: box.left - c.x * k, gy: box.top - c.y * k,
+                gw: a.w * k, gh: a.h * k, wasPanel: isOpen() };
+    ghost.src = base.src;                    // 화면의 <img> src 가 곧 보관함 원본이다
+    ghost.style.left = s.gx + 'px';
+    ghost.style.top = s.gy + 'px';
+    ghost.style.width = s.gw + 'px';
+    ghost.style.height = s.gh + 'px';
+    setWin(box.left, box.top, box.width, box.height);
+    cropState = s;
+    close();                                 // 서식 창은 덮개 밑에 깔리므로 잠시 닫는다
+    document.body.appendChild(cropUi);
+  }
+
+  // 적용 — 창 자리를 원본 좌표로 되돌려 crop 으로 적는다. patchBase 한 번(Ctrl+Z 한 번).
+  function applyCrop() {
+    const s = cropState;
+    if (!s) { closeCrop(); return; }
+    const r = cwin.getBoundingClientRect();
+    // 창이 원본 전체와 같으면 «자르기 해제»로 적는다 — crop:null 이 남으면 안 된다
+    const full = Math.abs(r.left - s.gx) < 1.5 && Math.abs(r.top - s.gy) < 1.5
+      && Math.abs(r.width - s.gw) < 1.5 && Math.abs(r.height - s.gh) < 1.5;
+    const w = Math.round(r.width);
+    const crop = full ? null : clampCrop({ x: (r.left - s.gx) / s.k, y: (r.top - s.gy) / s.k,
+                                           w: r.width / s.k, h: r.height / s.k }, s.a);
+    const wasPanel = s.wasPanel;
+    closeCrop();
+    imageApi.patchBase({ crop, w });
+    if (wasPanel) setTimeout(openPanel, 0);
+  }
+
+  // ⛔ 끌기의 «잡기»는 손잡이나 창 자신에 건다. 덮개에 걸면 끌기가 끝난 뒤 click 의
+  //    과녁이 덮개가 되어 «바깥을 눌렀다»로 읽히고, 크기를 조절하자마자 그대로 적용돼 버린다.
+  cropUi.addEventListener('pointerdown', (e) => {
+    if (!cropState) return;
+    const t = e.target;
+    const hd = t && t.closest ? t.closest('.ch') : null;
+    const cap = hd || (t && t.closest && t.closest('.cw'));
+    if (!cap) return;                        // 어두운 바깥은 click 이 «적용»으로 받는다
+    e.preventDefault();
+    const r = cwin.getBoundingClientRect();
+    cropDrag = { c: hd ? hd.dataset.c : null, cap, id: e.pointerId,
+                 x0: e.clientX, y0: e.clientY, l: r.left, t: r.top, w: r.width, h: r.height };
+    try { cap.setPointerCapture(e.pointerId); } catch (err) { /* 잡기 실패해도 끌기는 된다 */ }
+  });
+  cropUi.addEventListener('pointermove', (e) => {
+    const s = cropState;
+    const g = cropDrag;
+    if (!g || !s) return;
+    const MIN = 12;                          // 창이 0 이 되면 나누기가 깨진다
+    const dx = e.clientX - g.x0;
+    const dy = e.clientY - g.y0;
+    let l = g.l, t = g.t, w = g.w, h = g.h;
+    if (!g.c) {                              // 창을 통째로 옮긴다 — 유령 안으로만
+      l = Math.max(s.gx, Math.min(g.l + dx, s.gx + s.gw - w));
+      t = Math.max(s.gy, Math.min(g.t + dy, s.gy + s.gh - h));
+    } else {
+      if (g.c.indexOf('w') >= 0) {
+        const nl = Math.max(s.gx, Math.min(g.l + dx, g.l + g.w - MIN));
+        w = g.l + g.w - nl; l = nl;
+      }
+      if (g.c.indexOf('e') >= 0) w = Math.max(MIN, Math.min(g.w + dx, s.gx + s.gw - g.l));
+      if (g.c.indexOf('n') >= 0) {
+        const nt = Math.max(s.gy, Math.min(g.t + dy, g.t + g.h - MIN));
+        h = g.t + g.h - nt; t = nt;
+      }
+      if (g.c.indexOf('s') >= 0) h = Math.max(MIN, Math.min(g.h + dy, s.gy + s.gh - g.t));
+    }
+    setWin(l, t, w, h);
+  });
+  const endCropDrag = (e) => {
+    if (!cropDrag) return;
+    try { cropDrag.cap.releasePointerCapture(cropDrag.id); } catch (err) { /* 이미 놓였다 */ }
+    cropDrag = null;
+    if (e) e.preventDefault();
+  };
+  cropUi.addEventListener('pointerup', endCropDrag);
+  cropUi.addEventListener('pointercancel', endCropDrag);
+  // 어두운 바깥을 누르면 적용(설계 §4-2). 안내 줄은 «바깥»이 아니다 — 제 단추가 있다.
+  cropUi.addEventListener('click', (e) => {
+    if (!cropState) return;
+    const t = e.target;
+    if (!(t && t.closest)) return;
+    if (t.closest('.ct-ok')) { applyCrop(); return; }
+    if (t.closest('.ct-no')) { closeCrop(); return; }
+    if (t.closest('.cw') || t.closest('.ch') || t.closest('.ctip')) return;
+    applyCrop();
+  });
+  // 덮개가 떠 있는 동안은 편집을 잠근다 — Enter 적용 · Esc 취소 말고는 아무것도 안 통한다.
+  // ⛔ stopPropagation 까지 해야 한다. 안 그러면 Esc 가 «그림 고르기 해제»로도 함께 먹어
+  //    적용할 그림이 사라진다(그림 단축키는 document 에 붙어 있다).
+  document.addEventListener('keydown', (e) => {
+    if (!cropOpen()) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.key === 'Escape') closeCrop();
+    else if (e.key === 'Enter') applyCrop();
+  }, true);
+  window.addEventListener('wheel', (e) => { if (cropOpen()) e.preventDefault(); },
+                          { passive: false, capture: true });
+
+  // 크기·모서리를 처음 상태로. 자르기·둥근 모서리를 떼고 폭을 원본으로 되돌린다.
+  // ⭐ 한 번의 patchPicked = setDoc 한 번 → Ctrl+Z 한 번에 통째로 돌아온다.
+  // ⚠ 여러 장을 골랐으면 폭은 «기준 그림의 원본 폭»으로 모인다(설계 §3 — 일괄은 기준을 따른다).
+  function reset() {
+    const info = imageApi.pickedInfo();
+    if (!info) return;
+    imageApi.patchPicked({ crop: null, rad: null, w: info.asset.w });
+  }
+
+  // ── 칸 입력 ──
+  // 입력 한 번 = setDoc 한 번(각자 Ctrl+Z 한 단계). number 칸의 change 는
+  // 「엔터」와 「칸 밖으로 나가기」 둘 다에서 온다 — 치는 도중에는 안 온다.
+  inW.addEventListener('change', () => {
+    const v = Number(inW.value);
+    if (!(v > 0)) { fill(); return; }
+    imageApi.setPickedWidths(pxOf(v));
+  });
+  inH.addEventListener('change', () => {
+    const info = imageApi.pickedInfo();
+    const v = Number(inH.value);
+    if (!info || !(v > 0)) { fill(); return; }
+    // 높이는 «비율을 거꾸로 풀어» 폭으로 바꾼다 — 저장하는 것은 언제나 폭이다.
+    const ratio = ratioOf({ crop: info.crop }, info.asset);
+    imageApi.setPickedWidths(Math.round(pxOf(v) / Math.max(0.01, ratio)));
+  });
+  inR.addEventListener('change', () => {
+    const v = Number(inR.value);
+    imageApi.patchPicked({ rad: v > 0 ? pxOf(v) : null });
+  });
+
+  // ── 단추 ──
+  // ⛔ 단추의 mousedown 을 막아야 «편집 자리»가 안 풀린다. 칸(input)은 막지 않는다 —
+  //    막으면 초점이 안 들어가 아무것도 못 친다.
+  for (const b of panel.querySelectorAll('button')) {
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+  }
+  panel.querySelector('.fp-x').addEventListener('click', close);
+  panel.querySelector('.fp-crop').addEventListener('click', () => openCrop());
+  panel.querySelector('.fp-reset').addEventListener('click', reset);
+  // 정렬은 리본 단추를 «대행»한다(M4) — 정렬 규칙은 리본에 한 벌만 있다.
+  for (const b of alignRow.querySelectorAll('button')) {
+    b.addEventListener('click', () => {
+      const t = barEl.querySelector('.tb[data-align="' + b.dataset.a + '"]');
+      if (t) t.click();
+    });
+  }
+
+  // ── 닫는 길 ──
+  document.addEventListener('mousedown', (e) => {
+    if (!isOpen()) return;
+    const t = e.target;
+    if (t && t.closest && (t.closest('#imgpanel') || t.closest('#imgui') || t.closest('#bar'))) return;
+    // 그림을 다시 누르는 것은 «다른 그림 고르기»다 — 창은 열어 둔 채 값만 갈아 끼운다
+    if (t && t.closest && (t.matches('img.ri, img.bimg') || t.closest('.iclip'))) return;
+    close();
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (isOpen() && e.key === 'Escape') close();
+  });
+
+  // 다시 그리면 <img> 가 새것이 되고 선택도 다시 잡힌다(reselect). 그 사이 한 번은
+  // «아무것도 안 골라진» 순간이 지나가므로 곧바로 닫으면 창이 깜빡인다 —
+  // 한 박자 뒤에 «최종 상태»를 보고 판단한다.
+  let pending = 0;
+  imageApi.onPick(() => {
+    if (!isOpen() || pending) return;
+    pending = setTimeout(() => {
+      pending = 0;
+      if (!isOpen()) return;
+      if (fill()) place();
+    }, 0);
+  });
+  window.addEventListener('resize', () => { if (isOpen()) place(); });
+  window.addEventListener('scroll', () => { if (isOpen()) place(); }, true);
+
+  // ── 여는 길 ──
+  // ⓐ 그림 더블클릭(S8) — 워드와 같은 감각
+  pagesEl.addEventListener('dblclick', (e) => {
+    const t = e.target;
+    if (!(t && t.closest)) return;
+    if (!(t.matches('img.ri, img.bimg') || t.closest('.iclip'))) return;
+    e.preventDefault();
+    // 더블클릭의 첫 클릭이 그림을 고르므로 이 시점엔 이미 골라져 있다
+    openPanel();
+  });
+  // ⓑ 리본의 그림 묶음 단추
+  for (const b of barEl.querySelectorAll('.tb[data-imgfmt]')) {
+    b.addEventListener('mousedown', (e) => e.preventDefault());
+    b.addEventListener('click', () => {
+      const k = b.dataset.imgfmt;
+      if (k === 'crop') openCrop();
+      else if (k === 'reset') reset();
+      else openPanel();
+    });
+  }
+
+  return { openPanel, openCrop, reset, close, closeCrop, cropOpen };
+}
+
+/* context.js */
+// 문맥 판정 · 리본 대행 · 상황별 리본 — 설계_서식과우클릭.md §5-1·§5-4 (S3·M4).
+// ⛔ 최상위 이름은 attachContext 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    파일이 달라도 최상위 이름이 겹치면 화면이 통째로 안 뜬다.
+//
+// ⭐ 여기서 «기능»을 새로 만들지 않는다. 지금 무엇을 골랐는지 «읽기»만 하고,
+//    실제 동작은 언제나 리본 단추를 눌러 대신한다(M4). 그래야 우클릭 메뉴·미니 패널·
+//    리본이 서로 어긋나지 않는다 — 규칙이 리본 한 벌뿐이기 때문이다.
+
+
+function attachContext({ pagesEl, barEl, imageApi }) {
+  // 지금 «무엇을 고른 상태인가». 순서가 곧 우선순위다 — 그림이 가장 세다.
+  function ctxOf() {
+    const n = imageApi.pickedImgs().length;
+    if (n) return { kind: 'image', label: '🖼 그림 · ' + n + '장' };
+    const cells = wholeCellsIn(pagesEl);
+    if (cells.length > 1) return { kind: 'table', label: '▦ 표 · ' + cells.length + '칸 고름' };
+    const el = activeBlockEl(pagesEl);
+    if (el && activeCellEl(el)) return { kind: 'table', label: '▦ 표' };
+    // 글자를 «집어» 놓았나 — 걸침 선택이면 블록마다 조각이 온다
+    const chars = targetsIn(pagesEl).reduce((s, t) => s + Math.abs((t.to || 0) - (t.from || 0)), 0);
+    if (chars > 0) return { kind: 'text', label: '가 글자 · ' + chars + '자' };
+    if (el && activeCapEl(el)) return { kind: 'caret', label: '그림 설명' };
+    const cls = el ? (el.className || '') : '';
+    const label = cls.indexOf('blk-list') >= 0 ? '• 목록'
+      : cls.indexOf('blk-heading') >= 0 ? '제목'
+      : cls.indexOf('blk-section') >= 0 ? '절 제목' : '¶ 문단';
+    return { kind: 'caret', label };
+  }
+
+  // 리본 단추 대행 — 메뉴·미니 패널이 «자기 손»으로 문서를 고치지 않게 하는 창구다.
+  // ⚠ 숨어 있는(hidden) 묶음의 단추도 click() 은 그대로 동작한다. 보임/숨김은 보기 문제일 뿐이다.
+  function pressButton(sel) {
+    const btn = barEl.querySelector(sel);
+    if (btn) { btn.click(); return true; }
+    console.warn('리본 단추를 못 찾았다:', sel);   // 조용히 삼키지 않되 죽지도 않는다
+    return false;
+  }
+
+  // ⛔ 손가락·마우스를 «누르고 있는 동안»에는 리본을 절대 바꾸지 않는다.
+  //    표 칸을 끌기 시작하면 곧바로 「표」 묶음이 나타나 리본이 한 줄 늘고,
+  //    그만큼 문서가 아래로 밀린다 — 끄는 손 밑에서 표가 움직이니 엉뚱한 칸이 골라진다
+  //    (2026-08-31 실측: 표 실입력 검사 12건이 이것 때문에 깨졌다).
+  //    누르고 있는 동안 온 갱신은 «밀린 일»로 적어 두었다가 손을 뗀 뒤에 한 번만 한다.
+  let holding = false;
+  let missed = false;
+  document.addEventListener('pointerdown', () => { holding = true; }, true);
+  const release = () => {
+    holding = false;
+    if (!missed) return;
+    missed = false;
+    refreshCtxGroups();
+  };
+  document.addEventListener('pointerup', release, true);
+  document.addEventListener('pointercancel', release, true);
+
+  // 상황 묶음을 보이거나 숨긴다. 표와 그림을 동시에 만족할 수도 있다(표 칸 안 그림).
+  // ⛔ 묶음이 나타나면 리본이 한 줄 늘고 그만큼 문서가 «아래로 밀린다». 태블릿에서는
+  //    188px 이나 밀려서, 표 칸을 누른 자리에서 표가 손끝 아래로 도망가 버린다(실측).
+  //    그래서 늘어난 만큼 화면을 같이 굴려 문서가 «가만히 있는 것처럼» 보이게 한다.
+  //    ⚠ 높이는 «정말 바뀔 때만» 잰다 — 커서가 움직일 때마다 재면 화면이 느려진다.
+  function refreshCtxGroups() {
+    if (holding) { missed = true; return; }
+    const el = activeBlockEl(pagesEl);
+    const gt = barEl.querySelector('[data-ctx="table"]');
+    const gi = barEl.querySelector('[data-ctx="image"]');
+    const 표켤까 = !!(wholeCellsIn(pagesEl).length
+      || (el && (activeCellEl(el) || (el.className || '').indexOf('blk-table') >= 0)));
+    const 그림켤까 = !!imageApi.pickedImgs().length;
+    if ((!gt || gt.hidden === !표켤까) && (!gi || gi.hidden === !그림켤까)) return;
+    const 전 = barEl.offsetHeight;
+    if (gt) gt.hidden = !표켤까;
+    if (gi) gi.hidden = !그림켤까;
+    const 후 = barEl.offsetHeight;
+    if (후 === 전) return;
+    // ⛔ 이 «보정 스크롤»은 사람이 화면을 굴린 것이 아니다. 그런데 브라우저는 똑같은
+    //    scroll 사건으로 알려 주므로, 그것을 «굴렸으니 메뉴를 닫자»로 읽는 곳이 있으면
+    //    방금 연 우클릭 메뉴가 곧바로 닫힌다(2026-08-31 실측: 그림 위 우클릭이 통째로 안 됐다).
+    //    그래서 «지금은 내가 굴리는 중»이라고 잠깐 표시해 둔다.
+    adjustUntil = Date.now() + 300;
+    window.scrollBy(0, 후 - 전);
+  }
+  let adjustUntil = 0;
+  const isAdjusting = () => Date.now() < adjustUntil;
+
+  document.addEventListener('selectionchange', refreshCtxGroups);
+  imageApi.onPick(refreshCtxGroups);
+  refreshCtxGroups();
+
+  return { ctxOf, pressButton, refreshCtxGroups, isAdjusting };
+}
+
+/* menu.js */
+// 우클릭 문맥 메뉴 + 미니 패널 — 설계_서식과우클릭.md §5-2·§5-3 (S4·S5·S6·M4·M5).
+// ⛔ 최상위 이름은 attachMenu 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    파일이 달라도 최상위 이름이 겹치면 화면이 통째로 안 뜬다.
+//
+// ⭐ 이 파일은 문서를 «직접» 고치지 않는다. 무엇을 누르든 결국 리본 단추를 대신 누른다(M4).
+//    그래야 규칙이 리본 한 벌뿐이어서 메뉴와 리본이 서로 어긋날 수가 없다.
+//    예외는 리본에 단추가 없는 것들뿐이다 — 복사·잘라내기·붙여넣기·그림 서식 창.
+
+// 빠른 줄 — 아이콘 가로줄. 리본 단추를 가리키는 셀렉터의 나열이다(S6·M4).
+// 글자 대신 기호만 쓴다. 리본 단추의 속을 그대로 복제하면 「굵게」처럼 글자가 길어
+// 줄이 넘친다.
+const MENU_MARKS = [
+  { sel: '[data-mark="b"]', txt: 'B', cls: 'q-b', tip: '굵게' },
+  { sel: '[data-mark="i"]', txt: 'I', cls: 'q-i', tip: '기울임' },
+  { sel: '[data-mark="u"]', txt: 'U', cls: 'q-u', tip: '밑줄' },
+  { sel: '[data-szstep="1"]', txt: 'A＋', tip: '글자 크게' },
+  { sel: '[data-szstep="-1"]', txt: 'A−', tip: '글자 작게' },
+];
+const MENU_COLORS = [
+  { sel: '.tb-c[data-color="#1c1e24"]', txt: '■', color: '#1c1e24', tip: '본문색' },
+  { sel: '.tb-c[data-color="#5a5e6a"]', txt: '■', color: '#5a5e6a', tip: '보조색' },
+  { sel: '.tb-c[data-color="#e5231b"]', txt: '■', color: '#e5231b', tip: '포인트색' },
+  { sel: '.tb-c[data-color=""]', txt: '✕', tip: '색 지우기' },
+];
+// 정렬·세로 맞춤·목록은 리본에 있는 SVG 를 그대로 복제해 쓴다 — 같은 그림이어야
+// «리본의 그것»임을 눈이 알아본다.
+const MENU_ALIGN = ['[data-align="left"]', '[data-align="center"]', '[data-align="right"]'];
+const MENU_VALIGN = ['[data-valign="top"]', '[data-valign="middle"]', '[data-valign="bottom"]'];
+// ⚠ 목록 단추는 리본에서 «• 목록» 이라는 글자다. 30px 짜리 작은 단추에 그대로 옮기면
+//   글자가 세 줄로 접혀 읽을 수 없다(캡처 실측). 여기서는 기호만 쓴다.
+const MENU_LIST = [
+  { sel: '[data-list="0"]', txt: '•', tip: '글머리표 목록' },
+  { sel: '[data-list="1"]', txt: '1.', tip: '번호 목록' },
+];
+
+// 목록(2열). press = 리본 단추 대행 · run = 리본에 없는 것
+const MENU_ITEMS = {
+  image: [
+    { label: '그림 서식…', run: 'panel' }, { label: '자르기', run: 'crop' },
+    { label: '처음 상태로', run: 'reset' }, { label: '삭제', run: 'remove' },
+    { label: '복사', run: 'copy' }, { label: '잘라내기', run: 'cut' },
+  ],
+  table: [
+    { label: '아래에 행', press: '[data-table="row+"]' },
+    { label: '이 행 지우기', press: '[data-table="row-"]' },
+    { label: '오른쪽에 열', press: '[data-table="col+"]' },
+    { label: '이 열 지우기', press: '[data-table="col-"]' },
+    { label: '병합', press: '[data-table="merge"]' },
+    { label: '분할', press: '[data-table="split"]' },
+    { label: '옆 나누기', press: '[data-table="splitx"]' },
+    { label: '아래 나누기', press: '[data-table="splity"]' },
+    { label: '머리글', press: '[data-table="head"]' },
+    { label: '표 지우기', press: '[data-table="del"]' },
+    { label: '복사', run: 'copy' }, { label: '잘라내기', run: 'cut' },
+    { label: '붙여넣기', run: 'paste' },
+  ],
+  text: [
+    { label: '복사', run: 'copy' }, { label: '잘라내기', run: 'cut' },
+    { label: '붙여넣기', run: 'paste' },
+  ],
+  caret: [
+    { label: '붙여넣기', run: 'paste' },
+    { label: '표 넣기', press: '[data-table="insert"]' },
+    { label: '그림 넣기', press: '[data-image="auto"]' },
+  ],
+};
+
+function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
+  const menu = document.createElement('div');
+  menu.id = 'ctxmenu';
+  menu.setAttribute('contenteditable', 'false');
+  const mini = document.createElement('div');
+  mini.id = 'minibar';
+  mini.setAttribute('contenteditable', 'false');
+
+  // ⛔ 마지막으로 무엇으로 눌렀는지 기억한다. 태블릿에서 «길게 누르기»는 브라우저가
+  //    이미 글자 고르기·붙여넣기 메뉴로 쓴다 — 우리가 가로채면 그 익숙한 것이 사라진다(M5).
+  let lastPtr = 'mouse';
+  document.addEventListener('pointerdown', (e) => { lastPtr = e.pointerType || 'mouse'; }, true);
+
+  // ── 부품 만들기 ──
+  // 리본 단추의 속(SVG)을 그대로 복제한다 — 없으면 만들지 않는다(리본이 바뀌면 여기도 따라간다)
+  function cloneBtn(sel, tip) {
+    const src = barEl.querySelector(sel);
+    if (!src) return null;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'q';
+    b.dataset.press = sel;
+    b.title = tip || src.title || '';
+    const svg = src.querySelector('svg');
+    if (svg) b.appendChild(svg.cloneNode(true));
+    else b.textContent = src.textContent.trim();
+    return b;
+  }
+  function markBtn(m) {
+    if (!barEl.querySelector(m.sel)) return null;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'q' + (m.cls ? ' ' + m.cls : '');
+    b.dataset.press = m.sel;
+    b.title = m.tip;
+    b.textContent = m.txt;
+    if (m.color) b.style.color = m.color;
+    return b;
+  }
+
+  // 문맥에 맞는 «빠른 줄» — 미니 패널(§5-3)도 이 함수를 그대로 쓴다.
+  // ⚠ 한 줄로 죽 늘어놓으면 폭에 따라 아무 데서나 접혀 «5개, 1개»처럼 갈라진다(캡처 실측).
+  //   뜻이 같은 것끼리 묶어(.qg) 줄을 나눈다 — 글자꼴 / 색 / 정렬·맞춤.
+  function quickStrip(kind) {
+    const wrap = document.createElement('div');
+    wrap.className = 'qs';
+    const group = (els) => {
+      const live = els.filter(Boolean);
+      if (!live.length) return;
+      const g = document.createElement('div');
+      g.className = 'qg';
+      for (const el of live) g.appendChild(el);
+      wrap.appendChild(g);
+    };
+    if (kind === 'image') {
+      group(MENU_ALIGN.map(s => cloneBtn(s)));
+      return wrap;
+    }
+    group(MENU_MARKS.map(markBtn));
+    group(MENU_COLORS.map(markBtn));
+    group(MENU_ALIGN.map(s => cloneBtn(s)).concat(
+      kind === 'table' ? MENU_VALIGN.map(s => cloneBtn(s)) : MENU_LIST.map(markBtn)));
+    return wrap;
+  }
+
+  // ── 실행 ──
+  // 1.5초짜리 알림 — 메뉴 자리에 띄운다. 실패를 조용히 삼키지 않기 위한 것이다.
+  function say(text, x, y) {
+    const t = document.createElement('div');
+    t.className = 'mtoast';
+    t.textContent = text;
+    t.style.left = Math.round(Math.min(x, window.innerWidth - 320)) + 'px';
+    t.style.top = Math.round(Math.min(y, window.innerHeight - 60)) + 'px';
+    document.body.appendChild(t);
+    setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, 1800);
+  }
+
+  let lastXY = { x: 40, y: 40 };
+
+  // 메뉴의 붙여넣기 — 브라우저가 «클립보드를 읽어도 되겠냐»고 한 번 묻는다.
+  // 막히면 안내로 물러난다(설계 §5-2 U1). ⛔ 조용히 아무 일도 안 하면 안 된다.
+  async function runPaste() {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        say('이 브라우저는 메뉴 붙여넣기를 막습니다 — Ctrl+V 를 눌러 주세요', lastXY.x, lastXY.y);
+        return;
+      }
+      const items = await navigator.clipboard.read();
+      let html = '';
+      let text = '';
+      const files = [];
+      for (const it of items) {
+        for (const ty of it.types) {
+          if (ty === 'text/html') html = await (await it.getType(ty)).text();
+          else if (ty === 'text/plain') text = await (await it.getType(ty)).text();
+          else if (ty.indexOf('image/') === 0) {
+            files.push(new File([await it.getType(ty)], 'paste', { type: ty }));
+          }
+        }
+      }
+      if (html.indexOf('<table') >= 0) {
+        say('표 붙여넣기는 Ctrl+V 를 눌러 주세요', lastXY.x, lastXY.y);
+        return;
+      }
+      if (imageApi.pasteData({ html, text, files, textOnly: true })) return;
+      say('붙여넣을 내용을 읽지 못했습니다 — Ctrl+V 를 눌러 주세요', lastXY.x, lastXY.y);
+    } catch (err) {
+      say('브라우저가 클립보드 읽기를 막았습니다 — Ctrl+V 를 눌러 주세요', lastXY.x, lastXY.y);
+    }
+  }
+
+  function run(kind) {
+    if (kind === 'panel') { formatApi.openPanel(); return; }
+    if (kind === 'crop') { formatApi.openCrop(); return; }
+    if (kind === 'reset') { formatApi.reset(); return; }
+    if (kind === 'remove') { imageApi.removePicked(); return; }
+    // ⭐ copy·cut 은 «우리가 직접» 담지 않는다. execCommand 가 브라우저의 copy/cut 을
+    //    일으키면 이미 있는 처리기가 그대로 돈다 — 자른 그림 굽기·표 모양 담기가 공짜다.
+    if (kind === 'copy') { document.execCommand('copy'); return; }
+    if (kind === 'cut') { document.execCommand('cut'); return; }
+    if (kind === 'paste') { runPaste(); return; }
+  }
+
+  // ── 메뉴 ──
+  const menuOpen = () => !!menu.parentNode;
+
+  function closeMenu() {
+    if (menu.parentNode) menu.parentNode.removeChild(menu);
+  }
+
+  function buildMenu(ctx) {
+    menu.textContent = '';
+    const badge = document.createElement('div');
+    badge.className = 'mbadge';
+    badge.textContent = ctx.label;
+    menu.appendChild(badge);
+    menu.appendChild(quickStrip(ctx.kind));
+    const list = document.createElement('div');
+    list.className = 'mlist';
+    for (const it of (MENU_ITEMS[ctx.kind] || MENU_ITEMS.caret)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = it.label;
+      if (it.press) b.dataset.press = it.press;
+      else b.dataset.run = it.run;
+      list.appendChild(b);
+    }
+    menu.appendChild(list);
+  }
+
+  function openMenuAt(x, y) {
+    lastXY = { x, y };
+    buildMenu(ctxApi.ctxOf());
+    if (!menu.parentNode) document.body.appendChild(menu);
+    menu.style.left = '0px';
+    menu.style.top = '0px';
+    // 화면 밖으로 나가면 안쪽으로 접는다 — 잘려 나가면 아래 항목을 아예 못 누른다
+    const w = menu.offsetWidth;
+    const h = menu.offsetHeight;
+    menu.style.left = Math.round(Math.max(6, Math.min(x, window.innerWidth - w - 6))) + 'px';
+    menu.style.top = Math.round(Math.max(6, Math.min(y, window.innerHeight - h - 6))) + 'px';
+    hideMini();
+  }
+
+  pagesEl.addEventListener('contextmenu', (e) => {
+    if (lastPtr === 'touch') return;      // 태블릿 길게 누르기는 브라우저 기본에 맡긴다(M5)
+    const t = e.target;
+    // 그림 위에서 우클릭하면 그 그림을 먼저 고른다 — 워드와 같다
+    const box = t && t.closest ? t.closest('.iclip') : null;
+    const img = t && t.matches && t.matches('img.ri, img.bimg') ? t
+      : (box ? box.querySelector('img') : null);
+    if (img && imageApi.pickedImgs().indexOf(img) < 0) imageApi.selectImg(img);
+    e.preventDefault();
+    openMenuAt(e.clientX, e.clientY);
+  });
+
+  // ⛔ mousedown 을 막아야 «고른 글»이 안 풀린다. 리본 단추가 쓰는 것과 같은 수법이다.
+  const guard = (root) => root.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('button')) e.preventDefault();
+  });
+  guard(menu);
+  guard(mini);
+
+  const fire = (e, closeAfter) => {
+    const b = e.target.closest ? e.target.closest('button') : null;
+    if (!b) return;
+    if (b.dataset.press) ctxApi.pressButton(b.dataset.press);
+    else if (b.dataset.run) run(b.dataset.run);
+    if (closeAfter) closeMenu();
+  };
+  menu.addEventListener('click', (e) => fire(e, true));
+  mini.addEventListener('click', (e) => fire(e, false));
+
+  document.addEventListener('mousedown', (e) => {
+    if (!menuOpen()) return;
+    if (e.target.closest && e.target.closest('#ctxmenu')) return;
+    closeMenu();
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (menuOpen() && e.key === 'Escape') { closeMenu(); return; }
+    // 타자를 치기 시작하면 미니 패널은 물러난다 — 글자를 가리면 안 된다
+    if (miniOpen() && e.key.length === 1) hideMini();
+    if (miniOpen() && e.key === 'Escape') hideMini();
+  }, true);
+  // 화면을 굴리면 메뉴는 따라가지 않으므로 닫는다.
+  // ⛔ 단 «리본이 커진 만큼 맞춰 굴린 것»은 사람이 굴린 게 아니다 — 그것까지 닫으면
+  //    그림 위 우클릭이 열리자마자 닫혀 통째로 안 되는 것처럼 보인다(2026-08-31 실측).
+  window.addEventListener('scroll', () => {
+    if (ctxApi.isAdjusting && ctxApi.isAdjusting()) return;
+    closeMenu();
+    hideMini();
+  }, true);
+
+  // ── 미니 패널 (S4) ──
+  // 마우스로 «고른 그 순간»에만 뜬다. 태블릿에서는 안 띄운다 — 브라우저 제 메뉴와 겹친다(M5).
+  const miniOpen = () => !!mini.parentNode;
+  function hideMini() {
+    if (mini.parentNode) mini.parentNode.removeChild(mini);
+  }
+
+  // 지금 고른 것을 감싸는 «화면 위 네모». 없으면 null(= 미니 패널을 안 띄운다).
+  function targetRect(kind) {
+    if (kind === 'image') {
+      const list = imageApi.pickedImgs();
+      const base = list[list.length - 1];
+      if (!base) return null;
+      return ((base.closest && base.closest('.iclip')) || base).getBoundingClientRect();
+    }
+    const s = window.getSelection();
+    if (!s || !s.rangeCount || s.getRangeAt(0).collapsed) return null;
+    const r = s.getRangeAt(0).getBoundingClientRect();
+    return (r.width || r.height) ? r : null;
+  }
+
+  function showMini() {
+    if (lastPtr === 'touch' || menuOpen()) { hideMini(); return; }
+    const ctx = ctxApi.ctxOf();
+    if (ctx.kind === 'caret') { hideMini(); return; }   // 커서만 있으면 띄울 까닭이 없다
+    const r = targetRect(ctx.kind);
+    if (!r) { hideMini(); return; }
+    mini.textContent = '';
+    const badge = document.createElement('div');
+    badge.className = 'mbadge';
+    badge.textContent = ctx.label;
+    mini.appendChild(badge);
+    mini.appendChild(quickStrip(ctx.kind));
+    if (!mini.parentNode) document.body.appendChild(mini);
+    // 고른 것의 «왼쪽 바깥»에 둔다 — 글자 위를 덮지 않는다(S4).
+    const w = mini.offsetWidth;
+    const h = mini.offsetHeight;
+    let x = r.left - 8 - w;
+    if (x < 4) x = 4;                    // 자리가 없으면 덮더라도 화면 안으로 접는다
+    let y = r.top;
+    if (y + h > window.innerHeight - 6) y = window.innerHeight - 6 - h;
+    if (y < 6) y = 6;
+    mini.style.left = Math.round(x) + 'px';
+    mini.style.top = Math.round(y) + 'px';
+  }
+
+  // 선택은 mouseup «뒤»에 확정된다 — 한 박자 뒤에 잰다
+  pagesEl.addEventListener('mouseup', () => {
+    if (lastPtr === 'touch') return;
+    setTimeout(showMini, 0);
+  });
+  imageApi.onPick(() => {
+    if (lastPtr === 'touch') return;
+    setTimeout(showMini, 0);
+  });
+  document.addEventListener('selectionchange', () => {
+    if (!miniOpen()) return;
+    const ctx = ctxApi.ctxOf();
+    if (ctx.kind === 'caret') hideMini();
+  });
+
+  return { openMenuAt, closeMenu, quickStrip, showMini, hideMini, menuOpen, miniOpen };
 }
 
 /* main.js */
+
+
+
 
 
 
@@ -4471,15 +5842,42 @@ attachToolbar({
   getDoc: () => state.doc,
   setDoc: applyDoc,
   redraw: draw,
+  // 그림을 골라 놓았으면 정렬은 그 그림 것이다. imageApi 는 «아래»에서 만들어지지만
+  // 이 함수는 단추를 누르는 «그때» 불리므로 그때는 이미 있다.
+  alignPicked: (a) => imageApi.alignPicked(a),
 });
 
-attachImages({
+const imageApi = attachImages({
   barEl: document.getElementById('bar'),
   pagesEl: document.getElementById('pages'),
   getDoc: () => state.doc,
   setDoc: applyDoc,
   redraw: draw,
 });
+window.__app.imageApi = imageApi;      // 검사 도구용 창구 — 화면 동작에는 쓰지 않는다
+
+const formatApi = attachFormat({
+  barEl: document.getElementById('bar'),
+  pagesEl: document.getElementById('pages'),
+  imageApi,
+});
+window.__app.formatApi = formatApi;
+
+const ctxApi = attachContext({
+  pagesEl: document.getElementById('pages'),
+  barEl: document.getElementById('bar'),
+  imageApi,
+});
+window.__app.ctxApi = ctxApi;
+
+const menuApi = attachMenu({
+  pagesEl: document.getElementById('pages'),
+  barEl: document.getElementById('bar'),
+  ctxApi,
+  imageApi,
+  formatApi,
+});
+window.__app.menuApi = menuApi;
 
 // ---- 문서 폴더 열기·저장 ----
 state.dir = null;
