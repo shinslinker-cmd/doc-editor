@@ -353,7 +353,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 09:14";
+window.__BUILD = "2026-08-31 09:36";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3692,43 +3692,28 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     return { rows };
   }
 
-  // 커서가 글자 «사이»에 있나 — 앞뒤 모두 글자가 있으면 참.
-  // 줄 처음·줄 끝·빈 문단은 거짓이다(거기서는 한 줄짜리 그림이 맞다).
-  function betweenText(b, at) {
-    if (!b || !at) return false;
-    const src = (at.item !== null && at.item !== undefined) ? (b.items || [])[at.item] : b.runs;
-    if (!Array.isArray(src)) return false;
-    return at.pos > 0 && at.pos < runsLength(src);
-  }
-
   // 자산 하나를 문맥에 맞게 넣는다. at 을 다음 그림이 이어 붙도록 고쳐 준다.
-  // ⭐ 「알아서」 규칙(2026-08-31 SKY: "그림은 그림, 글 안그림 구지 나누지 말고,
-  //    표 칸 안에서 그림이 알아서 바뀌는것 처럼 하자"):
-  //    · 표 칸 안       → 칸 안 그림 (칸 폭에 맞춘다 — 부품 사진)
-  //    · 글자 사이      → 글안 그림 (그 자리 글자 높이에 맞춘다 — 기호·아이콘)
-  //    · 그 밖          → 한 줄짜리 그림 블록 (+ 설명 자리)
-  function insertOne(a, at) {
+  // ⭐ 「알아서」 규칙 — 워드처럼 (2026-08-31 SKY 2차 지시):
+  //    · 표 칸 안 → 칸 안 그림 (칸 폭에 맞춘다 — 부품 사진)
+  //    · 그 밖    → 한 줄짜리 그림 블록 (+ 설명 자리)
+  // ⛔ «글자 사이면 글자 높이로 줄인다» 규칙은 폐기했다(2026-08-31 SKY:
+  //    "작은 심볼 같은건 기호나 특수문자 같은걸로 나중에 대체 … 일반 적인 워드 처럼 할 꺼야").
+  //    문단 어디에 커서가 있든 제대로 된 크기로 들어가고, 작게 쓰려면 손잡이로 줄인다.
+  // dispW = 표시 폭 힌트(px). 붙여넣기가 «잘라낸 그 크기»를 지키는 데 쓴다.
+  // 없으면 원본 폭에서 시작한다.
+  function insertOne(a, at, dispW) {
     const doc = getDoc();
     const got = addAsset(doc.assets, a.data, a.w, a.h);
     const b = at ? doc.blocks.find(x => x.id === at.id) : null;
-    const asInline = !!(at && at.cell) || betweenText(b, at);
+    const asInline = !!(at && at.cell);
     if (asInline && b) {
       const src = at.cell ? cellRunsOf(b, at.cell)
         : (at.item !== null && at.item !== undefined ? b.items[at.item] : b.runs);
       if (!Array.isArray(src)) return;
-      let w;
-      let h;
-      if (at.cell) {
-        // 표 칸 — 칸 안폭에 맞춘다(부품 사진 용도, 설계 §4-2). 패딩 몫 18px.
-        const cw = (b.cols[at.cell[1]] ? b.cols[at.cell[1]].w : 200) - 18;
-        w = Math.max(24, Math.min(a.w, cw));
-        h = Math.max(1, Math.round(w * a.h / Math.max(1, a.w)));
-      } else {
-        // 글자 사이 — 그 자리 글자 높이에 맞춘다(기호·아이콘 용도)
-        const sz = markAt(src, at.pos).sz || 12.5;
-        h = Math.max(12, Math.round(sz * 1.4));
-        w = Math.max(1, Math.round(h * a.w / Math.max(1, a.h)));
-      }
+      // 표 칸 — 칸 안폭에 맞춘다(부품 사진 용도, 설계 §4-2). 패딩 몫 18px.
+      const cw = (b.cols[at.cell[1]] ? b.cols[at.cell[1]].w : 200) - 18;
+      const w = Math.max(24, Math.min(dispW || a.w, cw));
+      const h = Math.max(1, Math.round(w * a.h / Math.max(1, a.w)));
       const runs = insertRun(src, at.pos, imgRun(got.id, w, h));
       const patch = at.cell ? cellPatch(b, at.cell, runs)
         : (at.item !== null && at.item !== undefined
@@ -3741,7 +3726,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       return;
     }
     // 독립 블록 — 빈 문단이면 그 자리를 차지, 아니면 바로 다음(설계 §5)
-    const w = Math.min(a.w, textWidth(doc));
+    const w = Math.min(dispW || a.w, textWidth(doc));
     const fresh = createBlock('image', { src: got.id, w });
     let blocks;
     if (b && b.type === 'para' && !runsLength(b.runs || [])) {
@@ -3783,32 +3768,160 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     fileEl.value = '';
   });
 
-  // ── 붙여넣기(그림 데이터만 든 클립보드) — 글·HTML 이 함께면 기존 길이 맡는다 ──
+  // data: 주소를 파일처럼 만들어 넣는 길로 보낸다 — 크기 재기·줄여 담기·중복 제거를
+  // 파일 붙이기와 «같은 경로»로 태우기 위해서다.
+  async function insertDataUrls(items) {
+    const at = caretCtx();
+    for (const it of items) {
+      try {
+        const blob = await fetch(it.url).then(r => r.blob());
+        const a = await fileToAsset(new File([blob], 'paste', { type: blob.type || 'image/png' }));
+        insertOne(a, at, it.w);
+      } catch (err) { console.warn('붙여넣은 그림을 못 읽었다:', err.message); }
+    }
+  }
+
+  // ── 붙여넣기 ──
+  // ⛔ 그림 붙여넣기를 브라우저 기본에 맡기면 그림이 조용히 사라진다.
+  //    크롬은 붙여넣은 <img> 를 «어느 블록에도 속하지 않는 자리»(.page-body 바로 아래)에
+  //    넣는다(2026-08-31 실측). 우리 코드는 «그 문단»을 되읽으므로 그림을 못 보고,
+  //    다음 다시 그리기가 그 <img> 를 통째로 쓸어 버린다 —
+  //    잘라내기 뒤 붙여넣기가 «아무 일도 안 일어남»으로 보이던 진짜 원인이다.
+  //    그래서 그림이 든 클립보드는 우리가 직접 받는다.
   pagesEl.addEventListener('paste', (e) => {
     const dt = e.clipboardData;
-    if (!dt || !dt.files || !dt.files.length) return;
-    if (dt.getData('text/html')) return;
+    if (!dt) return;
+    const html = dt.getData('text/html') || '';
+    if (html.indexOf('<table') >= 0) return;          // 표 붙여넣기는 편집기가 맡는다
+    const files = dt.files ? Array.from(dt.files).filter(f => /^image\//.test(f.type || '')) : [];
+    if (files.length) { e.preventDefault(); insertFiles(files); return; }
+    const text = (dt.getData('text/plain') || '').trim();
+    if (text) return;                                  // 글이 섞였으면 기존 길이 맡는다
+    // 태그를 통째로 집어 src 와 width 를 함께 읽는다 — 속성 차례는 앱마다 다르다
+    const items = [];
+    const re = /<img\b[^>]*>/gi;
+    let m = re.exec(html);
+    while (m) {
+      const tag = m[0];
+      const src = /src=["'](data:image\/[^"']+)["']/i.exec(tag);
+      if (src) {
+        const wm = /width=["']?(\d+)/i.exec(tag);
+        items.push({ url: src[1], w: wm ? Number(wm[1]) : 0 });
+      }
+      m = re.exec(html);
+    }
+    if (!items.length) return;
     e.preventDefault();
-    insertFiles(dt.files);
+    insertDataUrls(items);
   });
 
-  // ── 파일 끌어다 놓기 — 놓은 자리에 커서를 옮기고 같은 규칙으로 ──
+  // ── 끌어다 놓기 ──
   // ⛔ 문서 «안»에서 끈 그림과 바깥에서 끌어온 파일을 반드시 구분한다.
   //    크롬은 문서 안에서 끈 그림도 dataTransfer.files 에 «파일»로 넣어 준다
   //    (2026-08-31 실측: drop(files=1)). 구분을 안 하면 그림을 옮기려 끌었을 뿐인데
   //    «새 파일을 가져온 것»으로 보고 원본 크기 복제본이 하나 더 생긴다.
-  //    문서 안 이동은 아직 안 만든다 — 편집기가 글 끌어놓기를 통째로 막고 있다.
-  let fromInside = false;
-  pagesEl.addEventListener('dragstart', () => { fromInside = true; }, true);
-  document.addEventListener('dragend', () => { fromInside = false; }, true);
+  let moving = null;   // 문서 안에서 끌고 있는 그림 { at, w, h, img }
+
+  // 놓은 자리를 찾는다 — 표 칸이 먼저다.
+  // ⚠ elementFromPoint(단수)는 겹쳐 놓은 것(열 손잡이 등)에 걸려 엉뚱한 것을 준다.
+  //   복수로 훑는다(2B 에서 겪은 함정과 같다).
+  function dropSpot(x, y) {
+    for (const el of document.elementsFromPoint(x, y)) {
+      if (!el || !el.closest) continue;
+      const td = el.closest('#pages td[data-r]');
+      if (td) return { td, blk: td.closest('.blk[data-id]') };
+      const blk = el.closest('#pages .blk[data-id]');
+      if (blk) return { td: null, blk };
+    }
+    return null;
+  }
+
+  // 끌어 온 그림을 놓은 자리로 «옮긴다». 지우기와 넣기를 한 번의 문서 갱신으로 해야
+  // Ctrl+Z 한 번에 통째로 되돌아온다.
+  function moveTo(mv, x, y) {
+    const spot = dropSpot(x, y);
+    if (!spot || !spot.blk) return;
+    const doc = getDoc();
+    const a = doc.assets[mv.img];
+    if (!a) return;
+    const at = mv.at;
+    const 같은자리 = spot.blk.dataset.id === at.b.id
+      && (!spot.td) === (!at.cell)
+      && (!spot.td || (String(at.cell && at.cell[0]) === spot.td.dataset.r
+                       && String(at.cell && at.cell[1]) === spot.td.dataset.c));
+    if (같은자리) return;                       // 제자리에 놓았다 — 아무 일도 안 한다
+
+    // ① 원래 자리에서 뺀다
+    let blocks;
+    if (at.kind === 'block') {
+      if (doc.blocks.length <= 1) return;      // 옮길 데가 없다
+      blocks = removeBlock(doc.blocks, at.b.id);
+    } else {
+      const src = runsAtTarget(at);
+      if (!Array.isArray(src)) return;
+      const runs = normalizeRuns(
+        sliceRuns(src, 0, at.pos).concat(sliceRuns(src, at.pos + 1, runsLength(src))));
+      blocks = replaceBlock(doc.blocks, at.b.id, patchAtTarget(at, runs));
+    }
+
+    // ② 놓은 자리에 넣는다
+    const destId = spot.blk.dataset.id;
+    const dest = blocks.find(x => x.id === destId);
+    if (!dest) return;                          // 옮기다 그 블록이 없어졌다(제자리 이동)
+    let caret = null;
+    if (spot.td) {
+      // 표 칸으로 — 칸 안폭에 맞춰 칸 글 끝에 붙인다
+      if (dest.type !== 'table') return;
+      const cell = [spot.td.dataset.r === 'h' ? 'h' : Number(spot.td.dataset.r),
+                    Number(spot.td.dataset.c)];
+      const cur = cellRunsOf(dest, cell);
+      if (!Array.isArray(cur)) return;
+      const cw = (dest.cols[cell[1]] ? dest.cols[cell[1]].w : 200) - 18;
+      const w = Math.max(24, Math.min(mv.w || a.w, cw));
+      const h = Math.max(1, Math.round(w * a.h / Math.max(1, a.w)));
+      const runs = insertRun(cur, runsLength(cur), imgRun(mv.img, w, h));
+      blocks = replaceBlock(blocks, destId, cellPatch(dest, cell, runs));
+      caret = { id: destId, cell, pos: runsLength(cur) + 1 };
+    } else {
+      // 보통 블록 다음에 — 한 줄짜리 그림으로. 끌기 전 크기를 그대로 지킨다.
+      const w = Math.min(mv.w || a.w, textWidth(doc));
+      const fresh = createBlock('image', { src: mv.img, w });
+      blocks = insertAfter(blocks, destId, fresh);
+      caret = null;
+      mv.freshId = fresh.id;
+    }
+    setDoc(Object.assign({}, doc, { blocks }));
+    redraw(caret ? { caret } : {});
+    if (mv.freshId) {
+      const el = pagesEl.querySelector('.blk-image[data-id="' + mv.freshId + '"] img.bimg');
+      if (el) selectImg(el);
+    }
+  }
+
+  pagesEl.addEventListener('dragstart', (e) => {
+    moving = null;
+    const t = e.target;
+    if (!(t && t.matches && t.matches('img.ri, img.bimg'))) return;
+    const at = targetOf(t);
+    if (!at) return;
+    moving = { at, w: t.width, h: t.height, img: t.dataset.img };
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }, true);
+  document.addEventListener('dragend', () => { moving = null; }, true);
 
   pagesEl.addEventListener('dragover', (e) => {
-    if (fromInside) return;
+    if (moving) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; return; }
     const ts = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
     if (ts.indexOf('Files') >= 0) e.preventDefault();
   });
   pagesEl.addEventListener('drop', (e) => {
-    if (fromInside) { e.preventDefault(); fromInside = false; return; }
+    if (moving) {
+      e.preventDefault();
+      const mv = moving;
+      moving = null;
+      moveTo(mv, e.clientX, e.clientY);
+      return;
+    }
     const files = e.dataTransfer && e.dataTransfer.files;
     if (!files || !files.length) return;
     e.preventDefault();
@@ -3869,26 +3982,27 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   });
 
   // 고른 그림의 모델 좌표를 찾는다 → { kind:'block', b } 또는 { kind:'run', b, cell|item|cap, pos }
-  function pickedTarget() {
-    if (!picked || !picked.isConnected) return null;
-    const blkEl = picked.closest('.blk[data-id]');
+  function targetOf(el) {
+    if (!el || !el.isConnected) return null;
+    const blkEl = el.closest('.blk[data-id]');
     if (!blkEl) return null;
     const doc = getDoc();
     const b = doc.blocks.find(x => x.id === blkEl.dataset.id);
     if (!b) return null;
-    if (picked.classList.contains('bimg')) return { kind: 'block', b };
-    const td = picked.closest('td[data-r]');
-    const li = picked.closest('.lst li[data-i]');
-    const cap = picked.closest('.blk-image .cap');
+    if (el.classList.contains('bimg')) return { kind: 'block', b };
+    const td = el.closest('td[data-r]');
+    const li = el.closest('.lst li[data-i]');
+    const cap = el.closest('.blk-image .cap');
     const host = td || li || cap || blkEl;
-    const parent = picked.parentNode;
-    const idx = Array.prototype.indexOf.call(parent.childNodes, picked);
+    const parent = el.parentNode;
+    const idx = Array.prototype.indexOf.call(parent.childNodes, el);
     const pos = offsetIn(host, parent, idx);
     return { kind: 'run', b, pos,
       cell: td ? [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] : null,
       item: li ? Number(li.dataset.i) : null,
       cap: cap ? 1 : 0 };
   }
+  function pickedTarget() { return targetOf(picked); }
   function runsAtTarget(at) {
     if (at.cell) return cellRunsOf(at.b, at.cell);
     if (at.cap) return at.b.caption || [];
@@ -3949,32 +4063,8 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     if (again) selectImg(again);
   });
 
-  // ── 고른 그림 복사(Ctrl+C) ──
-  // ⛔ 그림 블록은 편집 불가 «통짜 섬»이라 브라우저의 «문서 선택»에 안 잡힌다.
-  //    그래서 Ctrl+C 를 눌러도 담을 게 없어 클립보드가 통째로 빈다
-  //    (2026-08-31 실측: «빈 클립보드» — 엑셀·워드에 안 붙던 진짜 원인).
-  //    고른 그림이 있으면 우리가 직접 담는다. 글줄 안 그림은 브라우저가 이미 잘 담으므로
-  //    글을 고른 상태면 손대지 않는다.
-  document.addEventListener('copy', (e) => {
-    if (!picked || !picked.isConnected) return;
-    const s = window.getSelection();
-    if (s && s.rangeCount && !s.getRangeAt(0).collapsed) return;   // 글을 골랐으면 브라우저에
-    const a = getDoc().assets[picked.dataset.img];
-    if (!a || !e.clipboardData) return;
-    e.preventDefault();
-    const w = picked.width || a.w;
-    const h = picked.height || a.h;
-    e.clipboardData.setData('text/html',
-      '<img src="' + a.data + '" width="' + w + '" height="' + h + '">');
-    e.clipboardData.setData('text/plain', '');
-  });
-
-  // ── 고른 그림 지우기 — Delete·Backspace. Esc 는 해제 ──
-  document.addEventListener('keydown', (e) => {
-    if (!picked || !picked.isConnected) return;
-    if (e.key === 'Escape') { deselect(); return; }
-    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-    e.preventDefault();
+  // 고른 그림을 모델에서 뺀다 — Delete·Backspace 와 잘라내기가 함께 쓴다.
+  function removePicked() {
     const at = pickedTarget();
     deselect();
     if (!at) return;
@@ -3991,6 +4081,47 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       sliceRuns(src, 0, at.pos).concat(sliceRuns(src, at.pos + 1, runsLength(src))));
     setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, at.b.id, patchAtTarget(at, runs)) }));
     redraw({ caret: { id: at.b.id, item: at.item, cell: at.cell, cap: at.cap, pos: at.pos } });
+  }
+
+  // 고른 그림을 클립보드에 담는다. 담을 게 없으면 거짓.
+  function putPickedOnClipboard(e) {
+    if (!picked || !picked.isConnected) return false;
+    const s2 = window.getSelection();
+    if (s2 && s2.rangeCount && !s2.getRangeAt(0).collapsed) return false;  // 글을 골랐으면 브라우저에
+    const a = getDoc().assets[picked.dataset.img];
+    if (!a || !e.clipboardData) return false;
+    const w = picked.width || a.w;
+    const h = picked.height || a.h;
+    e.clipboardData.setData('text/html',
+      '<img src="' + a.data + '" width="' + w + '" height="' + h + '">');
+    e.clipboardData.setData('text/plain', '');
+    return true;
+  }
+
+  // ── 고른 그림 복사(Ctrl+C) ──
+  // ⛔ 그림 블록은 편집 불가 «통짜 섬»이라 브라우저의 «문서 선택»에 안 잡힌다.
+  //    그래서 Ctrl+C 를 눌러도 담을 게 없어 클립보드가 통째로 빈다
+  //    (2026-08-31 실측: «빈 클립보드» — 엑셀·워드에 안 붙던 진짜 원인).
+  //    고른 그림이 있으면 우리가 직접 담는다. 글줄 안 그림은 브라우저가 이미 잘 담으므로
+  //    글을 고른 상태면 손대지 않는다.
+  document.addEventListener('copy', (e) => {
+    if (putPickedOnClipboard(e)) e.preventDefault();
+  });
+
+  // ── 고른 그림 잘라내기(Ctrl+X) — 워드·엑셀과 같다 (2026-08-31 SKY) ──
+  document.addEventListener('cut', (e) => {
+    if (!putPickedOnClipboard(e)) return;
+    e.preventDefault();
+    removePicked();
+  });
+
+  // ── 고른 그림 지우기 — Delete·Backspace. Esc 는 해제 ──
+  document.addEventListener('keydown', (e) => {
+    if (!picked || !picked.isConnected) return;
+    if (e.key === 'Escape') { deselect(); return; }
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+    e.preventDefault();
+    removePicked();
   });
 
   return { insertFiles };
