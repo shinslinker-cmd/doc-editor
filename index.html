@@ -64,9 +64,12 @@ body { margin:0; background:var(--desk); color:var(--ink);
       font:600 12.5px 'Noto Sans KR','맑은 고딕',sans-serif;
       transition:transform .12s, box-shadow .12s, background .12s; }
 .tb:hover { transform:translateY(-2px); box-shadow:0 3px 10px rgba(20,22,30,.12); }
-/* 눌린 상태 — 검은 배경은 너무 튀어서(SKY 2026-08-28) 살짝 눌린 회색으로 */
-.tb.on { background:var(--line-soft); border-color:#9aa0ae;
-         box-shadow:inset 0 1px 3px rgba(20,22,30,.18); }
+/* 눌린 상태(켜짐) — ⛔ 검은 배경은 너무 튀고(SKY 2026-08-28), 옅은 회색은 «꺼진 것과
+   차이가 없어» 켠 건지 끈 건지 알 수가 없었다(SKY 2026-08-31: «선택/해제가 구분이 없어서
+   헷갈려»). 그래서 이 앱이 «고른 것»에 쓰는 그 파랑을 그대로 쓴다 — 옅은 파란 바탕 +
+   파란 테두리 + 진한 파란 글자. 종이를 덮지 않으면서 켜진 것이 한눈에 보인다. */
+.tb.on { background:#e9f1ff; border-color:#5490ff; color:#12459b; font-weight:800;
+         box-shadow:inset 0 1px 3px rgba(84,144,255,.28); }
 .tb:disabled { opacity:.4; cursor:default; transform:none; box-shadow:none; }
 .blk-list { margin:0 0 6px; }
 .lst { margin:0; padding-left:22px; font-size:12.5px; line-height:1.85; color:#2b2f3a; }
@@ -304,7 +307,22 @@ body { margin:0; background:var(--desk); color:var(--ink);
   font:inherit; cursor:pointer; white-space:nowrap; }
 #imgpanel .fp-btns button:hover { background:#f5f6f8; }
 #imgpanel .fp-align { display:flex; }
-#imgpanel .fp-align button.on { border-color:var(--ink); font-weight:700; }
+/* 「둥근 모서리」 단추 한 줄 — 단추가 곧 이름표이고, 옆 칸에 정확한 mm 를 친다 */
+#imgpanel .fp-line { display:grid; grid-template-columns:1fr 58px auto; align-items:center;
+  gap:6px; margin-bottom:7px; color:var(--sub); }
+#imgpanel .fp-line button { height:30px; padding:0 8px; border:1px solid var(--line);
+  border-radius:7px; background:#fff; color:var(--ink); font:inherit; cursor:pointer;
+  white-space:nowrap; }
+#imgpanel .fp-line input { min-width:0; width:100%; height:28px; padding:0 6px;
+  border:1px solid var(--line); border-radius:6px; font:inherit; color:var(--ink); }
+#imgpanel .fp-line i { font-style:normal; color:var(--dim); }
+/* 편집 줄(복사·잘라내기·삭제)은 서식과 성격이 달라 선으로 갈라 둔다 */
+#imgpanel .fp-edit { border-top:1px solid var(--line-soft); margin-top:10px; padding-top:9px; }
+#imgpanel .fp-edit .fp-del { color:var(--point); }
+/* 켜짐 표시는 리본 단추와 «같은 모양»이어야 한다 — 어디서 눌러도 같은 뜻으로 읽힌다 */
+#imgpanel button.on, #ctxmenu .q.on, #minibar .q.on {
+  background:#e9f1ff !important; border-color:#5490ff !important; color:#12459b !important;
+  font-weight:800; }
 @media print { #imgpanel { display:none !important; } }
 
 /* ── 자르기 덮개 (설계_서식과우클릭.md §4-2) ──
@@ -509,7 +527,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 13:56";
+window.__BUILD = "2026-08-31 14:14";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -4861,23 +4879,35 @@ function attachFormat({ barEl, pagesEl, imageApi }) {
   const panel = document.createElement('div');
   panel.id = 'imgpanel';
   panel.setAttribute('contenteditable', 'false');
+  // ⭐ 그림에 관한 것은 «이 창 하나»가 전부다(2026-08-31 SKY: «서식은 동일하게 같이 쓰게 통합»).
+  //    더블클릭으로 들어오나 우클릭으로 들어오나 나오는 것은 이 창이다. 그래서 우클릭
+  //    메뉴에만 있던 복사·잘라내기·삭제도 여기 함께 둔다 — 그러지 않으면 우클릭으로
+  //    할 수 있던 일이 사라진다.
   panel.innerHTML = ''
     + '<div class="fp-ttl">그림 서식<button class="fp-x" type="button" title="닫기">✕</button></div>'
     + '<div class="fp-n"></div>'
     + '<label>폭 <input class="fp-w" type="number" step="0.1" min="1"><i>mm</i></label>'
     + '<label>높이 <input class="fp-h" type="number" step="0.1" min="1"><i>mm</i></label>'
-    + '<label>둥근 모서리 <input class="fp-r" type="number" step="0.5" min="0"><i>mm</i></label>'
+    // 「둥근 모서리」는 단추가 곧 이름표다 — 눌러서 켜고 끄고(2mm), 다른 값이 필요하면
+    // 옆 칸에 mm 로 친다. 이름이 두 번 나오지 않게 이렇게 묶었다.
+    + '<div class="fp-line"><button class="fp-round" type="button"'
+    + ' title="둥근 모서리 켜기/끄기 — 2mm. 다른 값은 옆 칸에 mm 로 칩니다">둥근 모서리</button>'
+    + '<input class="fp-r" type="number" step="0.5" min="0"><i>mm</i></div>'
     + '<div class="fp-btns"><button class="fp-crop" type="button">자르기</button>'
     + '<button class="fp-reset" type="button">처음 상태로</button></div>'
     + '<div class="fp-btns fp-align"><button type="button" data-a="left">왼쪽</button>'
     + '<button type="button" data-a="center">가운데</button>'
-    + '<button type="button" data-a="right">오른쪽</button></div>';
+    + '<button type="button" data-a="right">오른쪽</button></div>'
+    + '<div class="fp-btns fp-edit"><button class="fp-copy" type="button">복사</button>'
+    + '<button class="fp-cut" type="button">잘라내기</button>'
+    + '<button class="fp-del" type="button">삭제</button></div>';
 
   const inW = panel.querySelector('.fp-w');
   const inH = panel.querySelector('.fp-h');
   const inR = panel.querySelector('.fp-r');
   const nEl = panel.querySelector('.fp-n');
   const alignRow = panel.querySelector('.fp-align');
+  const roundBtn = panel.querySelector('.fp-round');
 
   const isOpen = () => !!panel.parentNode;
 
@@ -4932,6 +4962,8 @@ function attachFormat({ barEl, pagesEl, imageApi }) {
     for (const b of alignRow.querySelectorAll('button')) {
       b.classList.toggle('on', b.dataset.a === info.align);
     }
+    // ⛔ 켜짐/꺼짐이 «눈에» 보여야 한다 — 눌러서 켠 건지 끈 건지 알 수가 없었다(SKY 지적)
+    roundBtn.classList.toggle('on', !!info.rad);
     return info;
   }
 
@@ -4960,7 +4992,11 @@ function attachFormat({ barEl, pagesEl, imageApi }) {
   function toggleRound() {
     const info = imageApi.pickedInfo();
     if (!info) return;
-    imageApi.patchPicked({ rad: info.rad ? null : pxOf(ROUND_MM) });
+    const 켠다 = !info.rad;
+    // ⚠ 칸도 «2» 로 맞춰 둔다. 안 그러면 8px 을 되돌려 재서 2.1 이 뜬다 —
+    //   단추로 2mm 를 켰는데 칸에는 2.1 이라 또 헷갈린다(반올림, showMm 설명 참고).
+    inR.value = 켠다 ? String(ROUND_MM) : '0';
+    imageApi.patchPicked({ rad: 켠다 ? pxOf(ROUND_MM) : null });
   }
   // 지금 켜져 있는지를 리본 단추에 눌린 모양으로 보여 준다
   function syncRoundBtn() {
@@ -5168,6 +5204,18 @@ function attachFormat({ barEl, pagesEl, imageApi }) {
   panel.querySelector('.fp-x').addEventListener('click', close);
   panel.querySelector('.fp-crop').addEventListener('click', () => openCrop());
   panel.querySelector('.fp-reset').addEventListener('click', reset);
+  panel.querySelector('.fp-round').addEventListener('click', toggleRound);
+  // 복사·잘라내기는 «우리가» 담지 않는다 — 브라우저의 copy/cut 을 일으키면 이미 있는
+  // 처리기가 그대로 돌아 자른 그림 굽기가 공짜다(우클릭 메뉴와 같은 길이다).
+  panel.querySelector('.fp-copy').addEventListener('click', () => document.execCommand('copy'));
+  panel.querySelector('.fp-cut').addEventListener('click', () => {
+    document.execCommand('cut');
+    close();                                 // 그림이 없어졌으니 창도 닫는다
+  });
+  panel.querySelector('.fp-del').addEventListener('click', () => {
+    imageApi.removePicked();
+    close();
+  });
   // 정렬은 리본 단추를 «대행»한다(M4) — 정렬 규칙은 리본에 한 벌만 있다.
   for (const b of alignRow.querySelectorAll('button')) {
     b.addEventListener('click', () => {
@@ -5359,14 +5407,10 @@ const MENU_LIST = [
 ];
 
 // 목록(2열). press = 리본 단추 대행 · run = 리본에 없는 것
+// ⛔ 그림은 여기 없다. 그림에 관한 것은 「그림 서식」 창 하나로 통합했다
+//    (2026-08-31 SKY: «서식은 동일하게 같이 쓰게 통합하고, 더블클릭으로 들어가나
+//    우클릭으로 들어가나 방식을 두 가지로»). 그림 위 우클릭은 그 창을 연다.
 const MENU_ITEMS = {
-  image: [
-    { label: '그림 서식…', run: 'panel' }, { label: '자르기', run: 'crop' },
-    { label: '둥근 모서리', press: '[data-imgfmt="round"]' },
-    { label: '처음 상태로', run: 'reset' },
-    { label: '삭제', run: 'remove' }, { label: '복사', run: 'copy' },
-    { label: '잘라내기', run: 'cut' },
-  ],
   table: [
     { label: '아래에 행', press: '[data-table="row+"]' },
     { label: '이 행 지우기', press: '[data-table="row-"]' },
@@ -5531,7 +5575,7 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
     menu.appendChild(quickStrip(ctx.kind));
     const list = document.createElement('div');
     list.className = 'mlist';
-    for (const it of (MENU_ITEMS[ctx.kind] || MENU_ITEMS.caret)) {
+    for (const it of (MENU_ITEMS[ctx.kind] || MENU_ITEMS.caret)) {   // 그림은 여기 안 온다
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = it.label;
@@ -5544,7 +5588,10 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
 
   function openMenuAt(x, y) {
     lastXY = { x, y };
-    buildMenu(ctxApi.ctxOf());
+    const ctx0 = ctxApi.ctxOf();
+    // 그림은 «그림 서식» 창 하나로 통합했다 — 들어오는 길만 둘이다(더블클릭·우클릭).
+    if (ctx0.kind === 'image') { closeMenu(); formatApi.openPanel(); return; }
+    buildMenu(ctx0);
     if (!menu.parentNode) document.body.appendChild(menu);
     menu.style.left = '0px';
     menu.style.top = '0px';
