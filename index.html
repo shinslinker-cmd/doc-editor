@@ -217,12 +217,21 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 크기 손잡이 — 편집 화면 전용, 인쇄에 안 찍힌다.
    ⚠ #imgui 자체는 pointer-events:none 이라 밑에 있는 글자를 가리지 않는다(2B 함정 재발 방지) */
 #imgui { position:absolute; z-index:30; pointer-events:none; }
-#imgui .imgh { position:absolute; width:10px; height:10px; background:#fff;
-  border:1.5px solid #5490ff; border-radius:2px; pointer-events:auto; }
-#imgui .imgh[data-c="nw"] { left:-5px; top:-5px; cursor:nwse-resize; }
-#imgui .imgh[data-c="ne"] { right:-5px; top:-5px; cursor:nesw-resize; }
-#imgui .imgh[data-c="sw"] { left:-5px; bottom:-5px; cursor:nesw-resize; }
-#imgui .imgh[data-c="se"] { right:-5px; bottom:-5px; cursor:nwse-resize; }
+/* ⛔ touch-action:none 이 없으면 태블릿·폰에서 크기 조절이 통째로 죽는다 —
+   손가락이 두어 번 움직이는 순간 크롬이 «이건 화면 넘기기구나» 하고 판단해
+   pointercancel 로 끊어 버린다(2026-08-31 실측: pointerdown → move 2번 → cancel).
+   ⭐ 잡히는 영역은 26px(손가락용), 눈에 보이는 네모는 그 안의 11px 이다.
+   보이는 것만 크게 하면 화면이 지저분해지고, 잡히는 것만 작으면 못 쓴다. */
+#imgui .imgh { position:absolute; width:26px; height:26px; pointer-events:auto;
+  touch-action:none; display:flex; align-items:center; justify-content:center; }
+#imgui .imgh::before { content:''; width:11px; height:11px; background:#fff;
+  border:1.5px solid #5490ff; border-radius:2px; }
+#imgui .imgh[data-c="nw"] { left:-13px; top:-13px; cursor:nwse-resize; }
+#imgui .imgh[data-c="ne"] { right:-13px; top:-13px; cursor:nesw-resize; }
+#imgui .imgh[data-c="sw"] { left:-13px; bottom:-13px; cursor:nesw-resize; }
+#imgui .imgh[data-c="se"] { right:-13px; bottom:-13px; cursor:nwse-resize; }
+/* 고른 그림 자체도 손가락 끌기가 스크롤로 새지 않게 */
+#pages img.imgsel { touch-action:none; }
 
 @media print {
   #side, #gauge, #folder-msg { display:none !important; }
@@ -333,8 +342,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
       </span>
       <span class="tb-sep"></span>
       <span class="tbg tbg-table" data-label="그림">
-      <button class="tb" data-image="block" title="그림 넣기 — 표 칸 안이면 칸 안에, 본문이면 한 줄짜리 그림으로">🖼 그림</button>
-      <button class="tb" data-image="inline" title="커서 자리에 글자처럼 들어가는 작은 그림">글안 그림</button>
+      <button class="tb" data-image="auto" title="그림 넣기 — 커서가 어디 있는지 보고 알아서 넣는다. 표 칸 안이면 칸 폭에 맞춰 칸 안에, 글자 사이면 글자 크기로, 그 밖에는 한 줄짜리 그림으로">🖼 그림</button>
       </span>
     </div>
     <!-- ⭐ 문서 전체가 하나의 입력판이다 (D16) — 선택·커서·조합·터치는 브라우저가 한다 -->
@@ -345,7 +353,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 08:48";
+window.__BUILD = "2026-08-31 09:14";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3684,12 +3692,26 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     return { rows };
   }
 
+  // 커서가 글자 «사이»에 있나 — 앞뒤 모두 글자가 있으면 참.
+  // 줄 처음·줄 끝·빈 문단은 거짓이다(거기서는 한 줄짜리 그림이 맞다).
+  function betweenText(b, at) {
+    if (!b || !at) return false;
+    const src = (at.item !== null && at.item !== undefined) ? (b.items || [])[at.item] : b.runs;
+    if (!Array.isArray(src)) return false;
+    return at.pos > 0 && at.pos < runsLength(src);
+  }
+
   // 자산 하나를 문맥에 맞게 넣는다. at 을 다음 그림이 이어 붙도록 고쳐 준다.
-  function insertOne(a, at, mode) {
+  // ⭐ 「알아서」 규칙(2026-08-31 SKY: "그림은 그림, 글 안그림 구지 나누지 말고,
+  //    표 칸 안에서 그림이 알아서 바뀌는것 처럼 하자"):
+  //    · 표 칸 안       → 칸 안 그림 (칸 폭에 맞춘다 — 부품 사진)
+  //    · 글자 사이      → 글안 그림 (그 자리 글자 높이에 맞춘다 — 기호·아이콘)
+  //    · 그 밖          → 한 줄짜리 그림 블록 (+ 설명 자리)
+  function insertOne(a, at) {
     const doc = getDoc();
     const got = addAsset(doc.assets, a.data, a.w, a.h);
     const b = at ? doc.blocks.find(x => x.id === at.id) : null;
-    const asInline = mode === 'inline' || (at && at.cell);
+    const asInline = !!(at && at.cell) || betweenText(b, at);
     if (asInline && b) {
       const src = at.cell ? cellRunsOf(b, at.cell)
         : (at.item !== null && at.item !== undefined ? b.items[at.item] : b.runs);
@@ -3738,7 +3760,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     if (el) selectImg(el);
   }
 
-  async function insertFiles(files, mode) {
+  async function insertFiles(files) {
     const list = Array.from(files || []).filter(f => /^image\//.test(f.type || ''));
     if (!list.length) return;
     const at = caretCtx();
@@ -3746,7 +3768,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       let a;
       try { a = await fileToAsset(f); }
       catch (e) { console.warn('그림을 못 읽었다:', f.name, e.message); continue; }
-      insertOne(a, at, mode);
+      insertOne(a, at);
     }
   }
 
@@ -3754,13 +3776,10 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
   const fileEl = document.getElementById('imgfile');
   for (const btn of barEl.querySelectorAll('.tb[data-image]')) {
     btn.addEventListener('mousedown', (e) => e.preventDefault());   // 선택이 안 풀리게
-    btn.addEventListener('click', () => {
-      fileEl.dataset.mode = btn.dataset.image === 'inline' ? 'inline' : 'auto';
-      fileEl.click();
-    });
+    btn.addEventListener('click', () => fileEl.click());
   }
   fileEl.addEventListener('change', () => {
-    insertFiles(fileEl.files, fileEl.dataset.mode || 'auto');
+    insertFiles(fileEl.files);
     fileEl.value = '';
   });
 
@@ -3770,15 +3789,26 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     if (!dt || !dt.files || !dt.files.length) return;
     if (dt.getData('text/html')) return;
     e.preventDefault();
-    insertFiles(dt.files, 'auto');
+    insertFiles(dt.files);
   });
 
   // ── 파일 끌어다 놓기 — 놓은 자리에 커서를 옮기고 같은 규칙으로 ──
+  // ⛔ 문서 «안»에서 끈 그림과 바깥에서 끌어온 파일을 반드시 구분한다.
+  //    크롬은 문서 안에서 끈 그림도 dataTransfer.files 에 «파일»로 넣어 준다
+  //    (2026-08-31 실측: drop(files=1)). 구분을 안 하면 그림을 옮기려 끌었을 뿐인데
+  //    «새 파일을 가져온 것»으로 보고 원본 크기 복제본이 하나 더 생긴다.
+  //    문서 안 이동은 아직 안 만든다 — 편집기가 글 끌어놓기를 통째로 막고 있다.
+  let fromInside = false;
+  pagesEl.addEventListener('dragstart', () => { fromInside = true; }, true);
+  document.addEventListener('dragend', () => { fromInside = false; }, true);
+
   pagesEl.addEventListener('dragover', (e) => {
+    if (fromInside) return;
     const ts = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
     if (ts.indexOf('Files') >= 0) e.preventDefault();
   });
   pagesEl.addEventListener('drop', (e) => {
+    if (fromInside) { e.preventDefault(); fromInside = false; return; }
     const files = e.dataTransfer && e.dataTransfer.files;
     if (!files || !files.length) return;
     e.preventDefault();
@@ -3790,7 +3820,7 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
         s.addRange(r);
       }
     }
-    insertFiles(files, 'auto');
+    insertFiles(files);
   });
 
   // ── 그림 고르기 + 크기 손잡이 (Task 10) ──
@@ -3917,6 +3947,26 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
       ? pagesEl.querySelector('.blk-image[data-id="' + at.b.id + '"] img.bimg')
       : null;
     if (again) selectImg(again);
+  });
+
+  // ── 고른 그림 복사(Ctrl+C) ──
+  // ⛔ 그림 블록은 편집 불가 «통짜 섬»이라 브라우저의 «문서 선택»에 안 잡힌다.
+  //    그래서 Ctrl+C 를 눌러도 담을 게 없어 클립보드가 통째로 빈다
+  //    (2026-08-31 실측: «빈 클립보드» — 엑셀·워드에 안 붙던 진짜 원인).
+  //    고른 그림이 있으면 우리가 직접 담는다. 글줄 안 그림은 브라우저가 이미 잘 담으므로
+  //    글을 고른 상태면 손대지 않는다.
+  document.addEventListener('copy', (e) => {
+    if (!picked || !picked.isConnected) return;
+    const s = window.getSelection();
+    if (s && s.rangeCount && !s.getRangeAt(0).collapsed) return;   // 글을 골랐으면 브라우저에
+    const a = getDoc().assets[picked.dataset.img];
+    if (!a || !e.clipboardData) return;
+    e.preventDefault();
+    const w = picked.width || a.w;
+    const h = picked.height || a.h;
+    e.clipboardData.setData('text/html',
+      '<img src="' + a.data + '" width="' + w + '" height="' + h + '">');
+    e.clipboardData.setData('text/plain', '');
   });
 
   // ── 고른 그림 지우기 — Delete·Backspace. Esc 는 해제 ──
