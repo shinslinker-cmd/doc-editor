@@ -232,6 +232,12 @@ body { margin:0; background:var(--desk); color:var(--ink);
 #imgui .imgh[data-c="se"] { right:-13px; bottom:-13px; cursor:nwse-resize; }
 /* 고른 그림 자체도 손가락 끌기가 스크롤로 새지 않게 */
 #pages img.imgsel { touch-action:none; }
+/* 끌 때 «어디로 가는지» 미리보기 — 보통 블록은 그 아래 굵은 줄, 표 칸은 테두리 */
+#imgdrop { position:absolute; z-index:29; pointer-events:none; height:3px;
+  background:#5490ff; border-radius:2px; box-shadow:0 0 0 1px rgba(84,144,255,.3); }
+#imgdrop.cell { height:auto; background:transparent; border:2px solid #5490ff;
+  border-radius:3px; box-shadow:none; }
+@media print { #imgdrop { display:none !important; } }
 
 @media print {
   #side, #gauge, #folder-msg { display:none !important; }
@@ -353,7 +359,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 09:36";
+window.__BUILD = "2026-08-31 10:07";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3622,6 +3628,7 @@ function attachToolbar({ barEl, pagesEl, getDoc, setDoc, redraw }) {
 
 
 
+
 const MAXPX = 2000;   // 붙일 때 긴 변 한도 — A4 인쇄 200dpi 상당(설계 §2-2)
 
 // 파일 → { data(dataURL), w, h }. 긴 변이 MAXPX 를 넘으면 줄여 담는다.
@@ -3781,6 +3788,74 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     }
   }
 
+  // 붙여넣은 HTML 을 토막으로 바꾼다. 블록이 여럿이면 사이에 줄바꿈을 넣는다 —
+  // 안 넣으면 두 문단이 소리 없이 한 줄로 붙는다.
+  function runsFromHtml(html) {
+    const d0 = new DOMParser().parseFromString(html, 'text/html');
+    const BLOCKY = /^(DIV|P|LI|TR|H1|H2|H3|H4|H5|H6|SECTION|ARTICLE|BLOCKQUOTE)$/;
+    const kids = Array.from(d0.body.childNodes)
+      .filter(n => n.nodeType === 1 && BLOCKY.test(n.tagName));
+    if (kids.length > 1) {
+      const out = [];
+      kids.forEach((n, i) => {
+        if (i) out.push({ t: '\n' });
+        for (const r of domToRuns(n)) out.push(r);
+      });
+      return out;
+    }
+    return domToRuns(d0.body);
+  }
+
+  // 토막들을 커서 자리에 넣는다. 줄바꿈이 있으면 줄마다 문단이 된다
+  // (표 칸 안에서는 칸 안 줄바꿈이 정상이라 그대로 둔다 — 편집기의 여러 줄 붙여넣기와 같은 규칙).
+  function insertRunsAt(list, at) {
+    const doc = getDoc();
+    const b = at ? doc.blocks.find(x => x.id === at.id) : null;
+    if (!b) return false;
+    const got = adoptImages(list, doc.assets);
+    const runs = got.runs.filter(r => r && r.t);
+    if (!runs.length) return false;
+    const inItem = at.item !== null && at.item !== undefined;
+    const src = at.cell ? cellRunsOf(b, at.cell) : (inItem ? b.items[at.item] : b.runs);
+    if (!Array.isArray(src)) return false;
+    const len = runsLength(src);
+    const pos = Math.max(0, Math.min(at.pos, len));
+    const head = sliceRuns(src, 0, pos);
+    const tail = sliceRuns(src, pos, len);
+    const assets = got.assets;
+
+    const lines = [[]];
+    for (const r of runs) {
+      if (r.img || r.t.indexOf('\n') < 0) { lines[lines.length - 1].push(r); continue; }
+      const parts = r.t.split('\n');
+      parts.forEach((t, i) => {
+        if (i) lines.push([]);
+        if (t) lines[lines.length - 1].push(Object.assign({}, r, { t }));
+      });
+    }
+
+    const itemPatch = (rs) => { const items = b.items.slice(); items[at.item] = rs; return { items }; };
+    if (at.cell || lines.length === 1) {
+      const merged = normalizeRuns(head.concat(runs, tail));
+      const patch = at.cell ? cellPatch(b, at.cell, merged) : (inItem ? itemPatch(merged) : { runs: merged });
+      setDoc(Object.assign({}, doc, { assets, blocks: replaceBlock(doc.blocks, b.id, patch) }));
+      redraw({ caret: { id: b.id, item: at.item, cell: at.cell, pos: pos + runsLength(runs) } });
+      return true;
+    }
+    // 여러 줄 — 첫 줄은 이 문단에, 나머지는 새 문단으로(편집기의 여러 줄 붙여넣기와 같다)
+    const first = normalizeRuns(head.concat(lines[0]));
+    const rest = lines.slice(1);
+    const fresh = rest.map((ln, i) => createBlock('para', {
+      runs: normalizeRuns(i === rest.length - 1 ? ln.concat(tail) : ln) }));
+    let blocks = replaceBlock(doc.blocks, b.id, inItem ? itemPatch(first) : { runs: first });
+    const idx = blocks.findIndex(x => x.id === b.id);
+    blocks = blocks.slice(0, idx + 1).concat(fresh, blocks.slice(idx + 1));
+    setDoc(Object.assign({}, doc, { assets, blocks }));
+    redraw({ caret: { id: fresh[fresh.length - 1].id, item: null,
+                      pos: runsLength(lines[lines.length - 1]) } });
+    return true;
+  }
+
   // ── 붙여넣기 ──
   // ⛔ 그림 붙여넣기를 브라우저 기본에 맡기면 그림이 조용히 사라진다.
   //    크롬은 붙여넣은 <img> 를 «어느 블록에도 속하지 않는 자리»(.page-body 바로 아래)에
@@ -3796,7 +3871,19 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     const files = dt.files ? Array.from(dt.files).filter(f => /^image\//.test(f.type || '')) : [];
     if (files.length) { e.preventDefault(); insertFiles(files); return; }
     const text = (dt.getData('text/plain') || '').trim();
-    if (text) return;                                  // 글이 섞였으면 기존 길이 맡는다
+    // ⛔ 글과 그림이 «섞인» 붙여넣기도 우리가 받아야 한다. 브라우저에 맡기면 크롬이
+    //    그림과 «그 뒤의 모든 것»을 문단 밖으로 밀어내고 커서까지 밖에 놓는다 —
+    //    우리 코드는 «커서가 있는 문단»을 읽으므로 읽을 문단을 못 찾고, 다음 다시 그리기가
+    //    밖에 나와 있던 것을 통째로 쓸어 버린다. 글까지 함께 사라진다(2026-08-31 실측).
+    if (text && html.indexOf('data:image') >= 0) {
+      const list = runsFromHtml(html);
+      if (list.some(r => r && (r.img || r.src$))) {
+        e.preventDefault();
+        insertRunsAt(list, caretCtx());
+        return;
+      }
+    }
+    if (text) return;                                  // 글만이면 기존 길이 맡는다
     // 태그를 통째로 집어 src 와 width 를 함께 읽는다 — 속성 차례는 앱마다 다르다
     const items = [];
     const re = /<img\b[^>]*>/gi;
@@ -3907,14 +3994,47 @@ function attachImages({ barEl, pagesEl, getDoc, setDoc, redraw }) {
     moving = { at, w: t.width, h: t.height, img: t.dataset.img };
     if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
   }, true);
-  document.addEventListener('dragend', () => { moving = null; }, true);
+  document.addEventListener('dragend', () => { moving = null; hideMark(); }, true);
+
+  // 놓일 자리를 미리 보여 준다 (2026-08-31 SKY: "어느 문단 사이로 가는지 미리보기로")
+  const mark = document.createElement('div');
+  mark.id = 'imgdrop';
+  mark.setAttribute('contenteditable', 'false');
+  function hideMark() { if (mark.parentNode) mark.parentNode.removeChild(mark); }
+  function showMark(x, y) {
+    const spot = dropSpot(x, y);
+    if (!spot || !spot.blk) { hideMark(); return; }
+    const pr = pagesEl.getBoundingClientRect();
+    const k = pr.width / pagesEl.offsetWidth;      // 태블릿에서 화면이 축소돼 있어도 맞게
+    const r = (spot.td || spot.blk).getBoundingClientRect();
+    if (spot.td) {                                  // 표 칸 — 그 칸을 테두리로 감싼다
+      mark.className = 'cell';
+      mark.style.left = ((r.left - pr.left) / k) + 'px';
+      mark.style.top = ((r.top - pr.top) / k) + 'px';
+      mark.style.width = (r.width / k) + 'px';
+      mark.style.height = (r.height / k) + 'px';
+    } else {                                        // 보통 블록 — 그 «아래»에 굵은 줄
+      mark.className = '';
+      mark.style.left = ((r.left - pr.left) / k) + 'px';
+      mark.style.top = ((r.bottom - pr.top) / k - 1) + 'px';
+      mark.style.width = (r.width / k) + 'px';
+      mark.style.height = '';
+    }
+    if (!mark.parentNode) pagesEl.appendChild(mark);
+  }
 
   pagesEl.addEventListener('dragover', (e) => {
-    if (moving) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; return; }
+    if (moving) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      showMark(e.clientX, e.clientY);
+      return;
+    }
     const ts = e.dataTransfer ? Array.from(e.dataTransfer.types) : [];
     if (ts.indexOf('Files') >= 0) e.preventDefault();
   });
   pagesEl.addEventListener('drop', (e) => {
+    hideMark();
     if (moving) {
       e.preventDefault();
       const mv = moving;
