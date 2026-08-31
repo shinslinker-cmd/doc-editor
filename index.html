@@ -535,7 +535,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 14:43";
+window.__BUILD = "2026-08-31 14:58";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -5381,11 +5381,18 @@ function attachContext({ pagesEl, barEl, imageApi }) {
       || (el && (activeCellEl(el) || (el.className || '').indexOf('blk-table') >= 0)));
     const 그림켤까 = !!imageApi.pickedImgs().length;
     if ((!gt || gt.hidden === !표켤까) && (!gi || gi.hidden === !그림켤까)) return;
-    const 전 = barEl.offsetHeight;
+    // ⛔ «리본이 얼마나 커졌나»로 보정하면 안 된다. 크롬이 이미 스스로 보정해 주는
+    //    경우가 있어서(스크롤 앵커링) 그때는 두 번 굴러 문서가 그만큼 튄다 —
+    //    2쪽 그림을 눌렀는데 화면이 위로 뛰던 진짜 원인이다(2026-08-31 SKY 지적,
+    //    실측: 리본은 70px 커졌는데 화면은 140px 굴렀다).
+    //    그래서 «문서가 실제로 움직인 거리»를 잰다. 크롬이 이미 맞춰 놨으면 0 이라
+    //    아무 일도 안 하고, 안 맞춰 놨으면 딱 그만큼만 되돌린다.
+    const ref = pagesEl.querySelector('.page');
+    const 전 = ref ? ref.getBoundingClientRect().top : null;
     if (gt) gt.hidden = !표켤까;
     if (gi) gi.hidden = !그림켤까;
-    const 후 = barEl.offsetHeight;
-    if (후 === 전) return;
+    const 후 = ref ? ref.getBoundingClientRect().top : null;
+    if (전 === null || 후 === null || Math.abs(후 - 전) < 0.5) return;
     // ⛔ 이 «보정 스크롤»은 사람이 화면을 굴린 것이 아니다. 그런데 브라우저는 똑같은
     //    scroll 사건으로 알려 주므로, 그것을 «굴렸으니 메뉴를 닫자»로 읽는 곳이 있으면
     //    방금 연 우클릭 메뉴가 곧바로 닫힌다(2026-08-31 실측: 그림 위 우클릭이 통째로 안 됐다).
