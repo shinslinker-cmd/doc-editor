@@ -1025,7 +1025,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 14:56";
+window.__BUILD = "2026-09-01 15:04";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -9142,8 +9142,12 @@ document.addEventListener('keydown', (e) => {
 function setView(v) { state.view = v; draw(); vbarApi.refresh(); }
 
 // 검사 도구가 들여다보는 창구다(tools/*.js). 화면 동작에는 쓰지 않는다.
+// ⚠ resyncParts 는 아래에서 «함수 선언»으로 만들어져 끌어올려지므로 여기서 이름을 써도 된다.
+//   검사 도구(parts-check)가 이 문으로 다시 맞추기를 부른다 — 진짜 사용자 경로(문서 열기·
+//   목록 고치기)와 같은 함수라, 이걸 통과하면 그 두 길도 통과한다.
 window.__app = { state, draw, DEFAULT_PAGE, history, saveSnapshot, listSnapshots,
-                 rememberDir, recallDir, forgetDir, docExists, serializeSwept, setView };
+                 rememberDir, recallDir, forgetDir, docExists, serializeSwept, setView,
+                 resyncParts };
 draw();
 
 // getView = 지금 보고 있는 판(없으면 null = 전체보기). 편집 길목이 «어느 판의 값을
@@ -9237,6 +9241,9 @@ const partsApi = attachPartsList({
     if (!state.dir) throw new Error('문서 폴더를 먼저 열어야 합니다');
     await savePartsFile(state.dir, next);
     state.parts = next;                 // ⚠ 파일에 굳은 «뒤»에 기억한다 — 실패하면 옛 값이 남는다
+    // ⭐ 여기가 기둥 3 의 심장이다 — 목록을 한 번 고치면 «지금 열린 서류»가 곧바로 따라 바뀐다.
+    // ⚠ 폴더의 «다른» 서류는 그 서류를 열 때 맞춰진다(문서를 열 때 resyncParts 를 부른다).
+    resyncParts();
   },
   getDoc: () => state.doc,
   warn: () => (state.dir ? null
@@ -9315,11 +9322,40 @@ async function refreshList() {
         history.push(state.doc.blocks, null, state.doc.variants);
         draw();
         vbarApi.refresh();            // 다른 문서다 — 판 바를 이 문서의 판으로 갈아 끼운다
+        resyncParts();                // 부품 목록에 맞춘다(Task 4) — 바뀐 것이 없으면 조용하다
         refreshList();
       } catch (e) { msg('문서를 열지 못했다: ' + e.message); toastErr('문서를 열지 못했습니다 — ' + e.message); }
     });
     box.appendChild(a);
   }
+}
+
+// ⭐ 다시 맞추기 (기둥 3 Task 4) — 「안전회로 부품 목록」의 값으로 이 문서의 글자를 맞춘다.
+//    2026-09-01 SKY 결정: "문서를 열 때 자동으로 맞추고 «몇 칸 바뀌었다»고 알린다."
+//
+// ⛔ 이 프로젝트에서 가장 위험한 자리다 — 여러 칸의 글자를 한꺼번에 갈아 끼운다. 그래서
+//    ① 조용히 안 한다(몇 칸이 바뀌었는지 반드시 알린다)
+//    ② 되돌릴 수 있다(applyDoc 을 거치므로 Ctrl+Z 한 번으로 전부 돌아간다)
+//    ③ 깨진 참조는 글자를 안 건드리고 «몇 곳이 깨졌다»고만 알린다(빈칸으로 만들지 않는다)
+// ⚠ 바뀐 것이 없으면 아무 말도 안 하고 문서도 안 건드린다 — 문서를 열 때마다 알림이
+//   뜨면 알림 자체가 무시된다.
+// ⛔ 최상위 이름 resyncParts 는 이 파일만 쓴다.
+function resyncParts() {
+  const r = syncDoc(state.doc, state.parts);
+  if (r.doc !== state.doc) {
+    applyDoc(r.doc);
+    draw();
+  }
+  if (r.changed.length) {
+    const 첫 = r.changed[0];
+    toast('부품 목록에 맞춰 ' + r.changed.length + '곳을 고쳤습니다'
+      + ' (예: ' + 첫.from + ' → ' + 첫.to + ') — Ctrl+Z 로 되돌립니다');
+  }
+  if (r.broken.length) {
+    // ⛔ 조용히 두면 개정번호를 고쳐도 그 칸만 안 바뀌는데 아무도 모른다(설계서 §7)
+    toastErr(r.broken.length + '곳이 목록에 없는 부품을 가리킵니다 — 빨간 물결로 표시했습니다');
+  }
+  return r;
 }
 
 async function useDir(handle) {
@@ -9330,6 +9366,7 @@ async function useDir(handle) {
   // 부품 목록(기둥 3)은 «폴더»에 산다 — 폴더를 열 때 함께 읽는다.
   // ⚠ 없으면 빈 목록이다. 목록이 없다고 서류를 못 여는 일은 없어야 한다.
   state.parts = readParts(await loadPartsFile(handle));
+  resyncParts();                      // 이제 목록을 알았다 — 열려 있던 문서를 맞춘다
   await refreshList();
 }
 
@@ -9403,6 +9440,7 @@ async function openFileHandle(fh) {
     vbarApi.refresh();                // 다른 문서다 — 판 바를 이 문서의 판으로 갈아 끼운다
     msg('파일: ' + fh.name);
     toast('문서를 열었습니다 — ' + fh.name);
+    resyncParts();                    // 부품 목록에 맞춘다(Task 4)
     refreshList();
   } catch (e) { msg('문서를 열지 못했다: ' + e.message); toastErr('문서를 열지 못했습니다 — ' + e.message); }
 }
