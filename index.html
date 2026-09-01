@@ -697,9 +697,50 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
   border-radius: 6px; background: #fff; cursor: pointer; }
 #docinfo button:hover { background: #f5f6f8; }
 #docinfo button:disabled { opacity: .4; cursor: default; }
-#docinfo .di-foot { display: flex; justify-content: flex-end;
+#docinfo .di-foot { display: flex; justify-content: flex-end; gap: 6px;
   border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 9px; }
+/* 「저장」만 눈에 띄게 — 이 창에서 «해야 하는 일»은 저장 하나다(2026-09-01 SKY).
+   나머지(기본으로·기본 넣기·닫기)는 가끔 쓰는 것이라 평범한 단추로 둔다.
+   ⚠ 왼쪽 끝에 세운다 — 오른쪽 끝은 「닫기」 자리라 손에 익은 자리를 바꾸면 잘못 누른다. */
+#docinfo .di-foot .di-save { margin-right: auto; font-weight: 700;
+  border-color: #c9ced8; background: #f2f4f8; }
+#docinfo .di-foot .di-save:hover { background: #e8ebf2; }
 @media print { #docinfo { display: none !important; } }
+
+/* 「부품 목록」 창 (기둥 3, 2026-09-01) — 문서 정보 창과 같은 계열이되 «표»라서 더 넓다.
+   ⚠ 폭 640px 은 칸 4개(이름·도면번호·개정·개정일자)＋지움 단추가 한 줄에 들어가는 최소다.
+   ⚠ 좁은 화면(태블릿 세로 753)에서는 화면 폭에 맞춰 줄인다 — 안 그러면 창이 화면 밖으로 나간다. */
+#partslist { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 60;
+  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px;
+  width: 640px; max-width: calc(100vw - 24px); }
+#partslist .pl-ttl { display: flex; align-items: center; justify-content: space-between;
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
+#partslist .pl-x { border: 0; background: none; cursor: pointer; color: var(--dim);
+  font-size: 13px; line-height: 1; padding: 2px 4px; }
+#partslist .pl-x:hover { color: var(--ink); }
+#partslist .pl-note { color: var(--sub); font-size: 11.5px; line-height: 1.5; margin: 0 0 9px; }
+/* 부품이 많아지면 창이 화면을 넘는다 — 목록만 스크롤한다(머리줄·바닥은 늘 보인다) */
+#partslist .pl-body { max-height: 52vh; overflow-y: auto; overflow-x: hidden; }
+#partslist .pl-row { display: grid; grid-template-columns: 1.2fr 1.2fr .8fr .9fr auto;
+  align-items: center; gap: 6px; padding: 2px 0; }
+#partslist .pl-head { font-weight: 700; color: var(--sub); font-size: 11.5px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; }
+#partslist .pl-row input[type=text] { min-width: 0; width: 100%; height: 28px; padding: 0 7px;
+  border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
+#partslist .pl-empty { color: var(--dim); font-size: 12px; padding: 14px 2px; text-align: center; }
+#partslist button { height: 28px; padding: 0 9px; font-size: 12px; border: 1px solid var(--line);
+  border-radius: 6px; background: #fff; cursor: pointer; }
+#partslist button:hover { background: #f5f6f8; }
+#partslist .pl-del { color: var(--dim); padding: 0 7px; }
+/* ⚠ 지움은 되돌릴 수 없다 — 마우스를 올렸을 때 빨갛게 해서 «무거운 단추»임을 알린다 */
+#partslist .pl-del:hover { color: #e5231b; border-color: #f0b6b2; background: #fdf2f1; }
+#partslist .pl-foot { display: flex; justify-content: flex-end; gap: 6px;
+  border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 9px; }
+#partslist .pl-add { margin-right: auto; font-weight: 700;
+  border-color: #c9ced8; background: #f2f4f8; }
+#partslist .pl-add:hover { background: #e8ebf2; }
+@media print { #partslist { display: none !important; } }
 
 /* 판별 값 창 (2026-09-01 SKY) — 한 칸이 판마다 어떤 값인지 모아 보고 그 자리에서 고친다.
    판 관리 창과 같은 계열의 작은 카드다. body 에 살아서 종이가 다시 그려져도 안 흔들린다.
@@ -771,6 +812,9 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
     <div class="sg">꾸미기</div>
     <!-- 머리글·바닥글에 나올 값(제목·문서번호·개정·날짜·회사·로고)을 고치는 유일한 자리 -->
     <button id="btn-docinfo"><span class="si">▤</span>머리글 및 바닥글</button>
+    <!-- 부품 목록(기둥 3) — 개정번호를 한 곳에서 고치면 그 부품이 나오는 서류가 같이 바뀐다.
+         목록은 서류 폴더의 _부품목록.json 한 개다(2026-09-01 SKY 결정). -->
+    <button id="btn-parts"><span class="si">⚙</span>부품 목록</button>
     <div class="sg">저장</div>
     <button id="btn-save"><span class="si">💾</span>저장</button>
     <button id="btn-saveas"><span class="si">⎘</span>다른 이름으로 저장</button>
@@ -939,7 +983,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 14:09";
+window.__BUILD = "2026-09-01 14:32";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -2188,6 +2232,35 @@ async function writeDoc(dirHandle, name, text) {
   await w.close();
 }
 
+// ── 부품 목록 (기둥 3) ────────────────────────────────────────
+// 서류 폴더에 «한 개»의 목록 파일을 둔다(2026-09-01 SKY: "부품 목록을 서류 폴더에 파일 하나").
+// 그래야 한 곳만 고치면 그 폴더의 모든 서류가 따라 바뀐다 — 기둥 3 의 뜻 그대로다.
+// ⚠ 문서 파일 «하나만» 남에게 주면 이 파일은 안 따라간다. 그래도 서류의 글자는 그대로다
+//   (참조는 값을 대신하는 것이 아니라 값에 붙은 꼬리표다 — core/parts.js).
+// ⚠ 이름을 밑줄로 시작한다 — 목록에 안 뜨고(.sdoc 이 아니다) 문서들보다 위에 모인다.
+// ⛔ 이름을 loadPartsFile·savePartsFile 로 짓는다 — core/parts.js 가 이미 readParts 를
+//    내보낸다. 빌드가 모듈을 한 덩어리로 합치므로 같은 이름이 둘이면 화면이 통째로 안 뜬다.
+const PARTS_FILE = '_부품목록.json';
+
+// 없으면 «빈 목록»을 준다 — 없다고 터지면 부품 목록을 안 쓰는 폴더에서 문서를 못 연다.
+// ⛔ 읽다 실패해도 터지지 않는다. 목록을 못 읽는 것은 서류를 못 여는 이유가 아니다
+//   (글자는 서류 안에 이미 있다).
+async function loadPartsFile(dirHandle) {
+  try {
+    const dir = await docsDir(dirHandle);
+    const fh = await dir.getFileHandle(PARTS_FILE);
+    return JSON.parse(await (await fh.getFile()).text());
+  } catch (e) { return null; }
+}
+
+async function savePartsFile(dirHandle, list) {
+  const dir = await docsDir(dirHandle);
+  const fh = await dir.getFileHandle(PARTS_FILE, { create: true });
+  const w = await fh.createWritable();
+  await w.write(JSON.stringify(list, null, 1));
+  await w.close();
+}
+
 // ── 고른 폴더를 기억한다 (2026-08-30 SKY: "문서 폴더를 기억하게 하자") ──
 // 폴더 손잡이(handle)는 브라우저 내부 저장소(IndexedDB)에 그대로 담을 수 있다.
 // ⚠ 담아 둬도 «권한»은 따로다. 브라우저를 껐다 켜면 권한이 «물어봄» 으로 내려갈 수 있고,
@@ -2254,6 +2327,427 @@ async function dirPermission(handle, ask) {
   let st = await handle.queryPermission(opt);
   if (st !== 'granted' && ask && handle.requestPermission) st = await handle.requestPermission(opt);
   return st;
+}
+
+/* parts.js */
+// 부품 목록(기둥 3) 논리 — DOM 도 파일도 모른다. 항상 새 객체를 만든다.
+// 설계: docs/설계_부품목록.md
+//
+// ⭐ 이 파일이 지키는 단 하나의 약속: **글자는 절대 사라지지 않는다.**
+//    참조(ref)는 «값을 대신하는 것»이 아니라 «값에 붙은 꼬리표»다.
+//
+//      토막(run) = { t: 'Rev5.0', ref: 'p3.rev' }
+//                    ↑ 지금 글자(늘 있다)  ↑ 어느 부품의 어느 칸에서 왔나
+//
+//    목록 파일을 못 읽어도·부품이 지워져도 서류는 «지금 글자» 그대로 보인다.
+//    이 순서가 뒤집히면(참조만 두고 그릴 때 값을 찾으면) 목록을 못 읽는 순간 서류가
+//    통째로 빈칸이 된다 — 이 프로젝트가 존재하는 이유에 정면으로 어긋난다.
+//
+// ⛔ 이 파일은 아무것도 import 하지 않는다 — 빌드가 모듈을 한 덩어리로 합치므로 역방향
+//    의존이 생기면 정의 순서가 꼬여 화면이 통째로 안 뜰 수 있다(variants.js 와 같은 이유).
+// ⛔ 최상위 이름 주의: pseq·PART_FIELDS·partId 는 이 파일만 쓴다.
+
+// 부품 하나가 갖는 «가져다 쓸 수 있는 칸»(설계서 §7). 필요하면 늘린다 —
+// 늘려도 옛 문서는 안 깨진다(모르는 칸을 가리키면 «깨진 참조»로 보일 뿐이다).
+const PART_FIELDS = [
+  ['name', '이름'],
+  ['drawing', '도면번호'],
+  ['rev', '개정'],
+  ['revDate', '개정일자'],
+];
+
+const FIELD_KEYS = PART_FIELDS.map(f => f[0]);
+
+// 판(版)과 같은 방식으로 id 를 짓는다 — 'p' + 순번.
+// ⭐ 이름이 아니라 id 로 가리키므로 **부품 이름을 바꿔도 서류가 안 깨진다.**
+let pseq = 0;
+function resetPartIds(n = 0) { pseq = n; }
+function adoptPartIds(list) {
+  for (const p of list || []) {
+    const m = /^p(\d+)$/.exec(p && p.id ? String(p.id) : '');
+    if (m) pseq = Math.max(pseq, Number(m[1]));
+  }
+}
+function partId() { pseq += 1; return 'p' + pseq; }
+
+// ── 목록 자체 ────────────────────────────────────────────────
+// 목록 = { parts: [ {id,name,drawing,rev,revDate,note} … ] }
+
+function createParts() { return { parts: [] }; }
+
+function dupPart(p) {
+  const o = { id: p.id };
+  for (const k of FIELD_KEYS) o[k] = typeof p[k] === 'string' ? p[k] : '';
+  o.note = typeof p.note === 'string' ? p.note : '';
+  return o;
+}
+
+const dupList = (lst) => ((lst && lst.parts) || []).map(dupPart);
+
+function addPart(lst, props = {}) {
+  const p = Object.assign({ id: partId() }, props);
+  return { parts: dupList(lst).concat([dupPart(p)]) };
+}
+
+function updatePart(lst, id, props = {}) {
+  return { parts: dupList(lst).map(p => (p.id === id ? dupPart(Object.assign({}, p, props, { id })) : p)) };
+}
+
+function removePart(lst, id) {
+  return { parts: dupList(lst).filter(p => p.id !== id) };
+}
+
+function findPart(lst, id) {
+  return ((lst && lst.parts) || []).find(p => p.id === id) || null;
+}
+
+// ⛔ 읽기 위생 — 목록 파일은 사람이 손댈 수 있는 자리(드라이브)에 산다.
+//    깨진 줄 하나가 프로그램을 멈추면 안 되므로, 알아볼 수 있는 것만 받고 나머지는 버린다.
+function readParts(raw) {
+  const src = (raw && typeof raw === 'object' && Array.isArray(raw.parts)) ? raw.parts : [];
+  const seen = new Set();
+  const parts = [];
+  for (const p of src) {
+    if (!p || typeof p !== 'object') continue;
+    const id = typeof p.id === 'string' && /^p\d+$/.test(p.id) ? p.id : '';
+    if (!id || seen.has(id)) continue;      // id 가 없거나 겹치면 버린다 — 겹치면 어느 쪽이 참인지 알 수 없다
+    seen.add(id);
+    parts.push(dupPart(Object.assign({}, p, { id })));
+  }
+  adoptPartIds(parts);
+  return { parts };
+}
+
+// ── 참조 ────────────────────────────────────────────────────
+// 참조 글자꼴은 '<부품id>.<칸>' — 예: 'p3.rev'
+
+function makeRef(id, field) { return String(id) + '.' + String(field); }
+
+function parseRef(ref) {
+  const m = /^(p\d+)\.([a-zA-Z]+)$/.exec(String(ref || ''));
+  if (!m) return null;
+  if (FIELD_KEYS.indexOf(m[2]) < 0) return null;
+  return { id: m[1], field: m[2] };
+}
+
+// 그 참조가 «지금» 가리키는 값. 부품이나 칸이 없으면 null 을 준다 —
+// ⛔ 빈 문자열이 아니다. 빈 문자열이면 «값이 빈 부품»과 «사라진 부품»을 구별할 수 없다.
+function refValue(lst, ref) {
+  const r = parseRef(ref);
+  if (!r) return null;
+  const p = findPart(lst, r.id);
+  if (!p) return null;
+  const v = p[r.field];
+  return typeof v === 'string' ? v : null;
+}
+
+function refBroken(lst, ref) { return refValue(lst, ref) === null; }
+
+// ── 다시 맞추기 ──────────────────────────────────────────────
+// ⛔ 이 프로젝트에서 가장 위험한 자리다 — 여러 칸의 글자를 한꺼번에 갈아 끼운다.
+//    그래서 ①고치기 전에 «몇 칸이 어떻게 바뀌는지» 세어서 돌려주고 ②깨진 참조는
+//    글자를 건드리지 않는다(빈칸으로 만들지 않는다).
+
+// 토막 하나를 맞춘다. 바뀌면 새 토막, 아니면 «같은 객체»를 그대로 돌려준다 —
+// 같은 객체를 돌려줘야 위에서 「바뀐 것이 없다」를 값싸게 알 수 있다.
+function syncRun(lst, run, log) {
+  if (!run || !run.ref) return run;
+  const now = refValue(lst, run.ref);
+  if (now === null) { if (log) log.broken.push({ ref: run.ref, t: run.t }); return run; }
+  if (now === run.t) return run;
+  if (log) log.changed.push({ ref: run.ref, from: run.t, to: now });
+  return Object.assign({}, run, { t: now });
+}
+
+function syncRuns(lst, runs, log) {
+  if (!Array.isArray(runs)) return runs;
+  let hit = false;
+  const out = runs.map(r => { const n = syncRun(lst, r, log); if (n !== r) hit = true; return n; });
+  return hit ? out : runs;
+}
+
+// 칸 하나 — 공통 값(runs)과 판별 값(vals) 양쪽을 맞춘다.
+// ⭐ 여기가 기둥 2(판)와 기둥 3(부품 목록)이 만나는 자리다. 판별 값 안의 토막도
+//    똑같이 ref 를 달 수 있어서, 새 장치를 하나도 안 만들고 둘이 함께 산다.
+function syncCell(lst, cell, log) {
+  if (!cell || typeof cell !== 'object') return cell;
+  let hit = false;
+  let next = cell;
+  const runs = syncRuns(lst, cell.runs, log);
+  if (runs !== cell.runs) { next = Object.assign({}, next, { runs }); hit = true; }
+  if (cell.vals && typeof cell.vals === 'object') {
+    let vhit = false;
+    const vals = {};
+    for (const k of Object.keys(cell.vals)) {
+      const v = syncRuns(lst, cell.vals[k], log);
+      if (v !== cell.vals[k]) vhit = true;
+      vals[k] = v;
+    }
+    if (vhit) { next = Object.assign({}, next, { vals }); hit = true; }
+  }
+  return hit ? next : cell;
+}
+
+function syncGrid(lst, grid, log) {
+  if (!Array.isArray(grid)) return grid;
+  let hit = false;
+  const out = grid.map(row => {
+    if (!Array.isArray(row)) return row;
+    let rhit = false;
+    const r = row.map(c => { const n = syncCell(lst, c, log); if (n !== c) rhit = true; return n; });
+    if (rhit) { hit = true; return r; }
+    return row;
+  });
+  return hit ? out : grid;
+}
+
+function syncBlock(lst, b, log) {
+  if (!b || typeof b !== 'object') return b;
+  if (b.type === 'table') {
+    const head = syncGrid(lst, b.head, log);
+    const rows = syncGrid(lst, b.rows, log);
+    if (head === b.head && rows === b.rows) return b;
+    return Object.assign({}, b, { head, rows });
+  }
+  if (Array.isArray(b.runs)) {
+    const runs = syncRuns(lst, b.runs, log);
+    return runs === b.runs ? b : Object.assign({}, b, { runs });
+  }
+  if (Array.isArray(b.items)) {
+    let hit = false;
+    const items = b.items.map(it => { const n = syncRuns(lst, it, log); if (n !== it) hit = true; return n; });
+    return hit ? Object.assign({}, b, { items }) : b;
+  }
+  if (Array.isArray(b.caption)) {
+    const caption = syncRuns(lst, b.caption, log);
+    return caption === b.caption ? b : Object.assign({}, b, { caption });
+  }
+  return b;
+}
+
+// 문서 전체를 목록에 맞춘다.
+// 돌려주는 것: { doc, changed: [{ref,from,to}…], broken: [{ref,t}…] }
+// ⚠ 바뀐 것이 없으면 **같은 문서 객체**를 그대로 돌려준다 — 새 객체를 만들면 화면의
+//   next === doc 가드를 지나가서, 아무것도 안 바뀐 되돌리기 걸음이 쌓인다
+//   (renameVariant 에서 겪은 그 함정).
+function syncDoc(doc, lst) {
+  const log = { changed: [], broken: [] };
+  if (!doc || !Array.isArray(doc.blocks)) return { doc, changed: [], broken: [] };
+  let hit = false;
+  const blocks = doc.blocks.map(b => { const n = syncBlock(lst, b, log); if (n !== b) hit = true; return n; });
+  return {
+    doc: hit ? Object.assign({}, doc, { blocks }) : doc,
+    changed: log.changed,
+    broken: log.broken,
+  };
+}
+
+// 문서가 쓰고 있는 참조를 모아 센다 — 「이 서류는 3번 부품을 4곳에서 쓴다」를 보여 줄 때.
+function countRefs(doc) {
+  const out = new Map();
+  const bump = (ref) => { if (ref) out.set(ref, (out.get(ref) || 0) + 1); };
+  const runs = (rs) => { for (const r of rs || []) if (r && r.ref) bump(r.ref); };
+  const cell = (c) => {
+    if (!c || typeof c !== 'object') return;
+    runs(c.runs);
+    if (c.vals) for (const k of Object.keys(c.vals)) runs(c.vals[k]);
+  };
+  for (const b of (doc && doc.blocks) || []) {
+    if (!b || typeof b !== 'object') continue;
+    if (b.type === 'table') {
+      for (const g of [b.head, b.rows]) for (const row of g || []) for (const c of row || []) cell(c);
+    } else {
+      runs(b.runs);
+      runs(b.caption);
+      for (const it of b.items || []) runs(it);
+    }
+  }
+  return out;
+}
+
+/* partslist.js */
+// 「부품 목록」 창 — 부품을 줄 단위로 더하고 고치고 지운다(기둥 3, Task 2).
+// 설계: docs/설계_부품목록.md · 목록은 서류 폴더의 _부품목록.json 한 개다(2026-09-01 SKY 결정).
+//
+// ⛔ 최상위 이름은 attachPartsList 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    같은 이름이 둘이면 화면이 통째로 안 뜬다.
+// ⚠ 이 창은 «목록»만 다룬다. 문서의 칸에 부품을 거는 일(Task 3)과 값을 다시 맞추는
+//   일(Task 4)은 아직 없다 — 여기서 고친 값은 목록 파일에만 들어간다.
+// ⛔ 지우기는 되돌릴 수 없다. 그래서 «이 부품을 쓰는 칸이 몇 곳인지» 세어서 보여 주고
+//   묻는다(데이터 안전). 세는 것은 «지금 열린 문서» 안에서다 — 다른 서류까지는 못 센다.
+
+
+
+function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
+  const btn = document.getElementById('btn-parts');
+  let el = null;
+
+  const close = () => { if (el) { el.remove(); el = null; } };
+
+  // 목록을 고친 뒤 곧바로 파일에 굳힌다 — 창을 닫았는데 안 저장돼 있으면 아무도 모른다.
+  async function commit(next, said) {
+    try {
+      await setList(next);
+      if (said && onSaved) onSaved(said);
+    } catch (e) {
+      if (onErr) onErr('부품 목록을 저장하지 못했습니다 — ' + e.message);
+    }
+    open();                                   // 값이 바뀌었으니 다시 그린다
+  }
+
+  function open() {
+    const scroll = el ? (el.querySelector('.pl-body') || {}).scrollTop || 0 : 0;
+    close();
+    const list = getList() || { parts: [] };
+    el = document.createElement('div');
+    el.id = 'partslist';
+    el.setAttribute('contenteditable', 'false');
+
+    const ttl = document.createElement('div');
+    ttl.className = 'pl-ttl';
+    ttl.append(document.createTextNode('부품 목록'));
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'pl-x';
+    x.title = '닫기';
+    x.textContent = '✕';
+    x.addEventListener('click', close);
+    ttl.appendChild(x);
+    el.appendChild(ttl);
+
+    const note = document.createElement('div');
+    note.className = 'pl-note';
+    note.textContent = '여기 적은 값을 서류의 칸에서 불러다 씁니다. '
+      + '한 곳만 고치면 그 부품을 쓰는 서류가 함께 바뀝니다.';
+    el.appendChild(note);
+
+    // ⚠ 목록은 «서류 폴더»에 사는 파일이다 — 폴더가 없으면 어디에 적을지가 없다.
+    //   그때는 조용히 빈 목록을 보여 주지 않고 «왜 못 쓰는지»를 말한다.
+    const 못쓰는이유 = warn ? warn() : null;
+    if (못쓰는이유) {
+      const w = document.createElement('div');
+      w.className = 'pl-empty';
+      w.textContent = 못쓰는이유;
+      el.appendChild(w);
+      const f0 = document.createElement('div');
+      f0.className = 'pl-foot';
+      const c0 = document.createElement('button');
+      c0.type = 'button';
+      c0.textContent = '닫기';
+      c0.addEventListener('click', close);
+      f0.appendChild(c0);
+      el.appendChild(f0);
+      document.body.appendChild(el);
+      방금열림();
+      return;
+    }
+
+    const body = document.createElement('div');
+    body.className = 'pl-body';
+
+    // 머리줄
+    const head = document.createElement('div');
+    head.className = 'pl-row pl-head';
+    for (const [, label] of PART_FIELDS) {
+      const c = document.createElement('span');
+      c.textContent = label;
+      head.appendChild(c);
+    }
+    const sp = document.createElement('span');
+    sp.textContent = '';
+    head.appendChild(sp);
+    body.appendChild(head);
+
+    // 지금 열린 문서가 어느 부품을 몇 곳에서 쓰는지 — 지우기 전에 보여 준다
+    const used = countRefs(getDoc ? getDoc() : null);
+    const usedBy = (id) => {
+      let n = 0;
+      for (const [key] of PART_FIELDS) n += used.get(makeRef(id, key)) || 0;
+      return n;
+    };
+
+    for (const p of list.parts) {
+      const row = document.createElement('div');
+      row.className = 'pl-row';
+      for (const [key, label] of PART_FIELDS) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = p[key] || '';
+        inp.placeholder = label;
+        inp.title = label;
+        // ⚠ 치는 «동안»은 저장하지 않는다 — 한 글자마다 파일을 쓰면 느리고, 지우다 만
+        //   중간 값이 다른 서류로 퍼진다. 칸을 벗어날 때 한 번 굳힌다.
+        inp.addEventListener('change', () => {
+          if ((p[key] || '') === inp.value) return;
+          commit(updatePart(getList(), p.id, { [key]: inp.value }), '부품을 고쳤습니다');
+        });
+        row.appendChild(inp);
+      }
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'pl-del';
+      del.textContent = '지움';
+      const n = usedBy(p.id);
+      del.title = n ? '이 문서에서 ' + n + '곳이 이 부품을 씁니다' : '이 문서에서는 안 씁니다';
+      del.addEventListener('click', () => {
+        // ⛔ 되돌릴 수 없다 — 몇 곳이 이 부품을 쓰는지 세어서 보여 주고 묻는다.
+        const 이름 = p.name || '(이름 없음)';
+        const 말 = n
+          ? '「' + 이름 + '」 을 목록에서 지웁니다.\n\n'
+            + '지금 문서의 ' + n + '곳이 이 부품을 가리키고 있습니다.\n'
+            + '⚠ 글자는 그대로 남습니다 — 다만 앞으로 함께 안 바뀝니다.\n\n지울까요?'
+          : '「' + 이름 + '」 을 목록에서 지웁니다. 지울까요?';
+        if (!window.confirm(말)) return;
+        commit(removePart(getList(), p.id), '「' + 이름 + '」 을 지웠습니다');
+      });
+      row.appendChild(del);
+      body.appendChild(row);
+    }
+
+    if (!list.parts.length) {
+      const empty = document.createElement('div');
+      empty.className = 'pl-empty';
+      empty.textContent = '아직 부품이 없습니다. 아래 「부품 추가」를 누르세요.';
+      body.appendChild(empty);
+    }
+
+    el.appendChild(body);
+
+    const foot = document.createElement('div');
+    foot.className = 'pl-foot';
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'pl-add';
+    add.textContent = '＋ 부품 추가';
+    add.addEventListener('click', () => commit(addPart(getList(), {}), '부품을 더했습니다'));
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = '닫기';
+    ok.addEventListener('click', close);
+    foot.append(add, ok);
+    el.appendChild(foot);
+
+    document.body.appendChild(el);
+    const b = el.querySelector('.pl-body');
+    if (b) b.scrollTop = scroll;
+    방금열림();
+  }
+
+  // ⛔ 창을 여는 그 클릭이 열고 나서도 계속 퍼져 나가 아래 «바깥 클릭»까지 온다 —
+  //    그러면 열리자마자 닫혀 아무 일도 안 일어난 것처럼 보인다(판 창에서 겪은 그 함정).
+  let 방금 = false;
+  const 방금열림 = () => { 방금 = true; setTimeout(() => { 방금 = false; }, 0); };
+
+  if (btn) btn.addEventListener('click', open);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  document.addEventListener('click', (e) => {
+    if (방금 || !el) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('#partslist, #btn-parts')) return;
+    close();
+  });
+
+  return { open, close, isOpen: () => !!el, rect: () => (el ? [el.getBoundingClientRect()] : []) };
 }
 
 /* autosave.js */
@@ -7110,7 +7604,7 @@ const FIELDS = [
   ['company', '회사', '바닥글 왼쪽. 비우면 SAMIL ELTEC CO., LTD.'],
 ];
 
-function attachDocInfo({ getDoc, setDoc, redraw, onSaved }) {
+function attachDocInfo({ getDoc, setDoc, redraw, onSaved, onSave }) {
   const btn = document.getElementById('btn-docinfo');
   let el = null;
 
@@ -7217,6 +7711,18 @@ function attachDocInfo({ getDoc, setDoc, redraw, onSaved }) {
 
     const foot = document.createElement('div');
     foot.className = 'di-foot';
+    // ⭐ 「저장」 — 창에서 친 값은 곧바로 문서에 들어가지만, 파일에 굳으려면 저장을 해야 한다.
+    //    그걸 하러 창을 닫고 사이드바까지 가야 했다(2026-09-01 SKY: "저장 버튼을 눌러야
+    //    머리글 및 바닥글 내용이 저장 되잖아. 머리글 및 바닥글 내부에도 저장 버튼을 만들자").
+    // ⚠ 저장하는 «일 자체»는 main.js 한 곳에만 있다 — 여기서 베끼면 한쪽만 고쳐진다.
+    const wr = document.createElement('button');
+    wr.type = 'button';
+    wr.className = 'di-save';
+    wr.textContent = '저장';
+    wr.title = '지금 문서를 파일에 저장한다 — 사이드바 「저장」과 같다';
+    wr.addEventListener('click', () => { if (onSave) onSave(); });
+    if (!onSave) wr.disabled = true;
+    foot.appendChild(wr);
     // 「기본으로」 = 로고·회사·분류를 이 기기에 기억한다. 새 문서가 그것을 물려받는다.
     const save = document.createElement('button');
     save.type = 'button';
@@ -7969,6 +8475,8 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
+
 // ⛔ 머리글 높이는 «한 곳»에서만 정한다 — 쪽 나눔을 재는 JS(measure.js HDR_H)와 그리는
 //    CSS 가 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다. JS 값을 CSS 에 넣어 준다.
 document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
@@ -8280,9 +8788,29 @@ window.__app.sidebarApi = sidebarApi;
 // ⚠ 되돌리기(Ctrl+Z)는 «글(blocks)과 판(variants)»만 담는다 — 문서 정보(meta)는 안 담긴다.
 //   되돌려도 meta 는 그대로 남으므로 «글이 망가지는» 위험은 없고, 문서 정보는 창에서 다시
 //   치면 된다. 되돌리기에까지 담으려면 core/history.js 와 모든 push 자리를 함께 고쳐야 한다.
+// ⚠ 창에서 친 값은 «곧바로» 문서에 들어가지만, 파일에 굳으려면 저장을 해야 한다.
+//   그래서 창 안에도 저장 단추를 둔다(2026-09-01 SKY) — 사이드바 「저장」과 똑같은 일을 한다.
 const docInfoApi = attachDocInfo({ getDoc: () => state.doc, setDoc: applyDoc, redraw: draw,
-  onSaved: toast });
+  onSaved: toast, onSave: saveNow });
 window.__app.docInfoApi = docInfoApi;
+
+// 부품 목록 창 (기둥 3) — 목록은 «서류 폴더»의 파일 하나다(2026-09-01 SKY 결정).
+// ⛔ 고치는 즉시 파일에 굳힌다 — 창을 닫았는데 안 저장돼 있으면 아무도 모른다.
+// ⚠ 여기서 고친 값이 서류의 글자에 반영되는 것은 «다시 맞추기»(Task 4)가 생긴 뒤다.
+const partsApi = attachPartsList({
+  getList: () => state.parts,
+  setList: async (next) => {
+    if (!state.dir) throw new Error('문서 폴더를 먼저 열어야 합니다');
+    await savePartsFile(state.dir, next);
+    state.parts = next;                 // ⚠ 파일에 굳은 «뒤»에 기억한다 — 실패하면 옛 값이 남는다
+  },
+  getDoc: () => state.doc,
+  warn: () => (state.dir ? null
+    : '부품 목록은 «서류 폴더»에 파일 하나로 저장됩니다. 먼저 「📁 문서 폴더 열기」를 눌러 주세요.'),
+  onSaved: toast,
+  onErr: toastErr,
+});
+window.__app.partsApi = partsApi;
 
 // 판(版) 바 — 판이 있는 문서에서만 리본 아래에 나타난다(설계_판.md §4-1).
 // ⚠ mainEl·docName 은 「판별 PDF」가 쓰던 것이라 그 기능과 함께 뺐다(2026-09-01 SKY).
@@ -8303,6 +8831,7 @@ window.__app.vbarApi = vbarApi;
 // ---- 문서 폴더 열기·저장 ----
 state.dir = null;
 state.name = null;
+state.parts = { parts: [] };        // 부품 목록 — 폴더를 열 때 그 폴더의 파일에서 읽는다
 
 // #folder-msg 는 «지금 상태»(어느 폴더인가)를 적는 조용한 줄이다 — 그대로 둔다.
 // 「방금 무슨 일이 일어났나」는 토스트가 알린다(2026-09-01 SKY: "저장을 했는데 뭐 했는데
@@ -8352,6 +8881,9 @@ async function useDir(handle) {
   await rememberDir(handle);
   msg(dirLabel(handle));
   toast('문서 폴더를 열었습니다 — ' + handle.name);
+  // 부품 목록(기둥 3)은 «폴더»에 산다 — 폴더를 열 때 함께 읽는다.
+  // ⚠ 없으면 빈 목록이다. 목록이 없다고 서류를 못 여는 일은 없어야 한다.
+  state.parts = readParts(await loadPartsFile(handle));
   await refreshList();
 }
 
@@ -8436,7 +8968,12 @@ if ('launchQueue' in window && 'files' in LaunchParams.prototype) {
   });
 }
 
-document.getElementById('btn-save').addEventListener('click', async () => {
+// ⭐ 저장은 «한 곳»에만 적는다 — 사이드바 「저장」과 「머리글 및 바닥글」 창의 저장이
+//    같은 일을 해야 한다(2026-09-01 SKY: "머리글 및 바닥글 내부에도 저장 버튼을 만들자").
+//    둘로 베껴 두면 한쪽만 고쳐져서, 어느 단추로 저장했느냐에 따라 결과가 달라진다.
+// ⛔ 최상위 이름 saveNow 는 이 파일만 쓴다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    같은 이름이 둘이면 화면이 통째로 안 뜬다.
+async function saveNow() {
   // 탐색기에서 .sdoc 을 눌러 연 문서는 «그 파일»에 되저장한다 — 폴더가 없어도 된다
   if (state.fileHandle) {
     try {
@@ -8461,7 +8998,9 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     toast('저장했습니다 — ' + name);
     await refreshList();
   } catch (e) { msg('저장하지 못했다: ' + e.message); toastErr('저장하지 못했습니다 — ' + e.message); }
-});
+}
+
+document.getElementById('btn-save').addEventListener('click', saveNow);
 
 // 새 문서 — 빈 문단 하나로 시작한다. 저장 전에는 파일이 없다(워드와 같다).
 document.getElementById('btn-new').addEventListener('click', () => {
