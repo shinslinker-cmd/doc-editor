@@ -1191,7 +1191,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-02 08:22";
+window.__BUILD = "2026-09-02 08:31";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -7749,7 +7749,12 @@ function attachFormat({ barEl, pagesEl, imageApi }) {
 //    리본이 서로 어긋나지 않는다 — 규칙이 리본 한 벌뿐이기 때문이다.
 
 
-function attachContext({ pagesEl, barEl, imageApi }) {
+// ⭐ 2026-09-02 SKY: "판에서 온 부분을 우클릭 했을 떄, 어느 꾸미기(안전관리부품목록)에서,
+//    어느 항목에 어디서 왔다고 기재해줘."
+//    → 부품 목록에서 온 값이면 뱃지에 «어느 부품의 어느 칸인지»를 적는다.
+//      사람이 그 글자를 보고 «왜 내가 못 고치지 / 어디서 오는 거지» 를 알 수 있어야 한다.
+// ⚠ 뱃지는 «지금 무엇을 고른 상태인가»를 말해 주는 한 줄이다 — 그 자리가 맞다.
+function attachContext({ pagesEl, barEl, imageApi, 부품출처 }) {
   // 지금 «무엇을 고른 상태인가». 순서가 곧 우선순위다 — 그림이 가장 세다.
   function ctxOf() {
     const n = imageApi.pickedImgs().length;
@@ -7757,7 +7762,11 @@ function attachContext({ pagesEl, barEl, imageApi }) {
     const cells = wholeCellsIn(pagesEl);
     if (cells.length > 1) return { kind: 'table', label: '▦ 표 · ' + cells.length + '칸 고름' };
     const el = activeBlockEl(pagesEl);
-    if (el && activeCellEl(el)) return { kind: 'table', label: '▦ 표' };
+    if (el && activeCellEl(el)) {
+      // 이 칸의 글이 부품 목록에서 온 것이면 그 사실을 앞세운다
+      const 출처 = 부품출처 ? 부품출처(activeCellEl(el)) : null;
+      return { kind: 'table', label: 출처 ? '⚙ ' + 출처 : '▦ 표' };
+    }
     // 글자를 «집어» 놓았나 — 걸침 선택이면 블록마다 조각이 온다
     const chars = targetsIn(pagesEl).reduce((s, t) => s + Math.abs((t.to || 0) - (t.from || 0)), 0);
     if (chars > 0) return { kind: 'text', label: '가 글자 · ' + chars + '자' };
@@ -9788,6 +9797,20 @@ const ctxApi = attachContext({
   pagesEl: document.getElementById('pages'),
   barEl: document.getElementById('bar'),
   imageApi,
+  // ⭐ 부품 목록에서 온 값이면 «어디서 왔는지»를 우클릭 뱃지에 적는다(2026-09-02 SKY).
+  //   ⚠ 화면(DOM)의 꼬리표를 읽는다 — 지금 보이는 판의 값이 무엇에서 왔는지가 궁금한 것이라
+  //     모델을 뒤지는 것보다 화면이 정확하다(판별 값이면 그 판의 것이 그려져 있다).
+  부품출처: (td) => {
+    const sp = td && td.querySelector ? td.querySelector('.pref') : null;
+    if (!sp || !sp.dataset.ref) return null;
+    const m = /^(p\d+)\.([a-zA-Z]+)$/.exec(sp.dataset.ref);
+    if (!m) return null;
+    const p2 = (state.parts && state.parts.parts || []).find(x => x.id === m[1]);
+    const 칸이름 = { name: '이름', drawing: '도면번호', rev: '개정', revDate: '개정일자' }[m[2]] || m[2];
+    if (!p2) return '안전관리 부품 목록 · 사라진 부품(' + m[1] + ') · ' + 칸이름;
+    const 갈래 = p2.note ? p2.note + ' › ' : '';
+    return '안전관리 부품 목록 · ' + 갈래 + (p2.name || '(이름 없음)') + ' › ' + 칸이름;
+  },
 });
 window.__app.ctxApi = ctxApi;
 
