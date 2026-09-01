@@ -277,15 +277,15 @@ body { margin:0; background:var(--desk); color:var(--ink);
       td 에 그리므로 병합(cs)·나누기가 저절로 반영된다.
    ⚠ var(--line)(#e4e5e9)로는 흰 종이에서도 칸 선택(연파랑) 위에서도 안 보였다(캡처 실측) —
       반투명 먹으로 둬야 두 바탕 모두에서 읽힌다. 인쇄에는 안 나온다. */
-/* ⛔ 세로 안내선을 «칸의 오른쪽 테두리»로 그리지 않는다 (2026-09-01 SKY 지적 2·3).
-   병합된 칸은 테두리를 «하나»만 그리므로 그 안쪽 열 경계선이 통째로 사라졌고,
-   :not(:last-child) 때문에 줄마다 선이 빠지는 자리가 달라 «색이 다른 것»처럼 보였다.
-   ⭐ 대신 열 손잡이(.colgrip)에 그린다 — 손잡이는 병합과 상관없이 «열 경계»마다 하나씩
-   있고 종이 높이만큼 뻗어 있다. 그래서 병합이 있어도 선이 다 보이고 굵기·색이 늘 같다.
-   ⚠ 손잡이 폭은 7px 이고 왼쪽이 (경계−3) 이므로, 선은 그 한가운데(left:3px)에 놓는다. */
-.blk-table:hover .colgrip::after { content:''; position:absolute; left:3px; top:0; bottom:0;
-  width:1px; background:rgba(28,30,36,.22); pointer-events:none; }
-.blk-table:hover .colgrip:hover::after, .blk-table .colgrip.on::after { background:transparent; }
+/* 세로 안내선 — 마우스를 표에 올리면 «칸 경계»가 보인다.
+   ⭐ 선은 «칸»의 오른쪽에 붙는다(격자 열이 아니다) — 2026-08-30 SKY: 한 칸만 옆으로
+   나눴을 때 «안 나뉜 행»까지 선이 가로지르면 안 된다.
+   ⛔ 전에는 «그 줄의 마지막 칸»(:last-child)을 뺐다. 그런데 세로 병합(rowspan)이 있으면
+   어떤 줄은 칸이 적어서, 그 줄의 «마지막 칸»이 표 오른쪽 끝이 아닌데도 선이 빠졌다 —
+   그래서 병합된 표에서 «세로선이 다 안 보인다»로 보였다(2026-09-01 SKY 지적 2·3).
+   ⭐ 이제 «표의 오른쪽 끝인 칸»만 뺀다. 그 판정은 CSS 로는 알 수 없어서 그릴 때
+   .edge 를 붙여 준다(render.js) — c + colspan 이 열 수와 같으면 오른쪽 끝이다. */
+.blk-table:hover td:not(.edge) { border-right:1px solid rgba(28,30,36,.22); }
 /* 여러 칸에 걸쳐 고르면 «칸 통째»로 칠한다 — 워드처럼 칸이 선택된 것이 보인다.
    반쪽만 파랗다가 칸 통째로 지워지면 놀라므로, 칠하는 범위와 지워지는 범위를 같게 뒀다. */
 .blk-table td.cellsel { background:rgba(84,144,255,.25); }
@@ -294,7 +294,6 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .blk-table.cells-picking td::selection, .blk-table.cells-picking td *::selection { background:transparent; }
 @media print { .colgrip { display:none !important; }
                .blk-table td { border-right:0 !important; }
-               .colgrip::after { display:none !important; }
                .blk-table td.cellsel { background:transparent; } }
 .blk-heading { font-size:27px; font-weight:900; line-height:1.2; margin:0 0 5px; letter-spacing:-.4px; }
 .blk-section { display:flex; align-items:center; gap:9px; margin:16px 0 7px; }
@@ -736,9 +735,18 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 #partslist .pl-row { display: grid; grid-template-columns: .9fr 1.2fr 1.1fr .7fr .8fr auto;
   align-items: center; gap: 6px; padding: 2px 0; }
 /* 갈래 제목 — 2026-09-01 SKY: "구분은 필요해". 56개가 한 덩어리면 무엇이 무엇인지 안 갈린다 */
-#partslist .pl-group { font-weight: 800; font-size: 11.5px; color: var(--sub);
-  background: #f2f4f8; border-radius: 5px; padding: 3px 8px; margin: 7px 0 3px;
+/* 갈래 제목 줄 — 이름을 그 자리에서 고치고, 그 갈래에 부품을 바로 더한다(2026-09-01 SKY) */
+#partslist .pl-group { display: flex; align-items: center; gap: 6px;
+  background: #f2f4f8; border-radius: 5px; padding: 2px 6px; margin: 7px 0 3px;
   position: sticky; top: 0; z-index: 1; }
+#partslist .pl-group .pl-gname { flex: 1; min-width: 0; height: 24px; padding: 0 6px;
+  font: inherit; font-weight: 800; font-size: 11.5px; color: var(--ink);
+  background: transparent; border: 1px solid transparent; border-radius: 5px; }
+/* ⚠ 가만히 있을 때 테두리를 안 보인다 — 제목처럼 읽히게. 만지면 «고칠 수 있는 것»으로 바뀐다 */
+#partslist .pl-group .pl-gname:hover { border-color: var(--line); background: #fff; }
+#partslist .pl-group .pl-gname:focus { border-color: var(--line); background: #fff; outline: none; }
+#partslist .pl-group .pl-gcnt { color: var(--dim); font-size: 11px; }
+#partslist .pl-group .pl-gadd { height: 22px; padding: 0 7px; font-size: 11px; }
 #partslist .pl-group:first-child { margin-top: 0; }
 #partslist .pl-row .pl-note { color: var(--sub); }
 #partslist .pl-head { font-weight: 700; color: var(--sub); font-size: 11.5px;
@@ -1042,7 +1050,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 16:23";
+window.__BUILD = "2026-09-01 16:50";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -1728,6 +1736,12 @@ function mergeCells(t, r1, c1, r2, c2) {
       } else delete base.vals;
       if (z > a) base.rs = z - a + 1;
       if (x > l) base.cs = x - l + 1;
+      // ⭐ 묶은 칸은 가운데 정렬로 시작한다 (2026-09-01 SKY: "문구 들도 지금 다 좌측 정렬
+      //    되어 있어. 가운데 정렬 하고"). 두 칸을 묶으면 글이 넓어진 칸의 왼쪽에 붙어
+      //    «치우쳐» 보인다. 묶은 칸은 대개 그 구역을 대표하는 이름이라 가운데가 맞다.
+      // ⚠ 사람이 이미 그 칸의 정렬을 정해 뒀으면 그것을 지킨다 — 남의 결정을 덮지 않는다.
+      //   (열 정렬은 «칸 정렬»보다 약하므로 여기서 칸에 붙이면 이긴다. 정렬 단추로 언제든 바꾼다.)
+      if (!base.align) base.align = 'center';
       rows[r][c] = base;
     } else rows[r][c] = { runs: [], cov: 1 };
   }
@@ -2869,6 +2883,46 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
     head.appendChild(sp);
     body.appendChild(head);
 
+    // 갈래 제목 줄 — 이름을 그 자리에서 고치고, 그 갈래에 부품을 바로 더한다
+    // (2026-09-01 SKY: "+부품 추가 버튼도 각 구분 항목에 추가 할수 있고, 그리고 구분 갈래도
+    //  명칭같은걸 수정 할 수 있고, 구분 갈래도 추가 할 수 있게 해줘.")
+    // ⛔ 갈래는 «따로 저장하는 것»이 아니다 — 부품의 구분 칸에 적힌 글이 곧 갈래다.
+    //    그래서 갈래 이름을 고치면 «그 갈래에 든 부품 전부»의 구분 칸을 함께 고친다.
+    function 갈래줄(구분, 지금목록) {
+      const 든것 = 지금목록.parts.filter(x => (x.note || '(구분 없음)') === 구분);
+      const g = document.createElement('div');
+      g.className = 'pl-group';
+      const nm = document.createElement('input');
+      nm.type = 'text';
+      nm.className = 'pl-gname';
+      nm.value = 구분 === '(구분 없음)' ? '' : 구분;
+      nm.placeholder = '구분 없음';
+      nm.title = '갈래 이름 — 고치면 이 갈래의 부품 ' + 든것.length + '개가 함께 바뀐다';
+      nm.addEventListener('change', () => {
+        const 새이름 = nm.value.trim();
+        if ((구분 === '(구분 없음)' ? '' : 구분) === 새이름) return;
+        let next = getList();
+        for (const p of 든것) next = updatePart(next, p.id, { note: 새이름 });
+        commit(next, '갈래 이름을 「' + (새이름 || '(구분 없음)') + '」 로 바꿨습니다', true);
+      });
+      const cnt = document.createElement('span');
+      cnt.className = 'pl-gcnt';
+      cnt.textContent = '(' + 든것.length + ')';
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'pl-gadd';
+      add.textContent = '＋ 부품';
+      add.title = '이 갈래에 부품을 하나 더한다';
+      add.addEventListener('click', () => {
+        // ⚠ 새 부품은 목록 «끝»에 붙는다. 그런데 갈래로 묶어 보여 주므로 화면에서는
+        //   이 갈래 아래에 나타난다 — 사람 눈에는 「여기에 생겼다」로 보인다.
+        commit(addPart(getList(), { note: 구분 === '(구분 없음)' ? '' : 구분 }),
+               '「' + 구분 + '」 에 부품을 더했습니다', true);
+      });
+      g.append(nm, cnt, add);
+      return g;
+    }
+
     // 지금 열린 문서가 어느 부품을 몇 곳에서 쓰는지 — 지우기 전에 보여 준다
     const used = countRefs(getDoc ? getDoc() : null);
     const usedBy = (id) => {
@@ -2885,11 +2939,7 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
       const 구분 = p.note || '(구분 없음)';
       if (구분 !== 앞구분) {
         앞구분 = 구분;
-        const g = document.createElement('div');
-        g.className = 'pl-group';
-        const n = list.parts.filter(x => (x.note || '(구분 없음)') === 구분).length;
-        g.textContent = 구분 + '  (' + n + ')';
-        body.appendChild(g);
+        body.appendChild(갈래줄(구분, list));
       }
       const row = document.createElement('div');
       row.className = 'pl-row';
@@ -2963,12 +3013,30 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
     add.type = 'button';
     add.className = 'pl-add';
     add.textContent = '＋ 부품 추가';
+    add.title = '구분 없이 부품 하나를 더한다 — 구분 칸에 글을 적으면 그 갈래로 옮겨간다';
     add.addEventListener('click', () => commit(addPart(getList(), {}), '부품을 더했습니다'));
+    // 「＋ 갈래 추가」 — 새 갈래는 «그 갈래의 첫 부품»으로 시작한다.
+    // ⛔ 빈 갈래를 따로 저장하지 않는다 — 갈래는 부품의 구분 칸이 만드는 것이라,
+    //    부품이 없는 갈래는 담을 자리가 없다. 그래서 새 부품 하나와 함께 만든다.
+    const gadd = document.createElement('button');
+    gadd.type = 'button';
+    gadd.className = 'pl-add';
+    gadd.textContent = '＋ 갈래 추가';
+    gadd.title = '새 갈래를 만든다 — 그 갈래의 첫 부품 한 줄이 함께 생긴다';
+    gadd.addEventListener('click', () => {
+      const 이름 = window.prompt('새 갈래 이름 (예: 인쇄회로기판)', '');
+      if (이름 === null) return;
+      const nm2 = 이름.trim();
+      if (!nm2) return;
+      const 있나 = (getList().parts || []).some(p => (p.note || '') === nm2);
+      if (있나) { if (onErr) onErr('「' + nm2 + '」 갈래는 이미 있습니다'); return; }
+      commit(addPart(getList(), { note: nm2 }), '「' + nm2 + '」 갈래를 만들었습니다', true);
+    });
     const ok = document.createElement('button');
     ok.type = 'button';
     ok.textContent = '닫기';
     ok.addEventListener('click', close);
-    foot.append(add, ok);
+    foot.append(add, gadd, ok);
     el.appendChild(foot);
 
     document.body.appendChild(el);
@@ -4223,6 +4291,8 @@ function tableEl(block, part, view) {
       if (cell.cov) return;                 // 임의 칸 나누기(R16)가 머리글에도 가로 병합을 만든다
       const td = document.createElement('td');
       if (cell.cs) td.colSpan = cell.cs;
+      // 머리글도 몸통과 같은 규칙이다 — 표의 오른쪽 끝 칸에는 세로 안내선을 안 붙인다
+      if (c + (cell.cs || 1) >= (block.cols || []).length) td.classList.add('edge');
       if (cell.align) td.style.textAlign = cell.align;
       if (cell.va) td.style.verticalAlign = cell.va;
       if (part && part.cont) td.setAttribute('contenteditable', 'false');
@@ -4247,6 +4317,10 @@ function tableEl(block, part, view) {
       td.dataset.c = String(c);
       if (cell.cs) td.colSpan = cell.cs;
       if (cell.rs) td.rowSpan = cell.rs;
+      // ⭐ «표의 오른쪽 끝»인 칸에는 세로 안내선을 안 붙인다(styles.css .blk-table:hover).
+      //    CSS 의 :last-child 로는 못 가른다 — 세로 병합이 있으면 어떤 줄은 칸이 적어서
+      //    그 줄의 마지막 칸이 오른쪽 끝이 아닌데도 선이 빠졌다(2026-09-01 SKY 지적 2·3).
+      if (c + (cell.cs || 1) >= (block.cols || []).length) td.classList.add('edge');
       const align = cell.align || (block.cols[c] && block.cols[c].align) || null;
       if (align) td.style.textAlign = align;
       if (cell.va) td.style.verticalAlign = cell.va;      // 위/가운데/아래 맞춤(엑셀과 같다)
