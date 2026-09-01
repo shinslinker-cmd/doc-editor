@@ -782,7 +782,10 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
   /* ⚠ 넓힌 까닭: 2026-09-01 SKY — "이름 항목 같은경우 잘려서 보이지 않는게 있어. 이 창을
      좀 더 크게 보이게끔 하자". 이름에 「SICON-4000EKZi(5.5kW~15kW)표준」 처럼 30자 넘는
      것이 있다. 좁은 화면에서는 화면 폭에 맞춰 줄어든다(max-width). */
-  width: 1080px; max-width: calc(100vw - 24px); }
+  width: 1320px; max-width: calc(100vw - 24px);
+  /* ⚠ 창 높이도 화면에 맞춘다 — 부품이 60개를 넘어가면 목록만으로도 화면을 넘는다.
+     제목·머리줄·아래 단추는 늘 보이고 «목록만» 스크롤한다(.pl-body). */
+  max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
 #partslist .pl-ttl { display: flex; align-items: center; justify-content: space-between;
   font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--u-border-card); }
 #partslist .pl-x { border: 0; background: none; cursor: pointer; color: var(--u-text-faint);
@@ -790,7 +793,9 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 #partslist .pl-x:hover { color: var(--u-text); }
 #partslist .pl-note { color: var(--u-text-sub); font-size:var(--u-fs-small); line-height: 1.5; margin: 0 0 9px; }
 /* 부품이 많아지면 창이 화면을 넘는다 — 목록만 스크롤한다(머리줄·바닥은 늘 보인다) */
-#partslist .pl-body { max-height: 52vh; overflow-y: auto; overflow-x: hidden; }
+/* ⭐ 목록이 남는 자리를 다 쓴다(flex:1) — 2026-09-02 SKY: "팝업창은 좀더 크게".
+   ⚠ min-height:0 이 없으면 flex 안에서 스크롤이 안 생기고 창이 화면 밖으로 자란다. */
+#partslist .pl-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 /* 칸 다섯(구분·이름·도면번호·개정·개정일자) + 지움 단추.
    ⚠ 「구분」 이 맨 앞이다 — 갈래 제목과 같은 줄에서 눈이 이어진다. */
 #partslist .pl-row { display: grid; grid-template-columns: .9fr 1.2fr 1.1fr .7fr .8fr auto;
@@ -1170,6 +1175,10 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
       <!-- 부품 값 넣기(기둥 3) — 리본에는 안 보이고 우클릭 메뉴가 이 단추를 대신 누른다.
            ⚠ hidden 이라도 .tb 의 display:inline-flex 가 이기므로 CSS 에 .tb[hidden] 규칙이 있다. -->
       <button class="tb" data-parts="cellref" hidden title="이 칸의 값을 「안전관리 부품 목록」에서 가져온다 — 이후 목록을 고치면 이 칸도 함께 바뀐다">부품 값 넣기…</button>
+      <!-- 블록 사이에 새 줄 넣기(2026-09-02 SKY) — 리본에는 안 보이고 우클릭 메뉴가 대신 누른다.
+           표·절 제목·그림 다음에는 커서를 둘 자리가 없어 글을 넣을 수 없었다. -->
+      <button class="tb" data-newline="before" hidden title="이 블록 «위»에 빈 줄을 하나 넣는다">위에 새 줄</button>
+      <button class="tb" data-newline="after" hidden title="이 블록 «아래»에 빈 줄을 하나 넣는다 (표 안에서는 Ctrl+Enter)">아래에 새 줄</button>
       </span>
     </div>
     <!-- 판(版) 바 — 판이 있는 문서에서만 보인다(설계_판.md §4-1). 인쇄에 안 찍힌다 -->
@@ -1182,7 +1191,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 17:31";
+window.__BUILD = "2026-09-02 08:22";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3775,6 +3784,93 @@ function attachPartsRef({ pagesEl, barEl, getDoc, setDoc, redraw, getView, getLi
   });
 
   return { open, close, isOpen: () => !!el, rect: () => (el ? [el.getBoundingClientRect()] : []) };
+}
+
+/* newline.js */
+// 블록 «사이»에 새 줄(문단)을 넣는다 (2026-09-02 SKY).
+//
+// SKY 3: "01 인쇄회로기판 표 아래, … 문구 같은 걸 추가 하고 싶은데, 현재는 추가 할수가
+//         없어 커서가 그 사이에 가질 않아."
+// SKY 4: "저 03 인버터 부분이 다음 페이지로 넘어 갔으면 좋겠어서, 내가 수동으로 엔터로
+//         줄바꿈해서 넘기고 싶은데 커서가 가질 않아."
+//
+// ⛔ 왜 안 됐나: 표·절 제목·그림은 «편집 못 하는 블록»이다. 문단이면 끝에서 Enter 를 치면
+//    새 문단이 생기는데[실측], 표 다음에 바로 절 제목이 오면 그 사이에 커서를 둘 자리가
+//    아예 없다. 블록과 블록 사이는 9px 뿐이고 거기를 눌러도 커서는 이웃 블록으로 간다.
+//
+// ⭐ 그래서 «커서를 두는» 길이 아니라 «넣으라고 시키는» 길을 만든다:
+//    ⓐ 우클릭 메뉴 「⬆ 위에 새 줄」 · 「⬇ 아래에 새 줄」 — 모든 블록에서 쓸 수 있다
+//    ⓑ 표 안에서 Ctrl+Enter — 표 바로 아래에 새 줄(워드와 같은 손버릇)
+//
+// ⚠ 새 줄은 «그 블록이 보이는 판»을 그대로 물려받는다 — 4000 에만 보이는 표 아래에 넣은
+//   줄이 모든 판에 나오면 다른 판 서류가 틀어진다.
+// ⛔ 최상위 이름은 attachNewline 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합친다.
+
+
+
+
+
+function attachNewline({ pagesEl, barEl, getDoc, setDoc, redraw, onDone }) {
+  // 지금 커서가 있는 블록 — 없으면 null
+  function 대상() {
+    const el = activeBlockEl(pagesEl);
+    return el ? el.dataset.id : null;
+  }
+
+  function 넣기(어디) {
+    const id = 대상();
+    if (!id) {
+      window.alert('새 줄을 넣을 자리를 먼저 누르세요 — 표·글·그림 아무 곳이나 누르면 됩니다.');
+      return;
+    }
+    const doc = getDoc();
+    const i = doc.blocks.findIndex(b => b.id === id);
+    if (i < 0) return;
+    const 기준 = doc.blocks[i];
+    const 새 = createBlock('para');
+    // ⚠ 보일 판을 물려받는다 — 안 물려받으면 4000 에만 있는 표 아래의 새 줄이
+    //   다섯 판 모두에 나와 다른 판 서류가 틀어진다.
+    if (기준.variants) 새.variants = 기준.variants.slice();
+    const 앞id = 어디 === 'before'
+      ? (i > 0 ? doc.blocks[i - 1].id : null)
+      : id;
+    let blocks;
+    if (앞id === null) {
+      blocks = [새].concat(doc.blocks);          // 맨 앞에 넣는다
+    } else {
+      blocks = insertAfter(doc.blocks, 앞id, 새);
+    }
+    setDoc(Object.assign({}, doc, { blocks }));
+    redraw({ caretId: 새.id });
+    if (onDone) {
+      onDone(어디 === 'before' ? '위에 새 줄을 넣었습니다' : '아래에 새 줄을 넣었습니다');
+    }
+  }
+
+  // ── 리본의 숨은 단추(우클릭 메뉴가 대신 누른다) ──────────────
+  // ⛔ 누르는 «순간» 선택이 풀리면 대상 블록을 잃는다 — 다른 리본 단추와 똑같이 막는다.
+  if (barEl) barEl.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('[data-newline]')) e.preventDefault();
+  });
+  if (barEl) barEl.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-newline]');
+    if (!btn) return;
+    넣기(btn.dataset.newline);
+  });
+
+  // ── 표 안에서 Ctrl+Enter → 표 바로 «아래»에 새 줄 ────────────
+  // ⚠ 표 안의 그냥 Enter 는 종전대로 둔다(칸 안 줄바꿈·아래 칸 이동) — 손버릇을 안 바꾼다.
+  // ⛔ e.key 로만 보면 한글 자판에서 놓칠 수 있어 e.code 도 함께 본다.
+  pagesEl.addEventListener('keydown', (e) => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    if (e.key !== 'Enter' && e.code !== 'Enter' && e.code !== 'NumpadEnter') return;
+    const el = activeBlockEl(pagesEl);
+    if (!el) return;
+    e.preventDefault();
+    넣기('after');
+  }, true);
+
+  return { 넣기 };
 }
 
 /* imgfmt.js */
@@ -7816,18 +7912,25 @@ const MENU_ITEMS = {
     { label: '판 관리…', press: '[data-vars="mgr"]' },
     // 부품 목록(기둥 3) — 이 칸의 값을 목록에서 가져온다. 판이 없는 문서에서도 쓴다.
     { label: '부품 값 넣기…', press: '[data-parts="cellref"]' },
+    // ⭐ 표 다음에는 커서를 둘 자리가 없어 글을 넣을 수 없었다(2026-09-02 SKY)
+    { label: '⬆ 위에 새 줄', press: '[data-newline="before"]' },
+    { label: '⬇ 아래에 새 줄', press: '[data-newline="after"]' },
   ],
   text: [
     { label: '복사', run: 'copy' }, { label: '잘라내기', run: 'cut' },
     { label: '붙여넣기', run: 'paste' },
     { label: '보일 판…', press: '[data-vars="block"]', when: 'vars' },
     { label: '판 관리…', press: '[data-vars="mgr"]' },
+    { label: '⬆ 위에 새 줄', press: '[data-newline="before"]' },
+    { label: '⬇ 아래에 새 줄', press: '[data-newline="after"]' },
   ],
   caret: [
     { label: '붙여넣기', run: 'paste' },
     { label: '표 넣기', press: '[data-table="insert"]' },
     { label: '그림 넣기', press: '[data-image="auto"]' },
     { label: '보일 판…', press: '[data-vars="block"]', when: 'vars' },
+    { label: '⬆ 위에 새 줄', press: '[data-newline="before"]' },
+    { label: '⬇ 아래에 새 줄', press: '[data-newline="after"]' },
     // ⭐ 「판 관리…」 는 «판이 없는 문서에서도» 보인다 — 판이 0개면 판 바도 리본 「판」 묶음도
     //    없어서 관리 창을 열 길이 아예 없었다(첫 판을 만들 입구가 없는 막힌 길이었다).
     { label: '판 관리…', press: '[data-vars="mgr"]' },
@@ -9387,6 +9490,7 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
 // ⛔ 머리글 높이는 «한 곳»에서만 정한다 — 쪽 나눔을 재는 JS(measure.js HDR_H)와 그리는
 //    CSS 가 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다. JS 값을 CSS 에 넣어 준다.
 document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
@@ -9775,6 +9879,18 @@ const partsRefApi = attachPartsRef({
   onSaved: toast,
 });
 window.__app.partsRefApi = partsRefApi;
+
+// 블록 사이에 새 줄 넣기 (2026-09-02 SKY) — 표·절 제목·그림 다음에는 커서를 둘 자리가
+// 없어 글을 넣을 수 없었다. 우클릭 「⬆ 위에 새 줄」·「⬇ 아래에 새 줄」 과 표 안 Ctrl+Enter.
+const newlineApi = attachNewline({
+  pagesEl: document.getElementById('pages'),
+  barEl: document.getElementById('bar'),
+  getDoc: () => state.doc,
+  setDoc: applyDoc,
+  redraw: draw,
+  onDone: toast,
+});
+window.__app.newlineApi = newlineApi;
 
 // 판(版) 바 — 판이 있는 문서에서만 리본 아래에 나타난다(설계_판.md §4-1).
 // ⚠ mainEl·docName 은 「판별 PDF」가 쓰던 것이라 그 기능과 함께 뺐다(2026-09-01 SKY).
