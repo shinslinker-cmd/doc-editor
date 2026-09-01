@@ -112,10 +112,15 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 글자 크기 고르기 — 폭·높이가 다른 단추와 똑같다(2026-09-01 SKY). 고르는 칸 자체가
    지금 값을 보여 주므로 아래 이름표는 두지 않는다 — 「크기」가 두 번 나온다.
    ⚠ 글자를 10px 로 줄여야 «12.5 본문» 같은 힌트가 잘리지 않고 들어간다(58px 안에). */
-.tb-selwrap { cursor:default; padding:0 4px; }
-.tb-selwrap .tb-sel { width:100%; height:26px; padding:0 2px; border:1px solid var(--line);
-      border-radius:5px; background:#fff; color:var(--ink); cursor:pointer;
+/* ⛔ 고르는 칸에 «제 테두리»를 두면 단추 테두리와 겹쳐 이중선으로 보인다(2026-09-01 SKY:
+   "외각 테두리 안에 드롭 버튼 테두리가 둘다 있으니 이중 테두리 같이 보여").
+   바깥 단추 테두리 하나만 쓰고, 속의 고르는 칸은 테두리 없이 그 안을 꽉 채운다. */
+.tb-selwrap { cursor:default; padding:0; }
+.tb-selwrap .tb-sel { width:100%; height:100%; padding:0 4px; border:0; outline:none;
+      border-radius:5px; background:transparent; color:var(--ink); cursor:pointer;
+      text-align:center; text-align-last:center;
       font:600 10px 'Noto Sans KR','맑은 고딕',sans-serif; }
+.tb-selwrap:hover { background:#f5f6f8; }
 /* 눌린 상태(켜짐) — ⛔ 검은 배경은 너무 튀고(SKY 2026-08-28), 옅은 회색은 «꺼진 것과
    차이가 없어» 켠 건지 끈 건지 알 수가 없었다(SKY 2026-08-31: «선택/해제가 구분이 없어서
    헷갈려»). 그래서 이 앱이 «고른 것»에 쓰는 그 파랑을 그대로 쓴다 — 옅은 파란 바탕 +
@@ -167,7 +172,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
   .tb .ic { height: 14px; font-size: 12.5px; }
   .tb .ic svg, svg.ic { width: 16px; height: 12px; }
   .tb .lb { font-size: 8.5px; }
-  .tb-selwrap .tb-sel { height: 24px; font-size: 9.5px; }
+  .tb-selwrap .tb-sel { font-size: 9.5px; }
   .tb-sep { height: 22px; margin: 0 2px; }
   .tbg { gap: 3px; }
   .tbg-table { padding: 8px 5px 4px; row-gap: 4px; }
@@ -181,6 +186,38 @@ body { margin:0; background:var(--desk); color:var(--ink);
         box-shadow:0 2px 14px rgba(20,22,30,.12); padding:46px 60px 34px;
         position:relative; overflow:hidden; }
 .page-body { display:flex; flex-direction:column; gap:0; }
+/* ── 머리글 (설계서 §8 확정값) ───────────────────────────────────────────────
+   ⛔ 높이는 «고정»이다 — 글자 수에 따라 늘었다 줄었다 하면 쪽 나눔이 그때마다 달라진다.
+      그래서 제목은 한 줄로 자른다. 이 높이는 measure.js 의 HDR_H 와 «같은 값»이어야 하고,
+      어긋나면 본문이 머리글 위로 올라탄다 — main.js 가 HDR_H 를 이 변수에 넣어 준다. */
+.page-hdr { flex:none; height:var(--hdr-h, 88px); display:flex; align-items:flex-start;
+            justify-content:space-between; gap:16px; position:relative;
+            padding-bottom:10px; margin-bottom:12px;
+            border-bottom:1.5px solid var(--ink); }
+/* 아래 경계의 왼쪽 끝 64px 만 3px 빨강 — 사이드바 머리와 같은 모티프다(§8) */
+.page-hdr::after { content:''; position:absolute; left:0; bottom:-1.5px;
+                   width:64px; height:3px; background:var(--point); }
+.page-hdr .ph-l { min-width:0; }
+.page-hdr .ph-cat { font:600 10px 'IBM Plex Mono',Consolas,monospace; color:#9aa0b4;
+                    letter-spacing:1.6px; text-transform:uppercase; }
+.page-hdr .ph-title { font-size:27px; font-weight:900; line-height:1.2; letter-spacing:-.4px;
+                      margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.page-hdr .ph-sub { font-size:12.5px; font-weight:500; color:#5a5e6a; margin-top:3px;
+                    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.page-hdr .ph-r { flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.page-hdr .ph-logo { height:38px; width:auto; display:block; }
+.page-hdr .ph-id { font:500 9px 'IBM Plex Mono',Consolas,monospace; color:#9aa0b4;
+                   text-align:right; line-height:1.5; }
+.page-hdr .ph-id b { color:var(--ink); font-weight:700; margin-left:6px; }
+/* ── 바닥글 ─────────────────────────────────────────────────────────────────
+   ⚠ 종이 아래 여백(34px) «안»에 얹는다 — 본문 높이를 안 먹는다. 쪽 번호가 있던 자리다.
+      그래서 바닥글이 생겨도 옛 문서의 쪽 나눔이 한 장도 안 바뀐다. */
+.page-ftr { position:absolute; left:60px; right:60px; bottom:12px; height:18px;
+            display:flex; align-items:center; justify-content:space-between;
+            border-top:1px solid #e8eaef; padding-top:5px;
+            font:500 9px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8; }
+.page-ftr .pf-r b { color:var(--ink); font-weight:600; font-size:10px; margin-left:2px; }
+/* 옛 쪽 번호 — 바닥글이 그 일을 물려받았다. 규칙은 남겨 둔다(옛 캡처·검사가 가리킬 수 있다). */
 .pgno { position:absolute; right:60px; bottom:14px;
         font:600 10px 'IBM Plex Mono',Consolas,monospace; color:var(--ink); }
 
@@ -456,8 +493,13 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 빠른 줄 — 기호만 쓴 작은 단추. 뜻이 같은 것끼리(.qg) 줄을 나눈다:
    글자꼴(B I U A＋ A−) / 색(■■■ ✕) / 정렬·맞춤. 한 줄로 죽 늘어놓으면 폭에 따라
    아무 데서나 접혀 «7개, 7개, 1개»처럼 갈라진다(캡처 실측). */
+/* ⭐ 줄을 «격자»로 세운다 — 2026-09-01 SKY: "서식바 크기가 다 달라. 어느정도 통일감 있게
+   정렬 해줘. 지금 각 서식바 안에 내용도 좀 정렬 해주고 각 항목끼리 같은 줄에 표시 된다던가."
+   옛 방식(flex + wrap)은 묶음마다 단추 수가 달라 칸이 제각각 어긋났고, 바의 폭도 내용에
+   따라 달라져 두 바가 나란히 뜰 때 들쭉날쭉했다.
+   이제 모든 묶음이 «6칸 격자»다 — 묶음이 달라도 세로줄이 맞고, 바의 폭도 늘 같다. */
 .qs { display:flex; flex-direction:column; gap:3px; padding-bottom:6px; }
-.qs .qg { display:flex; flex-wrap:wrap; gap:3px; }
+.qs .qg { display:grid; grid-template-columns:repeat(6, 30px); gap:3px; justify-content:start; }
 .qs .q { width:30px; height:30px; padding:0; flex:none; display:flex; align-items:center;
   justify-content:center; border:1px solid transparent; border-radius:6px;
   background:#fff; color:var(--ink); font:inherit; cursor:pointer; }
@@ -473,7 +515,10 @@ body { margin:0; background:var(--desk); color:var(--ink);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #ctxmenu .mlist button:hover { background:#f2f3f6; border-color:var(--line); }
 #minibar, #minibar2 { padding:6px; }
-#minibar .qs, #minibar2 .qs { padding-bottom:0; max-width:200px; }
+/* 두 서식바(글자·표)가 나란히 뜨므로 폭이 같아야 나란해 보인다 — 격자 6칸이 그 폭을 정한다
+   (30×6 + 3×5 틈 = 195px). max-width 로 «접히게» 두면 내용에 따라 폭이 달라진다. */
+#minibar .qs, #minibar2 .qs { padding-bottom:0; }
+#minibar, #minibar2 { width:211px; }
 /* 알림 — 붙여넣기가 브라우저에 막혔을 때 «막혔다»고 말해 준다. 조용히 삼키지 않는다. */
 .mtoast { position:fixed; z-index:130; max-width:300px; padding:9px 12px; border-radius:8px;
   background:var(--ink); color:#fff; font-size:12px; line-height:1.5;
@@ -599,6 +644,34 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 #vmgr .vmgr-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vc, #8a8e98); }
 #vmgr .vmgr-row .nm { flex: 1; font-weight: 600; }
 #vmgr button { font-size: 12px; padding: 2px 8px; }
+/* 문서 정보 창 — 머리글·바닥글 값(제목·문서번호·개정·날짜·회사·로고)을 고친다.
+   판 관리 창과 같은 계열의 작은 카드다. body 에 살아서 종이가 다시 그려져도 안 흔들린다. */
+#docinfo { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 60;
+  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px; width: 380px; }
+#docinfo .di-ttl { display: flex; align-items: center; justify-content: space-between;
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
+#docinfo .di-x { border: 0; background: none; cursor: pointer; color: var(--dim);
+  font-size: 13px; line-height: 1; padding: 2px 4px; }
+#docinfo .di-x:hover { color: var(--ink); }
+#docinfo .di-note { color: var(--sub); font-size: 11.5px; line-height: 1.5; margin: 0 0 9px; }
+#docinfo .di-row { display: grid; grid-template-columns: 58px 1fr; align-items: center;
+  gap: 8px; padding: 3px 0; }
+#docinfo .di-row .nm { font-weight: 700; color: var(--sub); }
+#docinfo .di-row input[type=text] { min-width: 0; width: 100%; height: 28px; padding: 0 7px;
+  border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
+#docinfo .di-logo { grid-template-columns: 58px 1fr auto auto; }
+#docinfo .di-logoview { display: flex; align-items: center; height: 30px; color: var(--dim);
+  font-size: 11.5px; }
+#docinfo .di-logoview img { max-height: 28px; max-width: 150px; }
+#docinfo button { height: 28px; padding: 0 9px; font-size: 12px; border: 1px solid var(--line);
+  border-radius: 6px; background: #fff; cursor: pointer; }
+#docinfo button:hover { background: #f5f6f8; }
+#docinfo button:disabled { opacity: .4; cursor: default; }
+#docinfo .di-foot { display: flex; justify-content: flex-end;
+  border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 9px; }
+@media print { #docinfo { display: none !important; } }
+
 /* 판별 값 창 (2026-09-01 SKY) — 한 칸이 판마다 어떤 값인지 모아 보고 그 자리에서 고친다.
    판 관리 창과 같은 계열의 작은 카드다. body 에 살아서 종이가 다시 그려져도 안 흔들린다.
    ⚠ z-index 는 관리 창(60)과 같은 층 — 둘이 동시에 뜰 일이 없다(입구가 다르다). */
@@ -662,6 +735,8 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
   <div class="side-btns">
     <button id="btn-folder">📁 문서 폴더 열기</button>
     <button id="btn-new">새 문서</button>
+    <!-- 머리글·바닥글에 나올 값(제목·문서번호·개정·날짜·회사·로고)을 고치는 유일한 자리 -->
+    <button id="btn-docinfo">문서 정보</button>
     <button id="btn-save">저장</button>
     <button id="btn-saveas">다른 이름으로 저장</button>
     <button id="btn-pdf" class="pri">PDF 저장</button>
@@ -828,7 +903,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 12:27";
+window.__BUILD = "2026-09-01 13:25";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -2298,10 +2373,25 @@ function paginate(blocks, heights, opts) {
 
 
 
-function contentHeightOf(page) {
+// ⭐ 머리글 높이는 «고정»이다(설계_머리글바닥글.md). 글자 수에 따라 늘었다 줄었다 하면
+//    쪽 나눔이 그때마다 달라져 예측할 수 없어진다 — 제목은 한 줄로 자른다(CSS).
+//    ⛔ 이 숫자가 CSS 와 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다.
+//       그래서 main.js 가 이 값을 CSS 변수(--hdr-h)에 넣어 «한 곳»으로 만든다.
+const HDR_H = 88;
+
+// 이 문서에 머리글에 넣을 것이 하나라도 있나 — 없으면 머리글 띠를 아예 안 그린다.
+// 그래야 보통 문서(공문·메모)는 지금까지와 «완전히 똑같이» 동작한다.
+function hasHeader(doc) {
+  const m = (doc && doc.meta) || {};
+  return !!(m.category || m.title || m.subtitle || m.logo || m.doc || m.rev || m.date);
+}
+
+// ⚠ 바닥글은 본문 높이를 안 먹는다 — 종이 아래 여백(34px) 안에 얹는다. 쪽 번호가 있던
+//    그 자리다. 그래서 바닥글이 생겨도 옛 문서의 쪽 나눔이 한 장도 안 바뀐다.
+function contentHeightOf(page, doc) {
   const p = page || DEFAULT_PAGE;
   const m = p.margin || DEFAULT_PAGE.margin;
-  return p.height - m.top - m.bottom;
+  return p.height - m.top - m.bottom - (hasHeader(doc) ? HDR_H : 0);
 }
 
 // 숨은 상자(#gauge)에 블록을 그려 실제 높이를 잰다. 화면에 보이는 것은 건드리지 않는다.
@@ -2610,7 +2700,7 @@ function renderPages(doc, pagesEl, gaugeEl, view) {
   const cur = view || null;
   const blocks = doc.blocks.filter(b => blockVisible(b, cur));     // 투영 — 원본 불변(P1)
   const heights = measureAll(blocks, gaugeEl, (b) => blockEl(b, doc.page, cur), cur);
-  const pages = paginate(blocks, heights, { contentHeight: contentHeightOf(doc.page) });
+  const pages = paginate(blocks, heights, { contentHeight: contentHeightOf(doc.page, doc) });
   const byId = new Map(blocks.map(b => [b.id, b]));
 
   pagesEl.textContent = '';
@@ -2625,15 +2715,92 @@ function renderPages(doc, pagesEl, gaugeEl, view) {
       if (b.type === 'table') body.appendChild(tableEl(b, ent, cur));
       else body.appendChild(blockEl(b, doc.page, cur));
     }
-    const no = document.createElement('div');
-    no.className = 'pgno';
-    no.setAttribute('contenteditable', 'false');
-    no.textContent = (i + 1) + ' / ' + pages.length;
-    pg.append(body, no);
+    // 머리글은 «흐름»에 있어 본문 높이를 먹고(measure.js HDR_H), 바닥글은 종이 아래 여백에
+    // 얹혀 본문 높이를 안 먹는다 — 쪽 번호가 있던 그 자리다.
+    const hdr = headerEl(doc);
+    if (hdr) pg.appendChild(hdr);
+    pg.append(body, footerEl(doc, i + 1, pages.length, cur));
     pagesEl.appendChild(pg);
   });
   applyVariantMarks(doc, pagesEl, cur);
   return { pages };
+}
+
+// 머리글 — 설계서 §8 확정값. ⛔ 편집 칸이 아니다(contenteditable=false) — 종이 위 «그림»이다.
+//    고치는 곳은 사이드바 「문서 정보」 창 하나뿐이다(설계_머리글바닥글.md §5).
+// ⚠ 넣을 것이 하나도 없으면 아예 안 그린다 — 그래야 보통 문서(공문·메모)의 쪽 나눔이
+//   지금까지와 한 장도 안 달라진다.
+function headerEl(doc) {
+  if (!hasHeader(doc)) return null;
+  const m = doc.meta || {};
+  const el = document.createElement('div');
+  el.className = 'page-hdr';
+  el.setAttribute('contenteditable', 'false');
+  const L = document.createElement('div');
+  L.className = 'ph-l';
+  const put = (cls, text) => {
+    if (!text) return;
+    const d = document.createElement('div');
+    d.className = cls;
+    d.textContent = text;
+    L.appendChild(d);
+  };
+  put('ph-cat', m.category);
+  put('ph-title', m.title);
+  put('ph-sub', m.subtitle);
+  const R = document.createElement('div');
+  R.className = 'ph-r';
+  if (m.logo) {
+    const img = document.createElement('img');
+    img.className = 'ph-logo';
+    img.src = m.logo;
+    img.alt = '';
+    R.appendChild(img);
+  }
+  const id = document.createElement('div');
+  id.className = 'ph-id';
+  const line = (k, v) => {
+    if (!v) return;
+    const row = document.createElement('div');
+    const key = document.createElement('span');
+    key.textContent = k;
+    const val = document.createElement('b');
+    val.textContent = v;
+    row.append(key, val);
+    id.appendChild(row);
+  };
+  line('DOC', m.doc);
+  line('REV', m.rev);
+  line('DATE', m.date);
+  if (id.childNodes.length) R.appendChild(id);
+  el.append(L, R);
+  return el;
+}
+
+// 바닥글 — 좌: 회사 · 우: 문서명(·판 이름) + 쪽 번호. 쪽 번호 자리를 그대로 물려받는다.
+function footerEl(doc, n, total, cur) {
+  const m = doc.meta || {};
+  const el = document.createElement('div');
+  el.className = 'page-ftr';
+  el.setAttribute('contenteditable', 'false');
+  const L = document.createElement('div');
+  L.className = 'pf-l';
+  // ⚠ 회사 이름을 안 적어 두었으면 §8 의 기본값을 쓴다
+  L.textContent = m.company || 'SAMIL ELTEC CO., LTD.';
+  const R = document.createElement('div');
+  R.className = 'pf-r';
+  // ⭐ 판 보기로 뽑은 종이에는 «어느 판인지»가 찍혀야 한다 — 다섯 벌을 종이로 늘어놓으면
+  //    똑같이 생겨서 구분이 안 된다(이 도구의 존재 이유가 판이다).
+  const parts = [];
+  if (m.title) parts.push(m.title);
+  const vn = cur ? variantName(doc, cur) : '';
+  if (vn) parts.push(vn);
+  if (parts.length) R.append(document.createTextNode(parts.join(' · ') + ' '));
+  const b = document.createElement('b');
+  b.textContent = n + ' / ' + total;
+  R.appendChild(b);
+  el.append(L, R);
+  return el;
 }
 
 // 표 한 조각을 그린다. part = { rowFrom, rowTo, cont } · null 이면 전체(높이 재기용).
@@ -6837,6 +7004,162 @@ function attachSidebar({ onResize }) {
   };
 }
 
+/* docinfo.js */
+// 문서 정보 창 — 머리글·바닥글에 나올 값을 고치는 유일한 자리.
+// 설계: docs/설계_머리글바닥글.md §5. SKY 지시(2026-09-01): "머리글 바닥글은 추천대로 진행".
+//
+// ⛔ 최상위 이름은 attachDocInfo 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로 같은 이름이
+//    둘이면 화면이 통째로 안 뜬다.
+// ⛔ 머리글을 «종이에서 직접» 고치게 하지 않는다. 편집층(D16)은 #pages 하나가 입력판이라,
+//    머리글을 편집 칸으로 만들면 글자 번호 셈(offsetIn)에 끼어들어 커서·지우기가 엉뚱한
+//    곳을 문다(설계_판.md P9 와 같은 이유). 그래서 창으로 고친다.
+// ⚠ 「적용」 단추를 두지 않는다(D15 과잉 방어 금지) — 치는 대로 곧바로 문서에 들어간다.
+
+const FIELDS = [
+  ['category', '분류', '예: 기술 서류'],
+  ['title', '제목', '머리글에 크게 나온다'],
+  ['subtitle', '부제', '제목 아래 작은 줄'],
+  ['doc', '문서번호', '예: SPEC-4000'],
+  ['rev', '개정', '예: 1.0'],
+  ['date', '날짜', '예: 2026.01.02'],
+  ['company', '회사', '바닥글 왼쪽. 비우면 SAMIL ELTEC CO., LTD.'],
+];
+
+function attachDocInfo({ getDoc, setDoc, redraw }) {
+  const btn = document.getElementById('btn-docinfo');
+  let el = null;
+
+  const close = () => { if (el) { el.remove(); el = null; } };
+
+  // meta 한 칸만 갈아 끼운다 — 나머지는 그대로 두고 새 문서 객체를 만든다(블록 불변 규칙).
+  function put(key, value) {
+    const doc = getDoc();
+    const meta = Object.assign({}, doc.meta || {});
+    if (value) meta[key] = value; else delete meta[key];
+    setDoc(Object.assign({}, doc, { meta }));
+    // ⚠ keepCaret 을 주지 않는다 — 주면 다시 그리며 종이에 초점을 옮겨 이 창의 입력칸에서
+    //   손이 튕겨 나간다(판별 값 창과 같은 이유).
+    redraw();
+  }
+
+  function open() {
+    close();
+    const doc = getDoc();
+    const m = doc.meta || {};
+    el = document.createElement('div');
+    el.id = 'docinfo';
+    el.setAttribute('contenteditable', 'false');
+
+    const ttl = document.createElement('div');
+    ttl.className = 'di-ttl';
+    ttl.append(document.createTextNode('문서 정보'));
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'di-x';
+    x.title = '닫기';
+    x.textContent = '✕';
+    x.addEventListener('click', close);
+    ttl.appendChild(x);
+    el.appendChild(ttl);
+
+    const note = document.createElement('div');
+    note.className = 'di-note';
+    note.textContent = '여기 적은 것이 종이 맨 위(머리글)와 맨 아래(바닥글)에 모든 쪽마다 나옵니다.';
+    el.appendChild(note);
+
+    for (const [key, label, tip] of FIELDS) {
+      const row = document.createElement('div');
+      row.className = 'di-row';
+      const lb = document.createElement('span');
+      lb.className = 'nm';
+      lb.textContent = label;
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = m[key] || '';
+      inp.placeholder = tip;
+      inp.title = tip;
+      inp.addEventListener('input', () => put(key, inp.value));
+      row.append(lb, inp);
+      el.appendChild(row);
+    }
+
+    // 로고 — 그림 넣기와 같은 방식으로 파일을 읽어 문서 «안»에 담는다.
+    // 그래야 문서 파일 하나만 주고받아도 로고가 따라간다(설계 §6-2).
+    const row = document.createElement('div');
+    row.className = 'di-row di-logo';
+    const lb = document.createElement('span');
+    lb.className = 'nm';
+    lb.textContent = '로고';
+    const view = document.createElement('span');
+    view.className = 'di-logoview';
+    if (m.logo) {
+      const img = document.createElement('img');
+      img.src = m.logo;
+      view.appendChild(img);
+    } else {
+      view.textContent = '(없음)';
+    }
+    const file = document.createElement('input');
+    file.type = 'file';
+    file.accept = 'image/*';
+    file.style.display = 'none';
+    file.addEventListener('change', () => {
+      const f = file.files && file.files[0];
+      if (!f) return;
+      const fr = new FileReader();
+      fr.onload = () => {
+        const url = String(fr.result || '');
+        // ⛔ 그림이 아닌 것은 안 받는다 — 머리글에 깨진 그림이 박히면 인쇄물이 망가진다
+        if (url.indexOf('data:image/') !== 0) { window.alert('그림 파일이 아닙니다'); return; }
+        put('logo', url);
+        open();                                   // 미리보기를 새로 그린다
+      };
+      fr.readAsDataURL(f);
+    });
+    const pick = document.createElement('button');
+    pick.type = 'button';
+    pick.textContent = '파일';
+    pick.title = '로고 그림 고르기 — 문서 안에 담긴다';
+    pick.addEventListener('click', () => file.click());
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.textContent = '지움';
+    del.title = '로고 지우기';
+    del.disabled = !m.logo;
+    del.addEventListener('click', () => { put('logo', ''); open(); });
+    row.append(lb, view, pick, del, file);
+    el.appendChild(row);
+
+    const foot = document.createElement('div');
+    foot.className = 'di-foot';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = '닫기';
+    ok.addEventListener('click', close);
+    foot.appendChild(ok);
+    el.appendChild(foot);
+
+    document.body.appendChild(el);
+    방금열림();
+  }
+
+  // ⛔ 창을 여는 그 클릭이 열고 나서도 계속 퍼져 나가 아래 «바깥 클릭»까지 온다 —
+  //    그러면 열리자마자 닫혀 아무 일도 안 일어난 것처럼 보인다(판 창에서 겪은 그 함정).
+  let 방금 = false;
+  const 방금열림 = () => { 방금 = true; setTimeout(() => { 방금 = false; }, 0); };
+
+  if (btn) btn.addEventListener('click', open);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  document.addEventListener('click', (e) => {
+    if (방금 || !el) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('#docinfo, #btn-docinfo')) return;
+    close();
+  });
+
+  return { open, close, isOpen: () => !!el, rect: () => (el ? [el.getBoundingClientRect()] : []) };
+}
+
 /* vbar.js */
 // 판(版) 바·판 관리 창 — 설계_판.md §4-1·§4-5. 판이 없는 문서에는 아무것도 안 보인다.
 // ⛔ 최상위 이름은 attachVbar 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로 같은 이름이
@@ -7499,6 +7822,12 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
+
+// ⛔ 머리글 높이는 «한 곳»에서만 정한다 — 쪽 나눔을 재는 JS(measure.js HDR_H)와 그리는
+//    CSS 가 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다. JS 값을 CSS 에 넣어 준다.
+document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
+
 const APP_NAME = '문서 편집기';
 document.title = APP_NAME;
 
@@ -7796,6 +8125,13 @@ window.__app.fitApi = fitApi;
 // (ResizeObserver 도 결국 깨어나지만, 끄는 «동안» 따라오게 하려면 여기서 직접 부른다.)
 const sidebarApi = attachSidebar({ onResize: () => fitApi.fit() });
 window.__app.sidebarApi = sidebarApi;
+
+// 문서 정보 창 — 머리글·바닥글 값을 고치는 유일한 자리(설계_머리글바닥글.md §5).
+// ⚠ 되돌리기(Ctrl+Z)는 «글(blocks)과 판(variants)»만 담는다 — 문서 정보(meta)는 안 담긴다.
+//   되돌려도 meta 는 그대로 남으므로 «글이 망가지는» 위험은 없고, 문서 정보는 창에서 다시
+//   치면 된다. 되돌리기에까지 담으려면 core/history.js 와 모든 push 자리를 함께 고쳐야 한다.
+const docInfoApi = attachDocInfo({ getDoc: () => state.doc, setDoc: applyDoc, redraw: draw });
+window.__app.docInfoApi = docInfoApi;
 
 // 판(版) 바 — 판이 있는 문서에서만 리본 아래에 나타난다(설계_판.md §4-1).
 // ⚠ mainEl·docName 은 「판별 PDF」가 쓰던 것이라 그 기능과 함께 뺐다(2026-09-01 SKY).
