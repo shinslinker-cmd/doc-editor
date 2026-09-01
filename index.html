@@ -279,7 +279,13 @@ body { margin:0; background:var(--desk); color:var(--ink);
       종이 부분을 엄지와 검지로 확대/축소를 할수 있게 해줘"). pan-y 만 적으면 그 요소 위에서
       확대/축소가 통째로 죽는데, 이 문서는 거의 표라서 «종이에서 핀치가 안 되는» 것처럼 보였다.
    ⚠ 가로 끌기(칸 고르기)는 그대로 우리 것이다 — pan-x 는 여전히 안 준다. */
-.blk-table { margin:3px 0 9px; position:relative; touch-action:pan-y pinch-zoom; }
+/* ⛔ pinch-zoom 을 뺐다 (2026-09-01 SKY: "종이 부분만 확대 축소 되도록").
+   브라우저의 두 손가락 확대는 «화면 전체»를 키운다 — 사이드바·리본까지. 그래서 그것을 끄고
+   ui/zoom.js 가 두 손가락을 직접 받아 종이(#pages)에만 배율을 건다.
+   ⚠ pan-y 는 남긴다 — 한 손가락 세로 끌기(종이 넘겨 보기)는 브라우저가 하는 게 자연스럽다. */
+.blk-table { margin:3px 0 9px; position:relative; touch-action:pan-y; }
+/* 종이 전체에서도 두 손가락을 우리가 받는다 — 표 밖에서 오므려도 종이가 줄어야 한다 */
+#pages { touch-action:pan-y; }
 .blk-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
 .blk-table td { outline:none; word-break:break-word; }
 /* ⭐ 행 여백은 2026-09-01 SKY 지시로 줄였다 — «전체적으로 표를 조금씩 줄여서 행 여백을
@@ -1124,7 +1130,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 17:06";
+window.__BUILD = "2026-09-01 17:16";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -8104,7 +8110,10 @@ const MINZOOM = 0.55;   // 이보다 작아지면 글자를 못 읽는다 — �
 const SLACK = 10;       // 종이 옆에 남기는 숨통(px). 0 이면 그림자가 잘려 답답하다
 const TAGGAP = 14;      // 종이 끝과 판 이름표 사이 (styles.css 의 .vtag left offset 과 같아야 한다)
 
-function attachFit({ mainEl, pagesEl, getDoc }) {
+// ⭐ 최종 배율 = 자동맞춤 × 사용자배율(ui/zoom.js). 둘은 하는 일이 다르다 —
+//    자동맞춤은 «좁은 화면에서 종이를 자리에 넣는» 것이고, 사용자배율은 «크게 보고 싶다»다.
+//    getUser 를 안 주면 1 로 보므로 지금까지와 똑같이 동작한다.
+function attachFit({ mainEl, pagesEl, getDoc, getUser }) {
   let last = -1;
   let lastPad = -1;
 
@@ -8135,9 +8144,14 @@ function attachFit({ mainEl, pagesEl, getDoc }) {
     const gutter = tagRoom();
     const 넉넉 = !gutter || room - SLACK >= paper + gutter * 2;
     const pad = 넉넉 ? 0 : gutter;
-    let z = (room - SLACK) / (paper + pad);
-    if (z >= 1) z = 1;                       // 자리가 넉넉하면 손대지 않는다
-    else if (z < MINZOOM) z = MINZOOM;
+    let auto = (room - SLACK) / (paper + pad);
+    if (auto >= 1) auto = 1;                 // 자리가 넉넉하면 손대지 않는다
+    else if (auto < MINZOOM) auto = MINZOOM;
+    // ⛔ 사용자배율은 «곱한다». 자동맞춤을 덮어쓰면 좁은 화면에서 종이가 다시 넘친다.
+    const user = (getUser && getUser()) || 1;
+    let z = auto * user;
+    // ⚠ 사용자가 키우겠다고 했으면 1 을 넘겨도 된다 — 바닥만 지킨다.
+    if (z < MINZOOM * 0.7) z = MINZOOM * 0.7;
     z = Math.round(z * 1000) / 1000;
     if (z === last && pad === lastPad && z === 1 && !pad) { pagesEl.style.zoom = ''; return; }
     last = z;
@@ -8154,6 +8168,101 @@ function attachFit({ mainEl, pagesEl, getDoc }) {
   }
   fit();
   return { fit, zoomNow: () => (Number(pagesEl.style.zoom) || 1) };
+}
+
+/* zoom.js */
+// 종이만 확대·축소한다 (2026-09-01 SKY).
+//
+// SKY: "화면 축소 및 확대를 할 때 사이드바나 리본도 같이 축소 확대 되는데,
+//       종이 부분만 확대 축소 되도록"
+//
+// ⛔ 브라우저의 확대(Ctrl+휠 · 두 손가락)는 «화면 전체»를 키운다 — 사이드바·리본까지.
+//    그것은 CSS 로 막을 수 없다. 그래서 그 동작을 «우리가 가로채서» 종이(#pages)에만 건다.
+//
+// ⭐ 최종 배율 = 자동맞춤(fit.js) × 사용자배율(여기)
+//    자동맞춤은 «좁은 화면에서 종이를 자리에 넣는» 일이고, 사용자배율은 «내가 크게 보고 싶다»다.
+//    둘은 하는 일이 달라서 곱해야 맞다. 사용자배율이 1 이면 지금까지와 똑같이 동작한다.
+//
+// ⛔ 최상위 이름은 attachZoom 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    같은 이름이 둘이면 화면이 통째로 안 뜬다.
+// ⚠ 인쇄에는 영향이 없다 — styles.css @media print 가 #pages 의 zoom 을 1 로 되돌린다.
+
+// ⛔ 이름을 ZMIN·ZMAX·ZSTEP 으로 짓는다. 처음엔 MIN·MAX 로 썼다가 ui/sidebar.js 의
+//    MIN·MAX 와 겹쳐 «화면이 통째로 안 떴다»(Identifier 'MIN' has already been declared).
+//    빌드가 모듈 34개를 한 덩어리로 합치므로 최상위 이름은 저장소 전체에서 겹치면 안 된다.
+const ZMIN = 0.4;      // 이보다 작으면 글자를 못 읽는다
+const ZMAX = 3;        // 이보다 크면 한 줄도 안 보인다
+const ZSTEP = 1.1;     // 휠 한 칸
+
+function attachZoom({ mainEl, pagesEl, refit, onChange }) {
+  let user = 1;
+
+  const 알림 = () => { if (onChange) onChange(user); };
+  const 맞추기 = () => { if (refit) refit(); };
+
+  function 정하기(v) {
+    const n = Math.max(ZMIN, Math.min(ZMAX, Math.round(v * 1000) / 1000));
+    if (n === user) return;
+    user = n;
+    맞추기();
+    알림();
+  }
+
+  // ── PC: Ctrl + 휠 ────────────────────────────────────────────
+  // ⛔ passive:false 여야 preventDefault 가 먹는다 — 안 그러면 브라우저가 화면 전체를 키운다.
+  mainEl.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    정하기(e.deltaY < 0 ? user * ZSTEP : user / ZSTEP);
+  }, { passive: false });
+
+  // ── 태블릿: 두 손가락 ────────────────────────────────────────
+  // ⚠ 브라우저의 두 손가락 확대는 styles.css 에서 껐다(touch-action 에 pinch-zoom 을 뺐다).
+  //   그래야 우리 손가락 처리가 «화면 전체 확대»에 먼저 먹히지 않는다.
+  // ⚠ 한 손가락 세로 끌기는 그대로 브라우저에 맡긴다(pan-y) — 종이를 손으로 넘겨 봐야 한다.
+  const 손 = new Map();
+  let 시작거리 = 0;
+  let 시작배율 = 1;
+  const 거리 = () => {
+    const p = [...손.values()];
+    if (p.length < 2) return 0;
+    return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+  };
+  pagesEl.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return;
+    손.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (손.size === 2) { 시작거리 = 거리(); 시작배율 = user; }
+  });
+  pagesEl.addEventListener('pointermove', (e) => {
+    if (!손.has(e.pointerId)) return;
+    손.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (손.size !== 2 || !시작거리) return;
+    e.preventDefault();
+    정하기(시작배율 * (거리() / 시작거리));
+  });
+  const 떼기 = (e) => {
+    if (!손.has(e.pointerId)) return;
+    손.delete(e.pointerId);
+    if (손.size < 2) 시작거리 = 0;
+  };
+  pagesEl.addEventListener('pointerup', 떼기);
+  pagesEl.addEventListener('pointercancel', 떼기);
+
+  // ── 자판 ────────────────────────────────────────────────────
+  // ⛔ e.key 로만 보면 한글 자판에서 안 먹는다 — e.code 는 «자판에 상관없는 키 자리»다
+  //    (2026-08-30 실측: Ctrl+Z 가 key='ㅋ' 로 왔다).
+  document.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    if (e.code === 'Equal' || e.key === '+' || e.key === '=') { e.preventDefault(); 정하기(user * ZSTEP); }
+    else if (e.code === 'Minus' || e.key === '-') { e.preventDefault(); 정하기(user / ZSTEP); }
+    else if (e.code === 'Digit0' || e.key === '0') { e.preventDefault(); 정하기(1); }
+  });
+
+  return {
+    get: () => user,
+    set: 정하기,
+    reset: () => 정하기(1),
+  };
 }
 
 /* sidebar.js */
@@ -9137,6 +9246,7 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
 // ⛔ 머리글 높이는 «한 곳»에서만 정한다 — 쪽 나눔을 재는 JS(measure.js HDR_H)와 그리는
 //    CSS 가 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다. JS 값을 CSS 에 넣어 준다.
 document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
@@ -9181,6 +9291,7 @@ function demoDoc() {
 // ⚠ 아래 attachFit 이 채운다. draw() 가 이 이름을 쓰므로 «먼저» 선언해 둔다 —
 //   const 로 아래에만 두면 첫 draw() 가 「초기화 전 접근」으로 터진다.
 let fitApi = null;
+let zoomApi = null;      // 사용자 확대·축소(ui/zoom.js) — fit 이 곱해 쓴다
 
 function draw(opt = {}) {
   const pagesEl = document.getElementById('pages');
@@ -9454,8 +9565,25 @@ fitApi = attachFit({
   mainEl: document.getElementById('main'),
   pagesEl: document.getElementById('pages'),
   getDoc: () => state.doc,
+  // ⭐ 최종 배율 = 자동맞춤 × 사용자배율. 아래 attachZoom 이 그 사용자배율을 쥔다.
+  //    ⚠ zoomApi 는 «아래»에서 만들어지므로 함수로 건네야 한다(그때 읽는다).
+  getUser: () => (zoomApi ? zoomApi.get() : 1),
 });
 window.__app.fitApi = fitApi;
+
+// 종이만 확대·축소 (2026-09-01 SKY: "사이드바나 리본도 같이 축소 확대 되는데, 종이 부분만")
+// ⛔ 브라우저 확대는 화면 전체를 키운다 — 그것을 가로채 종이에만 건다.
+zoomApi = attachZoom({
+  mainEl: document.getElementById('main'),
+  pagesEl: document.getElementById('pages'),
+  refit: () => fitApi.fit(),
+  onChange: (v) => {
+    // 사람이 «지금 몇 %인지» 알아야 한다 — 1 로 돌아오면 조용하다(원래 크기니까)
+    if (Math.abs(v - 1) < 0.001) toast('종이 크기를 원래대로 돌렸습니다');
+    else toast('종이 ' + Math.round(v * 100) + '%  (Ctrl+0 으로 원래대로)');
+  },
+});
+window.__app.zoomApi = zoomApi;
 
 // 사이드바 너비 손잡이 — 끌면 #main 이 넓어지고 좁아지므로 종이 배율을 곧바로 다시 맞춘다.
 // (ResizeObserver 도 결국 깨어나지만, 끄는 «동안» 따라오게 하려면 여기서 직접 부른다.)
