@@ -494,10 +494,18 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .blk.vlim { position: relative; }
 .blk.vlim::before { content: ''; position: absolute; left: -14px; top: 0; bottom: 0; width: 3px;
   background: var(--vc, #8a8e98); border-radius: 2px; pointer-events: none; }
-.blk.vlim::after { content: attr(data-vnames); position: absolute; top: 0; left: calc(100% + 12px);
-  font: 600 9px/1.6 'IBM Plex Mono', monospace; color: var(--vc, #8a8e98);
-  background: var(--vcb, #f2f3f6); padding: 1px 5px; border-radius: 4px;
-  white-space: nowrap; pointer-events: none; }
+/* 판 이름표 — 종이 «밖»에 세운다(2026-09-01 SKY: "아예 종이 바깥에… 글씨 크기도 좀 키워줘.
+   판과 같은 색상으로 맞춰 주고"). 옛 값은 9px 이었고 종이 안쪽 여백에 걸쳐 지저분했다.
+   ⭐ 이름표는 종이의 «덮개 층»(.vtags)에 그린다 — 편집 칸 안이 아니라서 판마다 제 색을 줄 수
+      있고(render.js addVariantTag), 커서 셈(P9)도 안 건드린다.
+   ⚠ left:calc(100% + 14px) 의 100% 는 «종이 폭»이다(덮개가 inset:0 이라) — 그래서 이름표가
+      본문이 아니라 «종이» 밖에 선다. 종이가 내용을 가두면 안 보인다 → #pages.vall 참고. */
+.vtags { position: absolute; inset: 0; pointer-events: none; }
+.vtag { position: absolute; left: calc(100% + 14px); display: flex; align-items: center; gap: 3px;
+  font: 700 11px/1.4 'IBM Plex Mono', Consolas, monospace; white-space: nowrap;
+  background: #fff; border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px;
+  box-shadow: 0 1px 4px rgba(20, 22, 30, .08); }
+.vtag .sep { color: #c9ccd4; font-weight: 400; }
 /* 전체보기에서만 종이 밖으로 나가는 것을 허락한다 — 판 보기·판 없는 문서는 종전대로
    .page 가 내용을 가둔다(render.js 가 #pages 에 vall 을 붙였다 뗀다). */
 #pages.vall .page { overflow: visible; }
@@ -526,7 +534,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
   #vpick { display: none; }
   .blk.vlim { box-shadow: none; }
   .blk.vlim::before { content: none; }
-  .blk.vlim::after { content: none; }
+  .vtags { display: none; }
   /* 인쇄에서는 종이가 다시 내용을 가둔다 — 표지가 없으니 밖으로 나갈 것도 없다 */
   #pages.vall .page { overflow: hidden; }
   tr.vlim td:first-child { box-shadow: none; }
@@ -659,7 +667,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 09:23";
+window.__BUILD = "2026-09-01 09:45";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -2549,7 +2557,44 @@ function tableEl(block, part, view) {
   return el;
 }
 
-// 판 표지(설계_판.md §4-2·§4-3) — 화면 전용. 글자 노드를 만들지 않는다(P9).
+// 판 이름표 — 종이 «밖»에 세운다(2026-09-01 SKY: "아예 종이 바깥에 표시 되도록 하고
+// 글씨 크기도 좀 키워줘. 판과 같은 색상으로 맞춰 주고").
+// ⛔ 편집 칸(.blk) «안»에는 글자 노드를 만들지 않는다(P9) — 넣으면 글자 번호 셈이 어긋나
+//    커서·지우기가 엉뚱한 곳을 문다. 그래서 종이의 «덮개 층»에 따로 그린다.
+//    쪽 번호(.pgno)와 같은 자리다: .page 의 직접 자식 · contenteditable=false.
+// ⭐ 판마다 «제 색»으로 쓴다 — 옛 방식(CSS ::after + attr)은 글자를 한 덩어리로만 칠할 수
+//    있어서 「4000·5000·5000IR·6000」이 전부 4000 색으로 나왔다(다른 세 판은 색이 거짓말).
+function addVariantTag(doc, blkEl, ids) {
+  const page = blkEl.closest('.page');
+  if (!page) return;
+  let layer = page.querySelector(':scope > .vtags');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'vtags';
+    layer.setAttribute('contenteditable', 'false');
+    page.appendChild(layer);
+  }
+  const tag = document.createElement('div');
+  tag.className = 'vtag';
+  // 덮개 층이 종이의 안쪽 상자에 딱 맞으므로(inset:0) 블록의 화면 위치 차이가 곧 자리다
+  tag.style.top = Math.round(blkEl.getBoundingClientRect().top
+    - page.getBoundingClientRect().top) + 'px';
+  ids.forEach((id, i) => {
+    if (i) {
+      const sep = document.createElement('span');
+      sep.className = 'sep';
+      sep.textContent = '·';
+      tag.appendChild(sep);
+    }
+    const s = document.createElement('span');
+    s.textContent = variantName(doc, id);
+    s.style.color = variantColor(doc, id).fg;
+    tag.appendChild(s);
+  });
+  layer.appendChild(tag);
+}
+
+// 판 표지(설계_판.md §4-2·§4-3) — 화면 전용. 편집 칸 안에는 글자 노드를 만들지 않는다(P9).
 // ⚠ 장을 넘은 표는 같은 data-id 의 .blk 조각이 여러 개다 — 조각마다 따로 표지를 붙인다.
 function applyVariantMarks(doc, pagesEl, cur) {
   // 전체보기(cur 없음) + 판 있는 문서에서만 이름표가 종이 «밖»에 선다 — 그때만 종이의
@@ -2565,9 +2610,8 @@ function applyVariantMarks(doc, pagesEl, cur) {
     if (!b) continue;
     if (!cur && Array.isArray(b.variants)) {               // 전체보기 — 판 제한 블록
       el.classList.add('vlim');
-      el.dataset.vnames = names(b.variants);
       el.style.setProperty('--vc', variantColor(doc, b.variants[0]).fg);
-      el.style.setProperty('--vcb', variantColor(doc, b.variants[0]).bg);
+      addVariantTag(doc, el, b.variants);
     }
     if (b.type !== 'table') continue;
     if (!cur && Array.isArray(b.rowv)) {                   // 전체보기 — 판 제한 행
