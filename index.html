@@ -109,12 +109,13 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .tb:hover { background:#f5f6f8; box-shadow:0 2px 8px rgba(20,22,30,.10); }
 .tb:hover .lb { color:var(--sub); }
 .tb.on .lb { color:#12459b; }
-/* 글자 크기 고르기 — 유일하게 폭이 다른 칸이다. 숫자와 «본문·표·제목» 힌트가 함께 보여야
-   해서 60px 에 안 들어간다. 높이는 같으므로 줄은 그대로 맞는다. */
-.tb-selwrap { width:84px; cursor:default; }
-.tb-selwrap .tb-sel { width:74px; height:21px; padding:0 3px; border:1px solid var(--line);
+/* 글자 크기 고르기 — 폭·높이가 다른 단추와 똑같다(2026-09-01 SKY). 고르는 칸 자체가
+   지금 값을 보여 주므로 아래 이름표는 두지 않는다 — 「크기」가 두 번 나온다.
+   ⚠ 글자를 10px 로 줄여야 «12.5 본문» 같은 힌트가 잘리지 않고 들어간다(58px 안에). */
+.tb-selwrap { cursor:default; padding:0 4px; }
+.tb-selwrap .tb-sel { width:100%; height:26px; padding:0 2px; border:1px solid var(--line);
       border-radius:5px; background:#fff; color:var(--ink); cursor:pointer;
-      font:600 11.5px 'Noto Sans KR','맑은 고딕',sans-serif; }
+      font:600 10px 'Noto Sans KR','맑은 고딕',sans-serif; }
 /* 눌린 상태(켜짐) — ⛔ 검은 배경은 너무 튀고(SKY 2026-08-28), 옅은 회색은 «꺼진 것과
    차이가 없어» 켠 건지 끈 건지 알 수가 없었다(SKY 2026-08-31: «선택/해제가 구분이 없어서
    헷갈려»). 그래서 이 앱이 «고른 것»에 쓰는 그 파랑을 그대로 쓴다 — 옅은 파란 바탕 +
@@ -166,8 +167,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
   .tb .ic { height: 14px; font-size: 12.5px; }
   .tb .ic svg, svg.ic { width: 16px; height: 12px; }
   .tb .lb { font-size: 8.5px; }
-  .tb-selwrap { width: 74px; }
-  .tb-selwrap .tb-sel { width: 66px; height: 19px; font-size: 10.5px; }
+  .tb-selwrap .tb-sel { height: 24px; font-size: 9.5px; }
   .tb-sep { height: 22px; margin: 0 2px; }
   .tbg { gap: 3px; }
   .tbg-table { padding: 8px 5px 4px; row-gap: 4px; }
@@ -404,7 +404,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 #imgpanel .fp-edit { border-top:1px solid var(--line-soft); margin-top:10px; padding-top:9px; }
 #imgpanel .fp-edit .fp-del { color:var(--point); }
 /* 켜짐 표시는 리본 단추와 «같은 모양»이어야 한다 — 어디서 눌러도 같은 뜻으로 읽힌다 */
-#imgpanel button.on, #ctxmenu .q.on, #minibar .q.on {
+#imgpanel button.on, #ctxmenu .q.on, #minibar .q.on, #minibar2 .q.on {
   background:#e9f1ff !important; border-color:#5490ff !important; color:#12459b !important;
   font-weight:800; }
 @media print { #imgpanel { display:none !important; } }
@@ -446,12 +446,12 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* ── 우클릭 문맥 메뉴 · 미니 패널 (설계_서식과우클릭.md §5-2·§5-3) ──
    ⭐ 맨 위 «뱃지»가 지금 무엇을 고른 상태인지 말해 준다 — 「▦ 표 · 3칸 고름」처럼.
       메뉴가 왜 이 모습인지 알려 주는 한 줄이라 이것부터 읽게 크기를 잡았다. */
-#ctxmenu, #minibar { position:fixed; z-index:120; background:#fff; color:var(--ink);
+#ctxmenu, #minibar, #minibar2 { position:fixed; z-index:120; background:#fff; color:var(--ink);
   border:1px solid var(--line); border-radius:10px; padding:8px;
   box-shadow:0 8px 28px rgba(20,22,30,.20); font-size:12px; }
-#minibar { z-index:115; }
+#minibar, #minibar2 { z-index:115; }
 #ctxmenu { width:264px; }
-#ctxmenu .mbadge, #minibar .mbadge { font-size:10.5px; color:var(--dim); letter-spacing:.2px;
+#ctxmenu .mbadge, #minibar .mbadge, #minibar2 .mbadge { font-size:10.5px; color:var(--dim); letter-spacing:.2px;
   padding:0 2px 6px; }
 /* 빠른 줄 — 기호만 쓴 작은 단추. 뜻이 같은 것끼리(.qg) 줄을 나눈다:
    글자꼴(B I U A＋ A−) / 색(■■■ ✕) / 정렬·맞춤. 한 줄로 죽 늘어놓으면 폭에 따라
@@ -472,13 +472,13 @@ body { margin:0; background:var(--desk); color:var(--ink);
   border-radius:6px; background:#fff; color:var(--ink); font:inherit; cursor:pointer;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #ctxmenu .mlist button:hover { background:#f2f3f6; border-color:var(--line); }
-#minibar { padding:6px; }
-#minibar .qs { padding-bottom:0; max-width:200px; }
+#minibar, #minibar2 { padding:6px; }
+#minibar .qs, #minibar2 .qs { padding-bottom:0; max-width:200px; }
 /* 알림 — 붙여넣기가 브라우저에 막혔을 때 «막혔다»고 말해 준다. 조용히 삼키지 않는다. */
 .mtoast { position:fixed; z-index:130; max-width:300px; padding:9px 12px; border-radius:8px;
   background:var(--ink); color:#fff; font-size:12px; line-height:1.5;
   box-shadow:0 6px 20px rgba(20,22,30,.28); }
-@media print { #ctxmenu, #minibar, .mtoast { display:none !important; } }
+@media print { #ctxmenu, #minibar, #minibar2, .mtoast { display:none !important; } }
 
 @media print {
   /* ⭐ 2026-09-01 SKY 지적 — «인쇄 미리보기에서 바닥글 1/1 이 2페이지로 넘어가서 표시된다».
@@ -721,6 +721,8 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
       </span>
       <span class="tb-sep"></span>
       <span class="tbg">
+      <!-- ⚠ 이 칸만 «심볼 + 이름» 두 칸이 아니다 — 고르는 칸 자체가 지금 값을 보여 주므로
+           아래 이름표를 두면 「크기」가 두 번 나온다(2026-09-01 SKY). 폭·높이는 다른 단추와 같다. -->
       <span class="tb tb-selwrap" title="글자 크기">
         <select id="tb-size" class="tb-sel">
           <option value="">크기</option>
@@ -743,7 +745,6 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
           <option value="30">30</option>
           <option value="36">36</option>
         </select>
-        <span class="lb">크기</span>
       </span>
       <button class="tb" data-szstep="1" title="글자 크게"><span class="ic">A＋</span><span class="lb">크게</span></button>
       <button class="tb" data-szstep="-1" title="글자 작게"><span class="ic">A−</span><span class="lb">작게</span></button>
@@ -827,7 +828,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 12:08";
+window.__BUILD = "2026-09-01 12:27";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3305,6 +3306,24 @@ function leftGutterX(pagesEl, width) {
 function clampTop(y, h) {
   const max = window.innerHeight - 6 - h;
   return Math.round(Math.max(6, Math.min(y, Math.max(6, max))));
+}
+
+// 종이 왼쪽 자리에 떠 있는 상자들을 «겹치지 않게» 쌓는다.
+// 2026-09-01 SKY: "물러나고 판별 값 창만 남는게 아니고, 둘다 표시 되는 조건이니까 둘다
+// 표시 되어야지. 겹치지만 않게." — 옛 4.4MB 프로그램의 positionBars() 도 두 바를 이렇게
+// 위아래로 붙여 놓았다(objH + gap + txtH).
+// wantY = 원래 놓고 싶은 자리 · h = 이 상자 높이 · taken = 이미 그 자리를 쓰는 상자들의 사각형
+function packInGutter(wantY, h, taken) {
+  const GAP = 8;
+  const hit = (y) => (taken || []).find(r => y < r.bottom + GAP && y + h > r.top - GAP);
+  let y = wantY;
+  for (let i = 0; i < 8; i++) { const r = hit(y); if (!r) break; y = r.bottom + GAP; }
+  // 아래로 밀다 화면 밖으로 나가면 위쪽으로 쌓아 본다
+  if (y + h > window.innerHeight - 6) {
+    y = wantY;
+    for (let i = 0; i < 8; i++) { const r = hit(y); if (!r) break; y = r.top - GAP - h; }
+  }
+  return clampTop(y, h);
 }
 
 /* editor.js */
@@ -6296,6 +6315,12 @@ const MENU_LIST = [
   { sel: '[data-list="1"]', txt: '1.', tip: '번호 목록' },
 ];
 
+// 표 서식바가 대행할 리본 단추 — 2026-09-01 SKY: "표안에 텍스트를 드래그 했을 땐
+// 텍스트 서식바와 표 서식바가 같이 뜨게 하자."
+const MENU_TABLEOPS = ['[data-table="row+"]', '[data-table="row-"]',
+  '[data-table="col+"]', '[data-table="col-"]',
+  '[data-table="merge"]', '[data-table="split"]', '[data-table="head"]'];
+
 // 목록(2열). press = 리본 단추 대행 · run = 리본에 없는 것
 // when: 'vars' = «이 문서에 판이 있을 때만» 보이는 항목 (아래 판있나() 가 판정한다)
 // ⛔ 그림은 여기 없다. 그림에 관한 것은 「그림 서식」 창 하나로 통합했다
@@ -6343,13 +6368,20 @@ const MENU_ITEMS = {
   ],
 };
 
-function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsOpen }) {
+function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsRects }) {
   const menu = document.createElement('div');
   menu.id = 'ctxmenu';
   menu.setAttribute('contenteditable', 'false');
   const mini = document.createElement('div');
   mini.id = 'minibar';
   mini.setAttribute('contenteditable', 'false');
+  // ⭐ 표 안 글자를 고르면 «글자 서식바»와 «표 서식바»가 함께 뜬다(2026-09-01 SKY).
+  //    한 상자에 몰아넣지 않는 까닭은 옛 4.4MB 프로그램과 같다 — 뜻이 다른 것을 한 덩어리로
+  //    두면 무엇이 글자에 걸리고 무엇이 표에 걸리는지 눈으로 안 갈린다.
+  const mini2 = document.createElement('div');
+  mini2.id = 'minibar2';
+  mini2.className = 'minibar';
+  mini2.setAttribute('contenteditable', 'false');
 
   // ⛔ 마지막으로 무엇으로 눌렀는지 기억한다. 태블릿에서 «길게 누르기»는 브라우저가
   //    이미 글자 고르기·붙여넣기 메뉴로 쓴다 — 우리가 가로채면 그 익숙한 것이 사라진다(M5).
@@ -6405,10 +6437,15 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsOpen }) {
       group(MENU_ALIGN.map(s => cloneBtn(s)));
       return wrap;
     }
+    if (kind === 'tableops') {                 // 표 서식바 — 행·열·병합·머리글·세로 맞춤
+      group(MENU_TABLEOPS.map(s => cloneBtn(s)));
+      group(MENU_VALIGN.map(s => cloneBtn(s)));
+      return wrap;
+    }
+    // 글자 서식바 — 굵게·색·정렬·목록. 표 안이든 문단이든 «글자에 걸리는 것»은 이것뿐이다.
     group(MENU_MARKS.map(markBtn));
     group(MENU_COLORS.map(markBtn));
-    group(MENU_ALIGN.map(s => cloneBtn(s)).concat(
-      kind === 'table' ? MENU_VALIGN.map(s => cloneBtn(s)) : MENU_LIST.map(markBtn)));
+    group(MENU_ALIGN.map(s => cloneBtn(s)).concat(MENU_LIST.map(markBtn)));
     return wrap;
   }
 
@@ -6575,9 +6612,10 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsOpen }) {
 
   // ── 미니 패널 (S4) ──
   // 마우스로 «고른 그 순간»에만 뜬다. 태블릿에서는 안 띄운다 — 브라우저 제 메뉴와 겹친다(M5).
-  const miniOpen = () => !!mini.parentNode;
+  const miniOpen = () => !!mini.parentNode || !!mini2.parentNode;
   function hideMini() {
     if (mini.parentNode) mini.parentNode.removeChild(mini);
+    if (mini2.parentNode) mini2.parentNode.removeChild(mini2);
   }
 
   // 지금 고른 것을 감싸는 «화면 위 네모». 없으면 null(= 미니 패널을 안 띄운다).
@@ -6601,26 +6639,46 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsOpen }) {
     //    서식 창이 더 자세하니 그쪽을 남긴다.
     if ((formatApi.panelOpen && formatApi.panelOpen())
       || (formatApi.cropOpen && formatApi.cropOpen())) { hideMini(); return; }
-    // ⛔ 판별 값 창·판 관리 창도 마찬가지다 — 둘 다 «종이 왼쪽»에 놓이므로 함께 뜨면
-    //    서로 포개진다(2026-09-01 SKY 1번: "판별 값 서식이랑 드래그 서식바가 겹쳐 보여").
-    if (varsOpen && varsOpen()) { hideMini(); return; }
     const ctx = ctxApi.ctxOf();
     if (ctx.kind === 'caret') { hideMini(); return; }   // 커서만 있으면 띄울 까닭이 없다
     const r = targetRect(ctx.kind);
     if (!r) { hideMini(); return; }
-    mini.textContent = '';
-    const badge = document.createElement('div');
-    badge.className = 'mbadge';
-    badge.textContent = ctx.label;
-    mini.appendChild(badge);
-    mini.appendChild(quickStrip(ctx.kind));
-    if (!mini.parentNode) document.body.appendChild(mini);
+
+    // 한 상자를 채워 넣는다. 뱃지 + 빠른 줄.
+    const fill = (el, label, kind) => {
+      el.textContent = '';
+      const badge = document.createElement('div');
+      badge.className = 'mbadge';
+      badge.textContent = label;
+      el.appendChild(badge);
+      el.appendChild(quickStrip(kind));
+      if (!el.parentNode) document.body.appendChild(el);
+    };
+    const drop = (el) => { if (el.parentNode) el.parentNode.removeChild(el); };
+
+    // ⭐ 표 안 글자를 고르면 «글자 서식바»와 «표 서식바»가 함께 뜬다(2026-09-01 SKY).
+    if (ctx.kind === 'image') {
+      fill(mini, ctx.label, 'image');
+      drop(mini2);
+    } else {
+      fill(mini, ctx.kind === 'table' ? '가 글자' : ctx.label, 'text');
+      if (ctx.kind === 'table') fill(mini2, ctx.label, 'tableops'); else drop(mini2);
+    }
+
     // ⭐ «종이 왼쪽 빈 자리»에 세운다 — 가로는 늘 같은 자리, 세로만 고른 자리를 따라간다.
     //    2026-09-01 SKY: "드래그를 했을 떄 뜨는 서식바는 현재 드래그한 위치의 종이 좌측에
     //    표시 되도록 했었는데, 어느 순간 변해 있어." 옛 4.4MB 프로그램과 같은 규칙이다.
     //    ⛔ 옛 코드는 «고른 것 바로 왼쪽»(r.left − 8 − 폭)이라 글자 위를 덮었다.
-    mini.style.left = leftGutterX(pagesEl, mini.offsetWidth) + 'px';
-    mini.style.top = clampTop(r.top, mini.offsetHeight) + 'px';
+    // ⭐ 판별 값 창·판 관리 창이 떠 있으면 «물러나지 않고» 그 아래에 쌓는다
+    //    (2026-09-01 SKY: "둘다 표시 되는 조건이니까 둘다 표시 되어야지. 겹치지만 않게").
+    const taken = (varsRects && varsRects()) || [];
+    const put = (el) => {
+      el.style.left = leftGutterX(pagesEl, el.offsetWidth) + 'px';
+      el.style.top = packInGutter(r.top, el.offsetHeight, taken) + 'px';
+      taken.push(el.getBoundingClientRect());
+    };
+    put(mini);
+    if (mini2.parentNode) put(mini2);
   }
 
   // 선택은 mouseup «뒤»에 확정된다 — 한 박자 뒤에 잰다
@@ -7415,8 +7473,10 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
   // 놓이므로 함께 뜨면 서로 포개진다(2026-09-01 SKY 1번, 캡처로 확인).
   // 그림 서식 창이 이미 쓰는 규칙과 같다: 자세한 쪽(이 창)을 남기고 미니가 물러난다.
   const panelOpen = () => !!valsEl || !!mgrEl;
+  // 그 창들이 지금 «어디를» 차지하고 있나 — 미니 패널이 그 자리를 피해 쌓는다.
+  const panelRects = () => [valsEl, mgrEl].filter(Boolean).map(el => el.getBoundingClientRect());
 
-  return { refresh, stickUnderBar, refreshGroup, openMgr, panelOpen };
+  return { refresh, stickUnderBar, refreshGroup, openMgr, panelOpen, panelRects };
 }
 
 /* main.js */
@@ -7719,7 +7779,8 @@ const menuApi = attachMenu({
   formatApi,
   // ⚠ vbarApi 는 «아래»에서 만들어진다. 화살표 함수라 «부를 때» 값을 보므로 괜찮다 —
   //   미니 패널을 띄우려 하는 순간은 언제나 앱이 다 세워진 뒤다.
-  varsOpen: () => !!(vbarApi && vbarApi.panelOpen && vbarApi.panelOpen()),
+  // 판별 값 창·판 관리 창이 «어디를» 차지했나 — 미니 패널이 그 자리를 피해 아래에 쌓는다.
+  varsRects: () => ((vbarApi && vbarApi.panelRects) ? vbarApi.panelRects() : []),
 });
 window.__app.menuApi = menuApi;
 
