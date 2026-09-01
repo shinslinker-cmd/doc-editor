@@ -180,11 +180,17 @@ body { margin:0; background:var(--desk); color:var(--ink);
 }
 @media print { #bar { display:none !important; } }
 /* 높이를 재는 숨은 상자 — 화면 밖에 두되 크기는 진짜 페이지와 같아야 한다 */
-#gauge { position:absolute; left:-10000px; top:0; width:674px; visibility:hidden; }
+/* ⛔ 높이를 재는 상자의 폭은 «진짜 종이의 글 폭»과 같아야 한다 — 다르면 줄바꿈이
+   달라져 쪽 나눔이 어긋난다. main.js 가 문서의 여백에서 계산해 넣어 준다. */
+#gauge { position:absolute; left:-10000px; top:0; width:var(--text-w, 702px); visibility:hidden; }
 
 .page { width:var(--page-w); height:var(--page-h); background:var(--paper);
-        box-shadow:0 2px 14px rgba(20,22,30,.12); padding:46px 60px 34px;
-        position:relative; overflow:hidden; }
+        box-shadow:0 2px 14px rgba(20,22,30,.12); padding:var(--pg-pad, 34px 46px 26px);
+        position:relative; overflow:hidden;
+        /* ⛔ 인쇄에서 «배경색»을 살린다 — 없으면 브라우저가 배경을 지워 머리글의 빨간 선과
+           표 머리글 회색 띠가 통째로 안 찍힌다(2026-09-01 SKY: "인쇄 할 떄, 머리글의 빨간색
+           선 부분이 보이지 않아"). 그 선은 가짜요소의 background 라 이 규칙이 없으면 사라진다. */
+        -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 .page-body { display:flex; flex-direction:column; gap:0; }
 /* ── 머리글 (설계서 §8 확정값) ───────────────────────────────────────────────
    ⛔ 높이는 «고정»이다 — 글자 수에 따라 늘었다 줄었다 하면 쪽 나눔이 그때마다 달라진다.
@@ -212,13 +218,13 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* ── 바닥글 ─────────────────────────────────────────────────────────────────
    ⚠ 종이 아래 여백(34px) «안»에 얹는다 — 본문 높이를 안 먹는다. 쪽 번호가 있던 자리다.
       그래서 바닥글이 생겨도 옛 문서의 쪽 나눔이 한 장도 안 바뀐다. */
-.page-ftr { position:absolute; left:60px; right:60px; bottom:12px; height:18px;
+.page-ftr { position:absolute; left:var(--pg-l, 46px); right:var(--pg-r, 46px); bottom:9px; height:18px;
             display:flex; align-items:center; justify-content:space-between;
             border-top:1px solid #e8eaef; padding-top:5px;
             font:500 9px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8; }
 .page-ftr .pf-r b { color:var(--ink); font-weight:600; font-size:10px; margin-left:2px; }
 /* 옛 쪽 번호 — 바닥글이 그 일을 물려받았다. 규칙은 남겨 둔다(옛 캡처·검사가 가리킬 수 있다). */
-.pgno { position:absolute; right:60px; bottom:14px;
+.pgno { position:absolute; right:var(--pg-r, 46px); bottom:14px;
         font:600 10px 'IBM Plex Mono',Consolas,monospace; color:var(--ink); }
 
 /* 고른 범위 표시 — 브라우저 기본(진한 파랑)은 글자 색을 덮어, 색을 바꿔도 바뀌었는지
@@ -237,7 +243,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
       종이 부분을 엄지와 검지로 확대/축소를 할수 있게 해줘"). pan-y 만 적으면 그 요소 위에서
       확대/축소가 통째로 죽는데, 이 문서는 거의 표라서 «종이에서 핀치가 안 되는» 것처럼 보였다.
    ⚠ 가로 끌기(칸 고르기)는 그대로 우리 것이다 — pan-x 는 여전히 안 준다. */
-.blk-table { margin:4px 0 12px; position:relative; touch-action:pan-y pinch-zoom; }
+.blk-table { margin:3px 0 9px; position:relative; touch-action:pan-y pinch-zoom; }
 .blk-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
 .blk-table td { outline:none; word-break:break-word; }
 /* ⭐ 행 여백은 2026-09-01 SKY 지시로 줄였다 — «전체적으로 표를 조금씩 줄여서 행 여백을
@@ -282,7 +288,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
                .blk-table td { border-right:0 !important; }
                .blk-table td.cellsel { background:transparent; } }
 .blk-heading { font-size:27px; font-weight:900; line-height:1.2; margin:0 0 5px; letter-spacing:-.4px; }
-.blk-section { display:flex; align-items:center; gap:9px; margin:22px 0 9px; }
+.blk-section { display:flex; align-items:center; gap:9px; margin:16px 0 7px; }
 .blk-section .n { font:600 11.5px 'IBM Plex Mono',Consolas,monospace;
                   color:var(--point); letter-spacing:1px; }
 .blk-section .t { font-size:13px; font-weight:700; letter-spacing:-.2px; white-space:nowrap; }
@@ -291,11 +297,34 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .blk.sel { box-shadow:0 0 0 2px rgba(229,35,27,.25); border-radius:3px; }
 #gauge .blk { margin-left:0; margin-right:0; }
 
-.side-btns { display:flex; flex-direction:column; gap:6px; margin:14px 12px; }
-.side-btns button { border:1px solid var(--line); border-radius:6px; padding:11px 14px;
+/* ⭐ 묶음 이름 — CP 검사성적서 관리시스템의 사이드바와 같은 방식(2026-09-01 SKY).
+   작고 조용한 글씨로 «여기서부터 무슨 묶음인가»만 알린다. */
+.sg { font:700 10px 'Noto Sans KR','맑은 고딕',sans-serif; color:#9aa0b4; letter-spacing:.6px;
+      padding:0 4px; margin:12px 0 5px; }
+.sg:first-child { margin-top:2px; }
+.sg-list { margin:14px 16px 6px; }
+/* 단추 앞 기호 — 폭을 고정해 글자 시작 자리가 모든 단추에서 같다(줄이 맞는다) */
+.side-btns .si { display:inline-flex; width:17px; flex:none; justify-content:center;
+                 font-size:12.5px; line-height:1; }
+.side-btns { display:flex; flex-direction:column; gap:4px; margin:12px 12px; }
+.side-btns button { display:flex; align-items:center; gap:8px; text-align:left;
+      border:1px solid var(--line); border-radius:6px; padding:10px 12px;
                     cursor:pointer; font:600 13px 'Noto Sans KR',sans-serif;
                     background:#fff; color:#454a58; }
 .side-btns button:hover { background:#f6f7fa; }
+/* ⭐ 누른 순간 «눌렸다»가 보이게 — 2026-09-01 SKY: "뭔가 했다는걸 좀 더 효과를 추가 해줘" */
+.side-btns button:active { transform:translateY(1px); background:#eef0f4; }
+.side-btns button.pri:active { background:var(--point); color:#fff; }
+
+/* 잠깐 뜨는 알림 — 「방금 무엇을 했는지」. 화면 아래 가운데. */
+#toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%, 14px); z-index:200;
+  max-width:min(520px, 86vw); padding:11px 16px; border-radius:9px;
+  background:var(--ink); color:#fff; font-size:12.5px; font-weight:600; letter-spacing:-.1px;
+  box-shadow:0 10px 30px rgba(20,22,30,.30);
+  opacity:0; pointer-events:none; transition:opacity .16s, transform .16s; }
+#toast.on { opacity:1; transform:translate(-50%, 0); }
+#toast.err { background:var(--point); }
+@media print { #toast { display:none !important; } }
 .side-btns button.pri { border:1.5px solid var(--point); color:var(--point); font-weight:800; }
 .side-btns button.pri:hover { background:var(--point); color:#fff; }
 #folder-msg { padding:2px 18px 6px; color:var(--dim); line-height:1.7; word-break:break-all;
@@ -732,16 +761,23 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <div id="app">
   <aside id="side"><div class="side-ttl"><div class="s-name">문서 편집기</div>
     <div class="s-eyebrow">SAMIL ELTEC CO., LTD.</div></div>
+  <!-- ⭐ 2026-09-01 SKY: "좌측 사이드바 여러개 버튼들도 항목별로 구분감을 추가하자.
+       내꺼 관리시스템 사이드바를 참고 해도 돼." — CP 검사성적서 관리시스템처럼 «작은 묶음
+       이름 + 그 아래 항목»으로 나눈다. 무엇이 무엇인지 눈으로 먼저 갈린다. -->
   <div class="side-btns">
-    <button id="btn-folder">📁 문서 폴더 열기</button>
-    <button id="btn-new">새 문서</button>
+    <div class="sg">문서</div>
+    <button id="btn-folder"><span class="si">📁</span>문서 폴더 열기</button>
+    <button id="btn-new"><span class="si">＋</span>새 문서</button>
+    <div class="sg">꾸미기</div>
     <!-- 머리글·바닥글에 나올 값(제목·문서번호·개정·날짜·회사·로고)을 고치는 유일한 자리 -->
-    <button id="btn-docinfo">문서 정보</button>
-    <button id="btn-save">저장</button>
-    <button id="btn-saveas">다른 이름으로 저장</button>
-    <button id="btn-pdf" class="pri">PDF 저장</button>
+    <button id="btn-docinfo"><span class="si">▤</span>머리글 및 바닥글</button>
+    <div class="sg">저장</div>
+    <button id="btn-save"><span class="si">💾</span>저장</button>
+    <button id="btn-saveas"><span class="si">⎘</span>다른 이름으로 저장</button>
+    <button id="btn-pdf" class="pri"><span class="si">⇩</span>PDF 저장</button>
   </div>
   <div id="folder-msg"></div>
+<div class="sg sg-list">문서 목록</div>
 <div id="doclist"></div>
   <!-- 지금 쓰고 있는 판. 새 판이 올라오면 여기가 «새 버전 있음» 단추로 바뀐다 -->
   <div id="ver" title="지금 쓰는 판"></div></aside>
@@ -903,7 +939,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 13:25";
+window.__BUILD = "2026-09-01 14:09";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -935,6 +971,12 @@ function bodyOf(run) {
     if (run.crop) m.crop = run.crop;
     if (run.rad) m.rad = run.rad;
   }
+  // 부품 목록 참조(ref)도 «몸»이다(설계_부품목록.md §3).
+  // ⛔ 여기 없으면 «조용히» 사라진다 — 토막 정리는 글자를 다시 만들 때 몸만 나르므로,
+  //    타자 한 번·서식 한 번에 참조가 통째로 날아가고 아무 오류도 안 난다.
+  //    그러면 개정번호를 고쳐도 그 서류만 안 바뀌고, SKY 는 그 이유를 알 길이 없다.
+  // ⛔ 서식(markOf)에 넣으면 안 된다 — 걸침 서식 한 번에 참조가 풀린다.
+  if (run && run.ref) m.ref = run.ref;
   return m;
 }
 
@@ -949,7 +991,11 @@ function sameMark(a, b) {
     const y = b && b[k] !== undefined && b[k] !== null ? b[k] : null;
     if (x !== y) return false;
   }
-  return true;
+  // 참조가 다르면 «다른 토막»이다 — 서식이 같다고 합치면 두 부품의 값이 한 덩어리가 되고
+  // 참조 하나만 남아, 다음에 맞출 때 한쪽 값이 다른 쪽 값으로 덮인다(글자가 사라진다).
+  const ra = a && a.ref ? a.ref : null;
+  const rb = b && b.ref ? b.ref : null;
+  return ra === rb;
 }
 
 function runsFromText(text) { return text ? [{ t: String(text) }] : []; }
@@ -1011,7 +1057,9 @@ function applyMark(runs, from, to, key, value) {
     // 겹쳤으면 통째로 겹친 것이므로 그대로 내보내면 된다.
     if (hasImg(r)) { out.push(Object.assign({ t }, bodyOf(r))); continue; }
     if (start < a) out.push(Object.assign({ t: t.slice(0, a - start) }, bodyOf(r)));
-    const m = markOf(r);
+    // ⛔ «몸»으로 만든다(markOf 가 아니다) — 서식만 나르면 부품 목록 참조(ref)가
+    //    굵게 한 번에 조용히 풀린다. 그림은 위에서 이미 걸러졌으므로 여기 몸은 서식＋ref 다.
+    const m = bodyOf(r);
     if (value === null || value === undefined || value === false) delete m[key];
     else m[key] = value;
     out.push(Object.assign({ t: t.slice(Math.max(0, a - start), Math.min(t.length, b - start)) }, m));
@@ -2011,9 +2059,13 @@ function repairBlocks(blocks, assets) {
 
 const DOC_VERSION = 5;   // 4→5: 판 — variants 정의·블록/행 보임·칸 판별 값 (설계_판.md)
 
+// ⭐ 2026-09-01 SKY: "전체 여백을 좀더 좁게 써서, 더 많은 내용이 들어 갈 수 있게.
+//    지금은 여백이 많아보여, 양옆 위아래." 옛 값은 46/60/34/60(텍스트 폭 674)이었다.
+//    ⚠ 이 값은 «새 문서»에만 쓰인다 — 이미 저장한 문서는 제 여백을 그대로 갖고 있다
+//      (deserialize 가 파일의 page 를 이깁니다). 그래야 만들어 둔 서류의 쪽 나눔이 안 바뀐다.
 const DEFAULT_PAGE = {
   width: 794, height: 1123,
-  margin: { top: 46, right: 60, bottom: 34, left: 60 },
+  margin: { top: 34, right: 46, bottom: 26, left: 46 },
 };
 
 function createDocument(meta = {}) {
@@ -2697,6 +2749,18 @@ function imageEl(block, page) {
 // 걸러 그리기만 하고 원본은 한 글자도 안 고친다(설계_판.md P1).
 function renderPages(doc, pagesEl, gaugeEl, view) {
   useAssets(doc.assets);
+  // ⛔ 종이 여백은 «문서마다» 다를 수 있다(파일에 담겨 있다). CSS 에 숫자로 박아 두면
+  //    옛 문서를 열었을 때 종이 여백과 «높이 재는 상자»의 폭이 어긋나 줄바꿈이 달라지고
+  //    쪽 나눔이 통째로 틀어진다. 그래서 그릴 때마다 이 문서의 값을 CSS 변수에 넣는다.
+  {
+    const pg = doc.page || DEFAULT_PAGE;
+    const m = pg.margin || DEFAULT_PAGE.margin;
+    const rs = document.documentElement.style;
+    rs.setProperty('--pg-pad', m.top + 'px ' + m.right + 'px ' + m.bottom + 'px ' + m.left + 'px');
+    rs.setProperty('--pg-l', m.left + 'px');
+    rs.setProperty('--pg-r', m.right + 'px');
+    rs.setProperty('--text-w', (pg.width - m.left - m.right) + 'px');
+  }
   const cur = view || null;
   const blocks = doc.blocks.filter(b => blockVisible(b, cur));     // 투영 — 원본 불변(P1)
   const heights = measureAll(blocks, gaugeEl, (b) => blockEl(b, doc.page, cur), cur);
@@ -7005,7 +7069,8 @@ function attachSidebar({ onResize }) {
 }
 
 /* docinfo.js */
-// 문서 정보 창 — 머리글·바닥글에 나올 값을 고치는 유일한 자리.
+// 「머리글 및 바닥글」 창 — 종이 맨 위·맨 아래에 나올 값을 고치는 유일한 자리.
+// ⚠ 이름은 2026-09-01 SKY 지시로 「문서 정보」에서 바꿨다 — 무엇을 고치는 창인지가 이름에 있어야 한다.
 // 설계: docs/설계_머리글바닥글.md §5. SKY 지시(2026-09-01): "머리글 바닥글은 추천대로 진행".
 //
 // ⛔ 최상위 이름은 attachDocInfo 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로 같은 이름이
@@ -7014,6 +7079,26 @@ function attachSidebar({ onResize }) {
 //    머리글을 편집 칸으로 만들면 글자 번호 셈(offsetIn)에 끼어들어 커서·지우기가 엉뚱한
 //    곳을 문다(설계_판.md P9 와 같은 이유). 그래서 창으로 고친다.
 // ⚠ 「적용」 단추를 두지 않는다(D15 과잉 방어 금지) — 치는 대로 곧바로 문서에 들어간다.
+
+// ⭐ 로고·회사·분류는 «거의 안 바뀌는 것»이다(2026-09-01 SKY: "머리글이나 바닥글에 로고라던가
+// 회사명 같은건 거이 고정으로 쓴단말야"). 그래서 이 셋만 «이 기기의 기본값»으로 기억해 두고,
+// 새 문서를 만들 때 자동으로 채운다. 문서마다 다르게 쓰고 싶으면 그 문서에서 고치면 되고,
+// 그러면 그 문서만 바뀐다(값은 여전히 문서 파일 안에 있다).
+// ⚠ 브라우저에 기억한다(사이드바 폭과 같은 자리) — 문서 파일에는 «그 문서의 값»만 담긴다.
+//   그래야 남에게 문서를 줘도 내 기본값이 따라가지 않는다.
+const DEFKEY = 'doc-editor-hdr-default';
+const DEFAULTABLE = ['logo', 'company', 'category'];
+
+function readHeaderDefaults() {
+  try {
+    const o = JSON.parse(window.localStorage.getItem(DEFKEY) || '{}');
+    const out = {};
+    for (const k of DEFAULTABLE) if (typeof o[k] === 'string' && o[k]) out[k] = o[k];
+    // ⛔ 로고는 그림이 아니면 버린다 — 머리글에 깨진 그림이 박히면 인쇄물이 망가진다
+    if (out.logo && out.logo.indexOf('data:image/') !== 0) delete out.logo;
+    return out;
+  } catch (e) { return {}; }
+}
 
 const FIELDS = [
   ['category', '분류', '예: 기술 서류'],
@@ -7025,7 +7110,7 @@ const FIELDS = [
   ['company', '회사', '바닥글 왼쪽. 비우면 SAMIL ELTEC CO., LTD.'],
 ];
 
-function attachDocInfo({ getDoc, setDoc, redraw }) {
+function attachDocInfo({ getDoc, setDoc, redraw, onSaved }) {
   const btn = document.getElementById('btn-docinfo');
   let el = null;
 
@@ -7052,7 +7137,7 @@ function attachDocInfo({ getDoc, setDoc, redraw }) {
 
     const ttl = document.createElement('div');
     ttl.className = 'di-ttl';
-    ttl.append(document.createTextNode('문서 정보'));
+    ttl.append(document.createTextNode('머리글 및 바닥글'));
     const x = document.createElement('button');
     x.type = 'button';
     x.className = 'di-x';
@@ -7132,6 +7217,33 @@ function attachDocInfo({ getDoc, setDoc, redraw }) {
 
     const foot = document.createElement('div');
     foot.className = 'di-foot';
+    // 「기본으로」 = 로고·회사·분류를 이 기기에 기억한다. 새 문서가 그것을 물려받는다.
+    const save = document.createElement('button');
+    save.type = 'button';
+    save.textContent = '기본으로';
+    save.title = '로고·회사·분류를 이 기기의 기본값으로 기억한다 — 새 문서가 자동으로 물려받는다';
+    save.addEventListener('click', () => {
+      const cur = getDoc().meta || {};
+      const keep = {};
+      for (const k of DEFAULTABLE) if (cur[k]) keep[k] = cur[k];
+      try { window.localStorage.setItem(DEFKEY, JSON.stringify(keep)); } catch (e) { /* 못 기억해도 그만 */ }
+      if (onSaved) onSaved('로고·회사·분류를 기본값으로 기억했습니다 — 새 문서가 물려받습니다');
+    });
+    // 「기본 불러오기」 = 기억해 둔 값을 지금 문서에 넣는다(옛 문서에 나중에 붙일 때 쓴다)
+    const load = document.createElement('button');
+    load.type = 'button';
+    load.textContent = '기본 넣기';
+    load.title = '기억해 둔 로고·회사·분류를 이 문서에 넣는다';
+    load.addEventListener('click', () => {
+      const d = readHeaderDefaults();
+      if (!Object.keys(d).length) { if (onSaved) onSaved('기억해 둔 기본값이 없습니다'); return; }
+      const doc = getDoc();
+      setDoc(Object.assign({}, doc, { meta: Object.assign({}, doc.meta || {}, d) }));
+      redraw();
+      open();
+      if (onSaved) onSaved('기본값을 이 문서에 넣었습니다');
+    });
+    foot.append(save, load);
     const ok = document.createElement('button');
     ok.type = 'button';
     ok.textContent = '닫기';
@@ -7159,6 +7271,37 @@ function attachDocInfo({ getDoc, setDoc, redraw }) {
 
   return { open, close, isOpen: () => !!el, rect: () => (el ? [el.getBoundingClientRect()] : []) };
 }
+
+/* toast.js */
+// 잠깐 뜨는 알림 — 「무엇을 했는지」를 눈에 보이게 한다.
+// 2026-09-01 SKY: "좌측 사이드바를 누르거나 뭐 저장을 하거나 했을 떄 저장을 했는데 뭐 했는데
+// 알 수 가 없어. 토스트 같은게 뜨던가 뭔가 했다는걸 좀 더 효과를 추가 해줘."
+//
+// ⛔ 최상위 이름은 toast·toastErr 둘뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    같은 이름이 둘이면 화면이 통째로 안 뜬다.
+// ⚠ 사이드바의 조용한 안내줄(#folder-msg)은 그대로 둔다 — 그것은 «지금 상태»(어느 폴더인가)를
+//    보여 주는 자리고, 이것은 «방금 무슨 일이 일어났나»를 알리는 자리다. 둘은 하는 일이 다르다.
+// ⚠ 인쇄에는 안 찍힌다(styles.css @media print).
+
+let box = null;
+let timer = 0;
+
+function show(text, kind) {
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'toast';
+    box.setAttribute('contenteditable', 'false');
+    document.body.appendChild(box);
+  }
+  box.textContent = text;
+  box.className = 'on' + (kind ? ' ' + kind : '');
+  clearTimeout(timer);
+  // ⚠ 한 번 껐다 켜야 «같은 글»이 다시 떠도 애니메이션이 다시 돈다
+  timer = setTimeout(() => { if (box) box.className = ''; }, kind === 'err' ? 3600 : 2000);
+}
+
+function toast(text) { show(text, ''); }
+function toastErr(text) { show(text, 'err'); }
 
 /* vbar.js */
 // 판(版) 바·판 관리 창 — 설계_판.md §4-1·§4-5. 판이 없는 문서에는 아무것도 안 보인다.
@@ -7824,6 +7967,8 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
+
 // ⛔ 머리글 높이는 «한 곳»에서만 정한다 — 쪽 나눔을 재는 JS(measure.js HDR_H)와 그리는
 //    CSS 가 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다. JS 값을 CSS 에 넣어 준다.
 document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
@@ -7840,7 +7985,12 @@ function demoDoc() {
     createBlock('section', { no: '01', title: '제어반 적용 범위 및 제품 특기사항' }),
   ];
   const cell = (s) => ({ runs: s ? [{ t: s }] : [] });
-  doc.blocks.push(createBlock('table', {
+  // ⛔ 열 너비 합을 «그 문서의 글 폭»에 맞춘다 — 숫자로 박아 두면 여백을 고치는 순간 어긋난다.
+  //    합이 글 폭과 다르면 표는 화면에서 늘어나 보이는데(table-layout:fixed + width:100%)
+  //    열 손잡이(.colgrip)는 «모델의 px» 자리에 그려져서, 보이는 선과 손잡이가 따로 논다.
+  //    2026-09-01 여백을 674 → 702 로 넓혔을 때 실제로 11px 어긋났다(table-check 가 잡았다).
+  const tw = doc.page.width - doc.page.margin.left - doc.page.margin.right;
+  doc.blocks.push(normalizeWidths(createBlock('table', {
     cols: [{ w: 200, align: 'left' }, { w: 240, align: 'left' }, { w: 234, align: 'center' }],
     head: [[cell('기판 구분'), cell('인쇄회로기판명'), cell('Revision')]],
     rows: [
@@ -7848,7 +7998,7 @@ function demoDoc() {
       [cell('주 제어기판'), cell('UMCB-4000Zi-B'), cell('Rev5.0')],
       [cell('안전회로 경유기판'), cell('EMR-100R'), cell('Rev5.0')],
     ],
-  }));
+  }), tw));
   for (let i = 1; i <= 60; i++) {
     doc.blocks.push(createBlock('para', {
       text: i + '. 안전회로의 전압은 AC 110V 를 사용하며, 브레이크 및 도어 모터 전압은 따로 분기한다.',
@@ -8130,7 +8280,8 @@ window.__app.sidebarApi = sidebarApi;
 // ⚠ 되돌리기(Ctrl+Z)는 «글(blocks)과 판(variants)»만 담는다 — 문서 정보(meta)는 안 담긴다.
 //   되돌려도 meta 는 그대로 남으므로 «글이 망가지는» 위험은 없고, 문서 정보는 창에서 다시
 //   치면 된다. 되돌리기에까지 담으려면 core/history.js 와 모든 push 자리를 함께 고쳐야 한다.
-const docInfoApi = attachDocInfo({ getDoc: () => state.doc, setDoc: applyDoc, redraw: draw });
+const docInfoApi = attachDocInfo({ getDoc: () => state.doc, setDoc: applyDoc, redraw: draw,
+  onSaved: toast });
 window.__app.docInfoApi = docInfoApi;
 
 // 판(版) 바 — 판이 있는 문서에서만 리본 아래에 나타난다(설계_판.md §4-1).
@@ -8153,6 +8304,9 @@ window.__app.vbarApi = vbarApi;
 state.dir = null;
 state.name = null;
 
+// #folder-msg 는 «지금 상태»(어느 폴더인가)를 적는 조용한 줄이다 — 그대로 둔다.
+// 「방금 무슨 일이 일어났나」는 토스트가 알린다(2026-09-01 SKY: "저장을 했는데 뭐 했는데
+// 알 수가 없어"). 둘은 하는 일이 다르므로 하나로 합치지 않는다.
 function msg(t) { document.getElementById('folder-msg').textContent = t; }
 
 // 문서를 어디에 담을지는 «사람이 폴더를 골라야» 정해진다(브라우저 보안 — 프로그램이 마음대로 못 연다).
@@ -8187,7 +8341,7 @@ async function refreshList() {
         draw();
         vbarApi.refresh();            // 다른 문서다 — 판 바를 이 문서의 판으로 갈아 끼운다
         refreshList();
-      } catch (e) { msg('문서를 열지 못했다: ' + e.message); }
+      } catch (e) { msg('문서를 열지 못했다: ' + e.message); toastErr('문서를 열지 못했습니다 — ' + e.message); }
     });
     box.appendChild(a);
   }
@@ -8197,6 +8351,7 @@ async function useDir(handle) {
   state.dir = handle;
   await rememberDir(handle);
   msg(dirLabel(handle));
+  toast('문서 폴더를 열었습니다 — ' + handle.name);
   await refreshList();
 }
 
@@ -8269,8 +8424,9 @@ async function openFileHandle(fh) {
     draw();
     vbarApi.refresh();                // 다른 문서다 — 판 바를 이 문서의 판으로 갈아 끼운다
     msg('파일: ' + fh.name);
+    toast('문서를 열었습니다 — ' + fh.name);
     refreshList();
-  } catch (e) { msg('문서를 열지 못했다: ' + e.message); }
+  } catch (e) { msg('문서를 열지 못했다: ' + e.message); toastErr('문서를 열지 못했습니다 — ' + e.message); }
 }
 
 if ('launchQueue' in window && 'files' in LaunchParams.prototype) {
@@ -8292,7 +8448,8 @@ document.getElementById('btn-save').addEventListener('click', async () => {
       await w.write(serializeSwept());
       await w.close();
       msg('저장함: ' + state.fileHandle.name);
-    } catch (e) { msg('저장하지 못했다: ' + e.message); }
+      toast('저장했습니다 — ' + state.fileHandle.name);
+    } catch (e) { msg('저장하지 못했다: ' + e.message); toastErr('저장하지 못했습니다 — ' + e.message); }
     return;
   }
   if (!state.dir) { msg(NEED_DIR); return; }
@@ -8301,13 +8458,17 @@ document.getElementById('btn-save').addEventListener('click', async () => {
     await writeDoc(state.dir, name, serializeSwept());
     state.name = name;
     msg('저장함: ' + name);
+    toast('저장했습니다 — ' + name);
     await refreshList();
-  } catch (e) { msg('저장하지 못했다: ' + e.message); }
+  } catch (e) { msg('저장하지 못했다: ' + e.message); toastErr('저장하지 못했습니다 — ' + e.message); }
 });
 
 // 새 문서 — 빈 문단 하나로 시작한다. 저장 전에는 파일이 없다(워드와 같다).
 document.getElementById('btn-new').addEventListener('click', () => {
-  state.doc = createDocument();
+  // ⭐ 로고·회사·분류는 «거의 안 바뀌는 것»이라 이 기기의 기본값을 물려받는다
+  //    (2026-09-01 SKY: "머리글이나 바닥글에 로고라던가 회사명 같은건 거이 고정으로 쓴단말야").
+  //    「머리글 및 바닥글」 창의 「기본으로」 단추가 그 값을 기억시킨다.
+  state.doc = createDocument(readHeaderDefaults());
   state.name = null;
   state.view = null;                    // 새 문서다 — 앞 문서의 판 보기는 버린다
   state.fileHandle = null;
@@ -8316,6 +8477,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
   vbarApi.refresh();                  // 새 문서는 판이 없다 — 판 바가 사라진다
   refreshList();
   msg('새 문서 — 저장하면 파일이 생깁니다');
+  toast('새 문서를 만들었습니다');
 });
 
 // 다른 이름으로 저장 — 지금 열린 폴더에 새 파일을 만든다(R15).
@@ -8326,7 +8488,7 @@ document.getElementById('btn-saveas').addEventListener('click', async () => {
   const input = window.prompt('다른 이름으로 저장 — 새 파일 이름:', cur);
   if (input === null) return;                                    // 사람이 취소한 것
   const name = input.trim().replace(/[\\/:*?"<>|]/g, '').replace(DOC_EXT, '');
-  if (!name) { msg('이름이 비었습니다'); return; }
+  if (!name) { msg('이름이 비었습니다'); toastErr('이름이 비었습니다'); return; }
   const full = name + DOC_EXT;
   try {
     // ⛔ 이미 있으면 «편집 중인 그 파일이라도» 물어본다(워드와 같다) — 다른 문서가 조용히
@@ -8337,8 +8499,9 @@ document.getElementById('btn-saveas').addEventListener('click', async () => {
     state.name = full;
     state.fileHandle = null;          // 이제 폴더의 이 파일이 «지금 문서»다
     msg('저장함: ' + full);
+    toast('저장했습니다 — ' + full);
     await refreshList();
-  } catch (e) { msg('저장하지 못했다: ' + e.message); }
+  } catch (e) { msg('저장하지 못했다: ' + e.message); toastErr('저장하지 못했습니다 — ' + e.message); }
 });
 
 if (!isSupported()) msg('⚠ 이 브라우저는 폴더 열기를 지원하지 않는다. 크롬·엣지로 열어야 한다');
