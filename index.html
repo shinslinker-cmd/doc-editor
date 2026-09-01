@@ -34,10 +34,23 @@ body { margin:0; background:var(--desk); color:var(--ink);
    조작부의 글자는 «내용»이 아니므로 못 고르게 하는 것이 맞다.
    ⚠ #pages(문서)에는 절대 걸지 않는다 — 거기서는 글을 골라야 한다. */
 #side, #bar, #vbar { -webkit-user-select:none; user-select:none; }
-#side { width:250px; flex:none; background:#fff; color:var(--ink);
+/* ⭐ 사이드바 폭은 변수다 — 사람이 손잡이를 끌어 바꾸고(ui/sidebar.js) 기억된다.
+   좁은 화면(태블릿)에서는 기본값을 줄인다 — 종이(794px) 옆에 판 이름표가 설 자리를
+   그만큼 벌어 준다(2026-09-01 SKY: "태블릿에서 사이드바 너비도 좀 줄이고").
+   ⚠ 사람이 손으로 정한 폭이 있으면 그것이 이긴다(스크립트가 :root 에 직접 넣는다). */
+:root { --sbw: 250px; }
+@media (max-width: 1200px) { :root { --sbw: 190px; } }
+#side { width:var(--sbw); flex:none; background:#fff; color:var(--ink);
         border-right:1px solid var(--line); padding:0;
         display:flex; flex-direction:column;
         position:sticky; top:0; height:100vh; overflow-y:auto; }
+/* 너비 손잡이 — 사이드바가 스크롤되는 상자라 그 «안»에 두면 같이 굴러간다. fixed 로 띄운다.
+   ⚠ touch-action:none 이 있어야 태블릿에서 끌기가 «화면 넘기기»에 먼저 잡히지 않는다. */
+#sbresize { position:fixed; top:0; bottom:0; left:calc(var(--sbw) - 3px); width:7px; z-index:20;
+            cursor:ew-resize; touch-action:none; }
+#sbresize::after { content:''; position:absolute; inset:0 3px; background:transparent; }
+#sbresize:hover::after, #sbresize.on::after { background:#5490ff; }
+@media print { #sbresize { display:none !important; } }
 #side .side-ttl, #side .side-btns, #folder-msg { flex:none; }
 #side .side-ttl { padding:24px 18px 16px; border-bottom:1.5px solid var(--ink); position:relative; }
 #side .side-ttl::after { content:''; position:absolute; left:0; bottom:-1.5px;
@@ -522,6 +535,36 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 #vmgr .vmgr-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vc, #8a8e98); }
 #vmgr .vmgr-row .nm { flex: 1; font-weight: 600; }
 #vmgr button { font-size: 12px; padding: 2px 8px; }
+/* 판별 값 창 (2026-09-01 SKY) — 한 칸이 판마다 어떤 값인지 모아 보고 그 자리에서 고친다.
+   판 관리 창과 같은 계열의 작은 카드다. body 에 살아서 종이가 다시 그려져도 안 흔들린다.
+   ⚠ z-index 는 관리 창(60)과 같은 층 — 둘이 동시에 뜰 일이 없다(입구가 다르다). */
+#vvals { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); z-index: 60;
+  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px 12px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px; min-width: 380px;
+  max-width: min(560px, 92vw); }
+#vvals .vv-ttl { display: flex; align-items: center; justify-content: space-between;
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
+#vvals .vv-x { border: 0; background: none; cursor: pointer; color: var(--dim);
+  font-size: 13px; line-height: 1; padding: 2px 4px; }
+#vvals .vv-x:hover { color: var(--ink); }
+#vvals .vv-note { color: var(--point); font-size: 11.5px; line-height: 1.45; margin: 2px 0 8px; }
+/* 한 줄: [색점] 이름(60px) [값 칸 — 남는 자리 전부] [단추] */
+#vvals .vv-row { display: grid; grid-template-columns: 10px 62px 1fr auto;
+  align-items: center; gap: 7px; padding: 3px 0; }
+#vvals .vv-row .dot { width: 9px; height: 9px; border-radius: 50%; background: #8a8e98; }
+#vvals .vv-row .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#vvals .vv-row input { min-width: 0; width: 100%; height: 28px; padding: 0 7px;
+  border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
+#vvals .vv-row input:disabled { background: #f6f7fa; color: var(--dim); }
+#vvals .vv-same { color: var(--dim); font-size: 11.5px; }
+#vvals .vv-row button, #vvals .vv-foot button { height: 28px; padding: 0 9px; font-size: 12px;
+  border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
+#vvals .vv-row button:hover, #vvals .vv-foot button:hover { background: #f5f6f8; }
+#vvals .vv-row button:disabled, #vvals .vv-foot button:disabled { opacity: .4; cursor: default; }
+#vvals .vv-foot { display: flex; gap: 6px; justify-content: flex-end;
+  border-top: 1px solid var(--line-soft); margin-top: 9px; padding-top: 9px; }
+@media print { #vvals { display: none !important; } }
+
 /* 「보일 판」 고르기 팝업 (설계 §4-4) — 판 관리 창(60) «위»에 뜬다(61). 목록이 동적이라 JS 로 만든다 */
 #vpick { position: fixed; top: 130px; left: 50%; transform: translateX(-50%); z-index: 61;
   background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 10px 12px;
@@ -560,6 +603,8 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <div id="doclist"></div>
   <!-- 지금 쓰고 있는 판. 새 판이 올라오면 여기가 «새 버전 있음» 단추로 바뀐다 -->
   <div id="ver" title="지금 쓰는 판"></div></aside>
+  <!-- 사이드바 너비 손잡이 — 끌면 사이드바가 넓어지고 좁아진다(ui/sidebar.js). 기억한다. -->
+  <div id="sbresize" title="끌어서 사이드바 너비 조절"></div>
   <main id="main">
     <div id="bar">
       <!-- 같은 기능은 한 묶음(tbg) — 좁은 화면에서 줄바꿈될 때 묶음째 내려간다 (2026-08-30 SKY) -->
@@ -648,6 +693,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
       <span class="tbg tbg-table" data-label="판" data-ctx="vars" hidden>
       <button class="tb" data-vars="block" title="이 블록(문단·표·그림)이 어느 판에 보일지 고른다 — 지정이 없으면 모든 판">보일 판…</button>
       <button class="tb" data-vars="row" title="이 행(세로로 묶인 행은 묶음째)이 어느 판에 보일지 고른다">행 보일 판…</button>
+      <button class="tb" data-vars="cellvals" title="이 칸이 판마다 어떤 값인지 한 창에서 보고 그 자리에서 고친다 — 판별로 만들기·공통으로 되돌리기·전부 통일까지">판별 값…</button>
       <button class="tb" data-vars="cellmake" title="이 칸의 값을 지금 보는 판에서만 다르게 — 이후 타자는 이 판 값만 고친다. 판 보기에서만 쓸 수 있다">이 칸 판별로</button>
       <button class="tb" data-vars="cellclear" title="이 칸의 판별 값을 전부 지우고 «지금 보이는 값»을 공통값으로 남긴다">판별 풀기</button>
       <!-- ⭐ 이 단추는 «늘 숨어» 있다. 판이 0개인 문서에는 판 바도 이 묶음도 없어서 판 관리 창을
@@ -667,7 +713,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 09:45";
+window.__BUILD = "2026-09-01 10:11";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -6136,6 +6182,9 @@ const MENU_ITEMS = {
     // 판(版) — 표 칸에서는 «행»과 «칸»까지 다룬다. 「보일 판…」 은 이 표 블록 전체에 붙는다.
     { label: '보일 판…', press: '[data-vars="block"]', when: 'vars' },
     { label: '행 보일 판…', press: '[data-vars="row"]', when: 'vars' },
+    // ⭐ 「판별 값…」 이 판마다의 값을 한 창에 모아 보여 준다(2026-09-01 SKY). 아래 두 항목은
+    //    그 창 안에서도 할 수 있지만, 손에 익은 길을 없애지 않으려고 그대로 둔다.
+    { label: '판별 값…', press: '[data-vars="cellvals"]', when: 'vars' },
     { label: '이 칸 판별로', press: '[data-vars="cellmake"]', when: 'vars' },
     { label: '판별 풀기', press: '[data-vars="cellclear"]', when: 'vars' },
     { label: '판 관리…', press: '[data-vars="mgr"]' },
@@ -6472,9 +6521,24 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
 
 const MINZOOM = 0.55;   // 이보다 작아지면 글자를 못 읽는다 — 거기서 멈춘다
 const SLACK = 10;       // 종이 옆에 남기는 숨통(px). 0 이면 그림자가 잘려 답답하다
+const TAGGAP = 14;      // 종이 끝과 판 이름표 사이 (styles.css 의 .vtag left offset 과 같아야 한다)
 
 function attachFit({ mainEl, pagesEl, getDoc }) {
   let last = -1;
+  let lastPad = -1;
+
+  // ⭐ 전체보기의 «판 이름표»는 종이 밖에 선다 — 그 자리를 안 세면 이름표가 잘린다
+  //    (2026-09-01 SKY: 태블릿에서 첫 글자만 보였다). 판 보기·판 없는 문서면 0 이라
+  //    지금까지와 똑같이 동작한다.
+  // ⚠ 반드시 zoom 을 벗긴 «맨 크기»로 재야 한다 — 부르는 쪽이 벗겨 놓고 부른다.
+  function tagRoom() {
+    let w = 0;
+    for (const t of pagesEl.querySelectorAll('.vtag')) {
+      const r = t.getBoundingClientRect().width;
+      if (r > w) w = r;
+    }
+    return w ? Math.ceil(w) + TAGGAP : 0;
+  }
 
   function fit() {
     const doc = getDoc && getDoc();
@@ -6484,12 +6548,20 @@ function attachFit({ mainEl, pagesEl, getDoc }) {
     pagesEl.style.zoom = '';
     const room = mainEl.clientWidth;
     if (!room) return;
-    let z = (room - SLACK) / paper;
+    // 종이는 가운데 정렬이라, 아무것도 안 해도 이름표가 보이려면 자리가 «양쪽»으로
+    // 이름표 폭만큼 있어야 한다. 그만큼 넉넉하면 손대지 않는다(넓은 화면은 지금 그대로).
+    // 모자라면 오른쪽에만 자리를 비우고(padding), 그래도 모자라면 그때 줄인다.
+    const gutter = tagRoom();
+    const 넉넉 = !gutter || room - SLACK >= paper + gutter * 2;
+    const pad = 넉넉 ? 0 : gutter;
+    let z = (room - SLACK) / (paper + pad);
     if (z >= 1) z = 1;                       // 자리가 넉넉하면 손대지 않는다
     else if (z < MINZOOM) z = MINZOOM;
     z = Math.round(z * 1000) / 1000;
-    if (z === last && z === 1) { pagesEl.style.zoom = ''; return; }
+    if (z === last && pad === lastPad && z === 1 && !pad) { pagesEl.style.zoom = ''; return; }
     last = z;
+    lastPad = pad;
+    pagesEl.style.paddingRight = pad ? pad + 'px' : '';
     pagesEl.style.zoom = z === 1 ? '' : String(z);
   }
 
@@ -6503,12 +6575,77 @@ function attachFit({ mainEl, pagesEl, getDoc }) {
   return { fit, zoomNow: () => (Number(pagesEl.style.zoom) || 1) };
 }
 
+/* sidebar.js */
+// 사이드바 너비 조절 — 손잡이를 끌면 사이드바가 넓어지고 좁아진다. 기억한다.
+// 2026-09-01 SKY: "태블릿에서 사이드바 너비도 좀 줄이고(일단 사이드바 너비는 조절할 수 있게
+// 기존처럼)". «기존» = 옛 4.4MB 프로그램의 같은 기능(손잡이 끌기 · 180~480px · 브라우저에 기억).
+//
+// ⛔ 최상위 이름은 attachSidebar 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로 같은 이름이
+//    둘이면 화면이 통째로 안 뜬다.
+// ⚠ 옛 프로그램은 mouse 사건만 들었다 — 태블릿에서는 손가락으로 못 끌었다.
+//    여기서는 pointer 사건을 쓴다(마우스·손가락·S펜이 한 길로 들어온다).
+// ⚠ 폭은 브라우저에 기억한다(localStorage). 문서가 아니라 «이 기기에서 보는 방식»이라
+//    문서 파일에 넣지 않는다.
+
+const KEY = 'doc-editor-sbw';
+const MIN = 180;
+const MAX = 480;
+
+function attachSidebar({ onResize }) {
+  const grip = document.getElementById('sbresize');
+  if (!grip) return { widthNow: () => 0 };
+
+  const put = (w) => document.documentElement.style.setProperty('--sbw', w + 'px');
+  const clamp = (w) => Math.max(MIN, Math.min(MAX, Math.round(w)));
+
+  // 기억해 둔 폭이 있으면 되살린다 — 없으면 CSS 기본값(넓은 화면 250 · 좁은 화면 190)을 쓴다.
+  // ⚠ 값이 망가져 있어도(사람이 손댔거나 옛 판) 조용히 무시하고 기본값으로 간다.
+  try {
+    const saved = parseInt(window.localStorage.getItem(KEY) || '', 10);
+    if (saved >= MIN && saved <= MAX) put(saved);
+  } catch (e) { /* 사생활 보호 모드 등 — 기억이 안 되는 것뿐이라 그냥 간다 */ }
+
+  let dragging = false;
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    grip.classList.add('on');
+    grip.setPointerCapture(e.pointerId);      // 손가락이 손잡이 밖으로 나가도 계속 따라온다
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    put(clamp(e.clientX));                    // 화면 왼쪽 끝에서 손끝까지가 곧 사이드바 폭이다
+    if (onResize) onResize();
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    grip.classList.remove('on');
+    const w = parseInt(getComputedStyle(document.documentElement)
+      .getPropertyValue('--sbw'), 10);
+    if (w >= MIN && w <= MAX) {
+      try { window.localStorage.setItem(KEY, String(w)); } catch (e) { /* 못 기억해도 그만 */ }
+    }
+    if (onResize) onResize();
+  };
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+
+  return {
+    widthNow: () => parseInt(getComputedStyle(document.documentElement)
+      .getPropertyValue('--sbw'), 10) || 0,
+    // 검사 도구가 «사람이 끈 것처럼» 폭을 정할 수 있게 열어 둔다
+    setWidth: (w) => { put(clamp(w)); if (onResize) onResize(); },
+  };
+}
+
 /* vbar.js */
 // 판(版) 바·판 관리 창 — 설계_판.md §4-1·§4-5. 판이 없는 문서에는 아무것도 안 보인다.
 // ⛔ 최상위 이름은 attachVbar 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로 같은 이름이
 //    둘이면 화면이 통째로 안 뜬다. 안쪽 이름(refresh·apply·delOne·mgrEl…)은 전부
 //    이 함수 «안»에 갇혀 있어 다른 파일과 부딪히지 않는다.
 // ⚠ 판 바는 #pages 밖(리본 아래)이라 좁은 화면 자동 축소(zoom)를 안 받고 인쇄에도 안 찍힌다.
+
 
 
 
@@ -6686,6 +6823,9 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
     };
     set('block', !!t);                              // 블록·고른 그림 — 대상이 있으면 된다
     set('row', 칸 && t.cell[0] !== 'h');            // 머리글은 늘 공통이다(P6) — 행 지정이 없다
+    // ⭐ 「판별 값…」 은 판별 칸이 아니어도 쓴다 — 공통 칸에서 «판별로» 를 시작하는
+    //    가장 쉬운 입구이기도 하다(설계: 정해야 할 것 2번, 추천안 그대로).
+    set('cellvals', 칸 && !!cellObj);
     set('cellmake', 칸 && !!cellObj);
     set('cellclear', 칸 && !!cellObj && !!Object.keys((cellObj || {}).vals || {}).length);
   }
@@ -6773,6 +6913,8 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
     const kind = btn.dataset.vars;
     // 판 관리 창 열기는 «대상»이 없어도 된다 — 판이 0개인 문서의 유일한 입구다(우클릭 메뉴 대행)
     if (kind === 'mgr') { openMgr(); return; }
+    // 「판별 값…」 — 칸이 아니면 창 스스로 «칸을 누르세요» 라고 알려 준다(여기서 조용히 안 삼킨다)
+    if (kind === 'cellvals') { openVals(null); return; }
     const doc = getDoc();
     const t = target();
     if (!t) return;
@@ -6839,6 +6981,193 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
         putCell(t, clearCellVariant(cellObj, getView()));
       }
     }
+  });
+
+  // ══ 판별 값 창 (2026-09-01 SKY) ═══════════════════════════════════════════════
+  // SKY 원문: "삼각형 부분을 클릭 하면 뭐가 다른지 볼수 있나? 어떤 판은 어떤 값이고 …
+  //            그 창이 뜬 상태에서도 수정 가능하게끔 … 통일 시킬수도 있고"
+  // 한 칸이 판마다 어떤 값인지 «한 창에» 모아 보여 주고, 그 자리에서 고친다.
+  // ⛔ 창은 document.body 에 산다 — 편집 칸 «안»에 글자 노드를 만들면 커서 셈이 어긋난다(P9).
+  // ⚠ 「적용」 단추를 두지 않는다(D15 과잉 방어 금지) — 치는 대로 곧바로 문서에 들어간다.
+  let valsEl = null;
+  let valsFor = null;              // { kind:'cell', id, cell } — 지금 창이 보고 있는 칸
+
+  const closeVals = () => { if (valsEl) { valsEl.remove(); valsEl = null; valsFor = null; } };
+
+  // 글자만 갈아 끼우고 «서식은 그대로» 둔다 — 첫 토막의 서식(굵게·색·모노…)을 물려준다.
+  // ⛔ 이게 없으면 기준 열의 모노 서식이 창에서 한 글자만 고쳐도 통째로 풀린다.
+  function reText(runs, text) {
+    const m = Object.assign({}, (runs && runs[0]) || {});
+    delete m.t;
+    delete m.img; delete m.src$; delete m.crop; delete m.rad;   // 그림은 안 나른다
+    return text ? [Object.assign({ t: text }, m)] : [];
+  }
+  const hasImg = (runs) => (runs || []).some(r => r && (r.img || r.src$));
+  // 「이 판만 공통으로」 — 그 판의 벌 하나만 뗀다(전부 푸는 clearCellVariant 와 다르다)
+  function dropVal(cell, id) {
+    if (!cell || !cell.vals || !Object.prototype.hasOwnProperty.call(cell.vals, id)) return cell;
+    const vals = Object.assign({}, cell.vals);
+    delete vals[id];
+    const nc = Object.assign({}, cell);
+    if (Object.keys(vals).length) nc.vals = vals; else delete nc.vals;
+    return nc;
+  }
+
+  function openVals(t0) {
+    const t = t0 || target();
+    if (!t || t.kind !== 'cell') {
+      window.alert('표 칸에서 쓰는 창입니다 — 값을 볼 칸을 먼저 누르세요');
+      return;
+    }
+    const doc = getDoc();
+    if (!(doc.variants || []).length) { window.alert('이 문서에는 판이 없습니다'); return; }
+    const b = doc.blocks.find(x => x.id === t.id);
+    const cell = b && cellOf(b, t.cell);
+    if (!cell) return;
+    closeVals();
+    valsFor = t;
+
+    valsEl = document.createElement('div');
+    valsEl.id = 'vvals';
+    valsEl.setAttribute('contenteditable', 'false');
+    const 그림칸 = hasImg(cell.runs) || Object.values(cell.vals || {}).some(hasImg);
+
+    const ttl = document.createElement('div');
+    ttl.className = 'vv-ttl';
+    ttl.append(document.createTextNode('판별 값'));
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'vv-x';
+    x.title = '닫기';
+    x.textContent = '✕';
+    x.addEventListener('click', closeVals);
+    ttl.appendChild(x);
+    valsEl.appendChild(ttl);
+
+    if (그림칸) {
+      const n = document.createElement('div');
+      n.className = 'vv-note';
+      n.textContent = '그림이 든 칸이라 여기서는 값을 못 고칩니다 — 판을 고르고 칸에서 직접 고치세요.';
+      valsEl.appendChild(n);
+    }
+
+    // 한 줄 = [색점] 이름 [값 칸] [단추]
+    const row = (id, name, color) => {
+      const r = document.createElement('div');
+      r.className = 'vv-row';
+      const dot = document.createElement('span');
+      dot.className = 'dot';
+      if (color) dot.style.background = color; else dot.style.visibility = 'hidden';
+      const nm = document.createElement('span');
+      nm.className = 'nm';
+      nm.textContent = name;
+      r.append(dot, nm);
+      return r;
+    };
+
+    const 다시 = () => { const keep = valsFor; closeVals(); openVals(keep); };
+
+    // ① 공통값 — 벌이 없는 판이 쓰는 값
+    const cur = () => cellOf(getDoc().blocks.find(x => x.id === t.id), t.cell) || { runs: [] };
+    const r0 = row(null, '공통', null);
+    const in0 = document.createElement('input');
+    in0.type = 'text';
+    in0.value = runsText(cell.runs || []);
+    in0.disabled = 그림칸;
+    in0.title = '벌이 없는 판이 모두 이 값을 씁니다 — 여기를 고치면 그 판들이 함께 바뀝니다';
+    in0.addEventListener('input', () => {
+      const c = cur();
+      putCell(t, Object.assign({}, c, { runs: reText(c.runs, in0.value) }));
+      redraw();
+    });
+    r0.appendChild(in0);
+    valsEl.appendChild(r0);
+
+    // ② 판마다 한 줄
+    for (const v of doc.variants) {
+      const has = !!(cell.vals && Object.prototype.hasOwnProperty.call(cell.vals, v.id));
+      const r = row(v.id, v.name, variantColor(doc, v.id).fg);
+      if (has) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = runsText(cell.vals[v.id] || []);
+        inp.disabled = 그림칸;
+        inp.addEventListener('input', () => {
+          const c = cur();
+          const vals = Object.assign({}, c.vals || {});
+          vals[v.id] = reText(vals[v.id], inp.value);
+          putCell(t, Object.assign({}, c, { vals }));
+          redraw();
+        });
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = '공통으로';
+        btn.title = '이 판의 값을 지우고 다시 공통값을 쓰게 한다';
+        btn.addEventListener('click', () => { putCell(t, dropVal(cur(), v.id)); redraw(); 다시(); });
+        r.append(inp, btn);
+      } else {
+        const same = document.createElement('span');
+        same.className = 'vv-same';
+        same.textContent = '공통을 씀';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = '판별로';
+        btn.title = '이 판만 다른 값을 갖게 한다 — 지금 공통값을 복사해 시작한다';
+        btn.disabled = 그림칸;
+        btn.addEventListener('click', () => {
+          putCell(t, makeCellVariant(cur(), v.id));
+          redraw();
+          다시();
+        });
+        r.append(same, btn);
+      }
+      valsEl.appendChild(r);
+    }
+
+    // ③ 아래 단추 — 통일
+    const foot = document.createElement('div');
+    foot.className = 'vv-foot';
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.textContent = '전부 공통으로';
+    all.title = '판별 값을 모두 지우고 «지금 보이는 값» 하나로 통일한다';
+    all.disabled = !Object.keys(cell.vals || {}).length;
+    all.addEventListener('click', () => {
+      const c = cur();
+      const n = Object.keys(c.vals || {}).length;
+      if (!n) return;
+      // 데이터가 사라지는 자리 — 몇 벌이 지워지는지 먼저 세어 보여준다(P5·D15 예외)
+      if (!window.confirm('판별 값 ' + n + '벌을 지우고 «지금 보이는 값»으로 통일합니다.\n'
+        + '(Ctrl+Z 한 번으로 되돌릴 수 있습니다)')) return;
+      putCell(t, clearCellVariant(c, getView()));
+      redraw();
+      다시();
+    });
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = '닫기';
+    close.addEventListener('click', closeVals);
+    foot.append(all, close);
+    valsEl.appendChild(foot);
+
+    document.body.appendChild(valsEl);
+  }
+
+  // Esc 로 닫는다 — 관리 창·고르기 팝업과 같은 규칙
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVals(); });
+
+  // ⭐ 판별 칸의 «모서리 삼각형»을 눌러도 열린다(SKY 원문). 삼각형은 CSS 로 그린 그림이라
+  //    누를 수가 없으므로, 칸의 오른쪽 위 모서리 18×18px 을 손잡이로 삼는다.
+  // ⚠ 태블릿에서는 이 18px 도 손가락에 작다 — 그쪽 입구는 리본 「판별 값…」 단추다.
+  pagesEl.addEventListener('click', (e) => {
+    const td = e.target && e.target.closest && e.target.closest('td.vcell');
+    if (!td) return;
+    const r = td.getBoundingClientRect();
+    if (e.clientX < r.right - 18 || e.clientY > r.top + 18) return;
+    const blk = td.closest('.blk');
+    if (!blk) return;
+    openVals({ kind: 'cell', id: blk.dataset.id,
+      cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] });
   });
 
   function putCell(t, nextCell) {
@@ -6919,6 +7248,7 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
 const APP_NAME = '문서 편집기';
 document.title = APP_NAME;
 
@@ -6947,6 +7277,10 @@ function demoDoc() {
   }
   return doc;
 }
+
+// ⚠ 아래 attachFit 이 채운다. draw() 가 이 이름을 쓰므로 «먼저» 선언해 둔다 —
+//   const 로 아래에만 두면 첫 draw() 가 「초기화 전 접근」으로 터진다.
+let fitApi = null;
 
 function draw(opt = {}) {
   const pagesEl = document.getElementById('pages');
@@ -7022,6 +7356,10 @@ function draw(opt = {}) {
     const host = hostOf({ id: keepId, item: keepItem, cell: keepCell, cap: keepCap });
     if (host) caretTo(host, keepPos);
   }
+  // ⚠ 판을 오가면 «판 이름표»가 생겼다 사라진다 — 종이 옆에 비워 둘 자리가 달라지는데
+  //    화면 크기는 그대로라 ResizeObserver 가 안 깨어난다. 그래서 그릴 때마다 한 번 맞춘다.
+  //    (아무것도 안 바뀌면 fit() 은 곧바로 물러난다.)
+  if (fitApi) fitApi.fit();
   return r;
 }
 
@@ -7193,12 +7531,17 @@ const menuApi = attachMenu({
 window.__app.menuApi = menuApi;
 
 // 좁은 화면에서 종이를 화면에 맞게 줄여 보여 준다(2026-08-31 SKY). 자리가 넉넉하면 그대로.
-const fitApi = attachFit({
+fitApi = attachFit({
   mainEl: document.getElementById('main'),
   pagesEl: document.getElementById('pages'),
   getDoc: () => state.doc,
 });
 window.__app.fitApi = fitApi;
+
+// 사이드바 너비 손잡이 — 끌면 #main 이 넓어지고 좁아지므로 종이 배율을 곧바로 다시 맞춘다.
+// (ResizeObserver 도 결국 깨어나지만, 끄는 «동안» 따라오게 하려면 여기서 직접 부른다.)
+const sidebarApi = attachSidebar({ onResize: () => fitApi.fit() });
+window.__app.sidebarApi = sidebarApi;
 
 // 판(版) 바 — 판이 있는 문서에서만 리본 아래에 나타난다(설계_판.md §4-1).
 // ⚠ mainEl·docName 은 「판별 PDF」가 쓰던 것이라 그 기능과 함께 뺐다(2026-09-01 SKY).
