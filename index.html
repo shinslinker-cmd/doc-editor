@@ -79,17 +79,42 @@ body { margin:0; background:var(--desk); color:var(--ink);
 
 /* 위쪽 도구모음 — 화면에 붙어 있고 문서와 함께 스크롤되지 않는다 */
 /* 줄 사이는 조금 넓게 — 표 묶음의 「표」 이름표가 윗줄에 붙어 답답해 보였다(캡처 실측) */
-#bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:12px 6px;
-       align-items:center; padding:8px 16px; background:#fff;
+#bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:10px 5px;
+       align-items:center; padding:7px 14px; background:#fff;
        border-bottom:1px solid var(--line); box-shadow:0 1px 6px rgba(20,22,30,.06); }
 /* ⛔ 버튼 글자는 꺾지 않는다(white-space) · 버튼도 줄이지 않는다(flex:none) —
    자리가 모자라면 글자가 두 줄이 되는 게 아니라 버튼 줄이 다음 줄로 내려간다 */
-.tb { min-width:56px; height:42px; padding:0 12px; border:1px solid var(--line);
+/* ⭐ 단추는 «심볼 + 작은 이름»의 두 칸이고 크기가 하나로 고정이다 (2026-09-01 SKY:
+   "해당 항목에 맞는 심볼 모양을 하나씩 추가해서 표시 하고, 그 심볼 아래 작게 대략적인
+   기능 … 버튼들의 크기를 어느 하나의 높이 및 너비로 고정 하는거야. 정렬 되게끔.")
+   옛 모양은 «글자 길이만큼» 넓어져 「굵게」는 56px, 「아래 나누기」는 100px 이라
+   줄이 들쭉날쭉했다. 이제 전부 60×52 라 격자처럼 줄이 맞는다.
+   ⚠ 이름(.lb)은 5글자를 넘기지 않는다 — 넘으면 60px 을 벗어나 잘린다. */
+.tb { width:58px; height:44px; padding:0; border:1px solid var(--line);
       border-radius:6px; background:#fff; color:var(--ink); cursor:pointer;
-      white-space:nowrap; flex:none;
+      white-space:nowrap; flex:none; overflow:hidden;
+      display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
       font:600 12.5px 'Noto Sans KR','맑은 고딕',sans-serif;
-      transition:transform .12s, box-shadow .12s, background .12s; }
-.tb:hover { transform:translateY(-2px); box-shadow:0 3px 10px rgba(20,22,30,.12); }
+      transition:box-shadow .12s, background .12s, border-color .12s; }
+.tb .ic { display:flex; align-items:center; justify-content:center;
+          height:15px; font-size:13.5px; line-height:1; }
+.tb .ic svg, svg.ic { width:17px; height:13px; display:block; }
+.tb .lb { font-size:9.5px; font-weight:600; color:var(--dim); line-height:1;
+          letter-spacing:-.2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+/* ⛔ 이 한 줄이 없으면 숨긴 단추(hidden)가 그대로 보인다 — 위의 display:inline-flex 가
+   브라우저 기본 [hidden]{display:none} 을 이기기 때문이다. .tbg 에서 이미 한 번 겪은
+   함정인데 .tb 를 flex 로 바꾸는 순간 똑같이 되살아났다(2026-09-01 캡처로 발견:
+   숨겨야 할 「이 칸 판별로」·「판별 풀기」·「판 관리…」 셋이 리본에 나와 격자를 깨고 있었다). */
+.tb[hidden] { display:none !important; }
+.tb:hover { background:#f5f6f8; box-shadow:0 2px 8px rgba(20,22,30,.10); }
+.tb:hover .lb { color:var(--sub); }
+.tb.on .lb { color:#12459b; }
+/* 글자 크기 고르기 — 유일하게 폭이 다른 칸이다. 숫자와 «본문·표·제목» 힌트가 함께 보여야
+   해서 60px 에 안 들어간다. 높이는 같으므로 줄은 그대로 맞는다. */
+.tb-selwrap { width:84px; cursor:default; }
+.tb-selwrap .tb-sel { width:74px; height:21px; padding:0 3px; border:1px solid var(--line);
+      border-radius:5px; background:#fff; color:var(--ink); cursor:pointer;
+      font:600 11.5px 'Noto Sans KR','맑은 고딕',sans-serif; }
 /* 눌린 상태(켜짐) — ⛔ 검은 배경은 너무 튀고(SKY 2026-08-28), 옅은 회색은 «꺼진 것과
    차이가 없어» 켠 건지 끈 건지 알 수가 없었다(SKY 2026-08-31: «선택/해제가 구분이 없어서
    헷갈려»). 그래서 이 앱이 «고른 것»에 쓰는 그 파랑을 그대로 쓴다 — 옅은 파란 바탕 +
@@ -128,22 +153,24 @@ body { margin:0; background:var(--desk); color:var(--ink);
                      transform:translateY(-50%); padding:0 5px; background:#fff;
                      font-size:9.5px; font-weight:700; letter-spacing:.4px; color:var(--dim); }
 .tb-sep { width:1px; height:26px; background:var(--line); margin:0 4px; }
-.tb-sel { min-width:96px; padding:0 8px; }
-.tb-c { min-width:42px; font-size:15px; line-height:1; }
-.tb-ic { min-width:42px; }
-.tb-ic svg { display:block; margin:0 auto; }
+/* ⚠ 옛 폭 지정(.tb-sel 96px · .tb-c 42px · .tb-ic 42px)은 없앴다 — 이제 .tb 하나가
+   모든 단추의 크기를 정한다. 클래스 이름은 남긴다(menu.js·검사가 셀렉터로 쓴다). */
+.tb-c .ic { font-size:15px; }
 /* ⭐ 좁은 화면(태블릿)에서는 리본을 낮춘다 — 2026-09-01 SKY: "리본 부분도 너무 커".
    실측으로 리본이 4줄에 129px, 판 바까지 180px 이 문서 위를 먹고 있었다.
    ⚠ 판 바 칩(.vchip 40px)은 그대로 둔다 — 바로 앞서 «작아서 누르기 힘들다» 고 키운 것이다.
       줄이는 것은 리본 단추뿐이고, 그래도 36px 이라 손가락에 충분하다. */
 @media (max-width: 1200px) {
-  #bar { gap: 9px 4px; padding: 6px 10px; }
-  .tb { height: 36px; min-width: 44px; padding: 0 9px; font-size: 12px; }
-  .tb-sel { min-width: 84px; }
-  .tb-c, .tb-ic { min-width: 36px; }
+  #bar { gap: 9px 3px; padding: 5px 9px; }
+  .tb { width: 50px; height: 40px; gap: 1px; }
+  .tb .ic { height: 14px; font-size: 12.5px; }
+  .tb .ic svg, svg.ic { width: 16px; height: 12px; }
+  .tb .lb { font-size: 8.5px; }
+  .tb-selwrap { width: 74px; }
+  .tb-selwrap .tb-sel { width: 66px; height: 19px; font-size: 10.5px; }
   .tb-sep { height: 22px; margin: 0 2px; }
-  .tbg { gap: 4px; }
-  .tbg-table { padding: 8px 6px 4px; row-gap: 4px; }
+  .tbg { gap: 3px; }
+  .tbg-table { padding: 8px 5px 4px; row-gap: 4px; }
   #vbar { padding: 4px 8px; }
 }
 @media print { #bar { display:none !important; } }
@@ -647,93 +674,135 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
   <div id="sbresize" title="끌어서 사이드바 너비 조절"></div>
   <main id="main">
     <div id="bar">
-      <!-- 같은 기능은 한 묶음(tbg) — 좁은 화면에서 줄바꿈될 때 묶음째 내려간다 (2026-08-30 SKY) -->
+      <!-- ⭐ 심볼 묶음(스프라이트) — 2026-09-01 SKY: "해당 항목에 맞는 심볼 모양을 하나씩
+           추가해서 표시 하고, 그 심볼 아래 작게 대략적인 기능 … 버튼들의 크기를 어느 하나의
+           높이 및 너비로 고정 하는거야. 정렬 되게끔."
+           ⚠ 그림을 여기 한 번만 그려 두고 단추는 <use> 로 가리킨다 — 같은 그림을 30번
+           베껴 쓰면 파일이 커지고, 한 곳을 고치면 나머지가 어긋난다.
+           ⚠ menu.js 가 리본 단추의 <svg> 를 복제해 우클릭 메뉴를 만든다 — <use> 는 복제해도
+           같은 문서 안이라 그대로 그려진다(실측). -->
+      <svg id="isprite" aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+        <symbol id="i-alignL" viewBox="0 0 18 14"><path d="M1 1.5h16M1 5h10M1 8.5h16M1 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-alignC" viewBox="0 0 18 14"><path d="M1 1.5h16M4 5h10M1 8.5h16M4 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-alignR" viewBox="0 0 18 14"><path d="M1 1.5h16M7 5h10M1 8.5h16M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-vTop" viewBox="0 0 18 14"><path d="M2 1.5h14M5 4.5h8M5 7.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-vMid" viewBox="0 0 18 14"><path d="M5 3.5h8M2 7h14M5 10.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-vBot" viewBox="0 0 18 14"><path d="M5 6.5h8M5 9.5h8M2 12.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-bullet" viewBox="0 0 18 14"><circle cx="2" cy="2.5" r="1.6" fill="currentColor"/><circle cx="2" cy="7" r="1.6" fill="currentColor"/><circle cx="2" cy="11.5" r="1.6" fill="currentColor"/><path d="M7 2.5h10M7 7h10M7 11.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-number" viewBox="0 0 18 14"><text x="0" y="4.6" font-size="5" font-weight="700" fill="currentColor">1</text><text x="0" y="9.2" font-size="5" font-weight="700" fill="currentColor">2</text><text x="0" y="13.8" font-size="5" font-weight="700" fill="currentColor">3</text><path d="M7 2.5h10M7 7h10M7 11.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-table" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1 5h16M1 9h16M6.5 1v12M11.5 1v12" stroke="currentColor" stroke-width="1.2" fill="none"/></symbol>
+        <symbol id="i-image" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="5.5" cy="5" r="1.6" fill="currentColor"/><path d="M2 12l4.5-5 3.5 3.5L13 7l3 5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></symbol>
+        <symbol id="i-rowAdd" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="7" rx="1.2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1 4.5h16" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M9 9.5v4M7 11.5h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-rowDel" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="7" rx="1.2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1 4.5h16" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M7 11.5h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-colAdd" viewBox="0 0 18 14"><rect x="1" y="1" width="8" height="12" rx="1.2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 1v12" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M13.5 5v4M11.5 7h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-colDel" viewBox="0 0 18 14"><rect x="1" y="1" width="8" height="12" rx="1.2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 1v12" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M11.5 7h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-head" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1.8 1.8h14.4v3H1.8z" fill="currentColor"/><path d="M1 9h16M6.5 5v8M11.5 5v8" stroke="currentColor" stroke-width="1.2" fill="none"/></symbol>
+        <symbol id="i-merge" viewBox="0 0 18 14"><rect x="1" y="2" width="16" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9 2v10" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2" fill="none"/><path d="M4 7h3M6 5.5L7.5 7 6 8.5M14 7h-3M12 5.5L10.5 7 12 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+        <symbol id="i-split" viewBox="0 0 18 14"><rect x="1" y="2" width="16" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9 2v10" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M6.5 7h-3M5 5.5L3.5 7 5 8.5M11.5 7h3M13 5.5L14.5 7 13 8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+        <symbol id="i-splitX" viewBox="0 0 18 14"><rect x="1" y="2" width="16" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9 2v10" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2.5 2" fill="none"/></symbol>
+        <symbol id="i-splitY" viewBox="0 0 18 14"><rect x="1" y="2" width="16" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1 7h16" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2.5 2" fill="none"/></symbol>
+        <symbol id="i-tableDel" viewBox="0 0 18 14"><rect x="1" y="1" width="11" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1 5h11M6.5 1v12" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M13 8.5l4 4M17 8.5l-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-fmt" viewBox="0 0 18 14"><path d="M1 3.5h16M1 10.5h16" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="6" cy="3.5" r="2.2" fill="#fff" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="10.5" r="2.2" fill="#fff" stroke="currentColor" stroke-width="1.5"/></symbol>
+        <symbol id="i-crop" viewBox="0 0 18 14"><path d="M4.5 1v9.5H14M1 4.5h9.5V14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-round" viewBox="0 0 18 14"><path d="M2 13V6a4 4 0 0 1 4-4h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M9 13h7" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 2" fill="none"/></symbol>
+        <symbol id="i-reset" viewBox="0 0 18 14"><path d="M15 7a6 6 0 1 1-1.9-4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" fill="none"/><path d="M13.5 1v3.2h-3.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/></symbol>
+        <symbol id="i-varBlock" viewBox="0 0 18 14"><path d="M9 1l7 3.2-7 3.2-7-3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/><path d="M2 8.2l7 3.2 7-3.2" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></symbol>
+        <symbol id="i-varRow" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1.8 5.4h14.4v3.2H1.8z" fill="currentColor"/></symbol>
+        <symbol id="i-varCell" viewBox="0 0 18 14"><rect x="1" y="2" width="7" height="10" rx="1.2" stroke="currentColor" stroke-width="1.5" fill="none"/><rect x="10" y="2" width="7" height="10" rx="1.2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M10 2l7 10" stroke="currentColor" stroke-width="1.5" fill="none"/></symbol>
+      </svg>
+
+      <!-- ⚠ 단추 속은 «심볼(.ic) + 작은 이름(.lb)» 두 칸이다. 크기는 CSS 가 하나로 고정한다.
+           ⛔ data-* 이름은 하나도 바꾸지 않는다 — toolbar.js·context.js·menu.js·검사 도구가
+              전부 이 이름으로 단추를 찾는다. 겉모습만 바뀐 것이다. -->
       <span class="tbg">
-      <button class="tb" data-mark="b" title="굵게 (Ctrl+B)"><b>굵게</b></button>
-      <button class="tb" data-mark="i" title="기울임 (Ctrl+I)"><i>기울임</i></button>
-      <button class="tb" data-mark="u" title="밑줄 (Ctrl+U)"><u>밑줄</u></button>
+      <button class="tb" data-mark="b" title="굵게 (Ctrl+B)"><span class="ic"><b>B</b></span><span class="lb">굵게</span></button>
+      <button class="tb" data-mark="i" title="기울임 (Ctrl+I)"><span class="ic"><i>I</i></span><span class="lb">기울임</span></button>
+      <button class="tb" data-mark="u" title="밑줄 (Ctrl+U)"><span class="ic"><u>U</u></span><span class="lb">밑줄</span></button>
       </span>
       <span class="tb-sep"></span>
       <span class="tbg">
-      <select id="tb-size" class="tb tb-sel" title="글자 크기">
-        <option value="">크기</option>
-        <option value="8.5">8.5 단위</option>
-        <option value="9">9</option>
-        <option value="10">10</option>
-        <option value="10.5">10.5 작게</option>
-        <option value="11">11</option>
-        <option value="11.5">11.5 표</option>
-        <option value="12">12</option>
-        <option value="12.5">12.5 본문</option>
-        <option value="13">13 소제목</option>
-        <option value="14">14</option>
-        <option value="15">15</option>
-        <option value="16">16</option>
-        <option value="18">18</option>
-        <option value="20">20</option>
-        <option value="24">24</option>
-        <option value="27">27 제목</option>
-        <option value="30">30</option>
-        <option value="36">36</option>
-      </select>
-      <button class="tb" data-szstep="1" title="글자 크게">A＋</button>
-      <button class="tb" data-szstep="-1" title="글자 작게">A−</button>
+      <span class="tb tb-selwrap" title="글자 크기">
+        <select id="tb-size" class="tb-sel">
+          <option value="">크기</option>
+          <option value="8.5">8.5 단위</option>
+          <option value="9">9</option>
+          <option value="10">10</option>
+          <option value="10.5">10.5 작게</option>
+          <option value="11">11</option>
+          <option value="11.5">11.5 표</option>
+          <option value="12">12</option>
+          <option value="12.5">12.5 본문</option>
+          <option value="13">13 소제목</option>
+          <option value="14">14</option>
+          <option value="15">15</option>
+          <option value="16">16</option>
+          <option value="18">18</option>
+          <option value="20">20</option>
+          <option value="24">24</option>
+          <option value="27">27 제목</option>
+          <option value="30">30</option>
+          <option value="36">36</option>
+        </select>
+        <span class="lb">크기</span>
+      </span>
+      <button class="tb" data-szstep="1" title="글자 크게"><span class="ic">A＋</span><span class="lb">크게</span></button>
+      <button class="tb" data-szstep="-1" title="글자 작게"><span class="ic">A−</span><span class="lb">작게</span></button>
       </span>
       <span class="tbg">
-      <button class="tb tb-c" data-color="#1c1e24" title="본문색" style="color:#1c1e24">■</button>
-      <button class="tb tb-c" data-color="#5a5e6a" title="보조색" style="color:#5a5e6a">■</button>
-      <button class="tb tb-c" data-color="#e5231b" title="포인트색" style="color:#e5231b">■</button>
-      <button class="tb tb-c" data-color="" title="색 지우기">✕</button>
+      <button class="tb tb-c" data-color="#1c1e24" title="본문색"><span class="ic" style="color:#1c1e24">■</span><span class="lb">본문색</span></button>
+      <button class="tb tb-c" data-color="#5a5e6a" title="보조색"><span class="ic" style="color:#5a5e6a">■</span><span class="lb">보조색</span></button>
+      <button class="tb tb-c" data-color="#e5231b" title="포인트색"><span class="ic" style="color:#e5231b">■</span><span class="lb">강조색</span></button>
+      <button class="tb tb-c" data-color="" title="색 지우기"><span class="ic">✕</span><span class="lb">색 지움</span></button>
       </span>
       <span class="tb-sep"></span>
       <!-- 정렬은 «언제나» 쓰는 것이라 항상 묶음에 둔다 — 문단·표 칸·고른 그림에 모두 붙는다.
            ⚠ data-align 셀렉터는 그대로다(toolbar.js·format.js 코드 무변). -->
       <span class="tbg">
-      <button class="tb tb-ic" data-align="left" title="왼쪽 정렬 — 문단·표 칸·고른 그림"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 5h10M1 8.5h16M1 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-align="center" title="가운데 정렬 — 문단·표 칸·고른 그림"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M4 5h10M1 8.5h16M4 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-align="right" title="오른쪽 정렬 — 문단·표 칸·고른 그림"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M7 5h10M1 8.5h16M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+      <button class="tb tb-ic" data-align="left" title="왼쪽 정렬 — 문단·표 칸·고른 그림"><svg class="ic" viewBox="0 0 18 14"><use href="#i-alignL"/></svg><span class="lb">왼쪽</span></button>
+      <button class="tb tb-ic" data-align="center" title="가운데 정렬 — 문단·표 칸·고른 그림"><svg class="ic" viewBox="0 0 18 14"><use href="#i-alignC"/></svg><span class="lb">가운데</span></button>
+      <button class="tb tb-ic" data-align="right" title="오른쪽 정렬 — 문단·표 칸·고른 그림"><svg class="ic" viewBox="0 0 18 14"><use href="#i-alignR"/></svg><span class="lb">오른쪽</span></button>
       </span>
       <span class="tbg">
-      <button class="tb" data-list="0" title="글머리표 목록">• 목록</button>
-      <button class="tb" data-list="1" title="번호 목록">1. 목록</button>
+      <button class="tb tb-ic" data-list="0" title="글머리표 목록"><svg class="ic" viewBox="0 0 18 14"><use href="#i-bullet"/></svg><span class="lb">글머리</span></button>
+      <button class="tb tb-ic" data-list="1" title="번호 목록"><svg class="ic" viewBox="0 0 18 14"><use href="#i-number"/></svg><span class="lb">번호</span></button>
       </span>
       <span class="tb-sep"></span>
       <!-- 넣기는 «지금 무엇을 골랐든» 쓰므로 항상 보인다 -->
       <span class="tbg tbg-table" data-label="넣기">
-      <button class="tb" data-table="insert" title="표 넣기 (3×3)">▦ 표</button>
-      <button class="tb" data-image="auto" title="그림 넣기 — 커서가 어디 있는지 보고 알아서 넣는다. 표 칸 안이면 칸 폭에 맞춰 칸 안에, 글자 사이면 글자 크기로, 그 밖에는 한 줄짜리 그림으로">🖼 그림</button>
+      <button class="tb tb-ic" data-table="insert" title="표 넣기 (3×3)"><svg class="ic" viewBox="0 0 18 14"><use href="#i-table"/></svg><span class="lb">표</span></button>
+      <button class="tb tb-ic" data-image="auto" title="그림 넣기 — 커서가 어디 있는지 보고 알아서 넣는다. 표 칸 안이면 칸 폭에 맞춰 칸 안에, 글자 사이면 글자 크기로, 그 밖에는 한 줄짜리 그림으로"><svg class="ic" viewBox="0 0 18 14"><use href="#i-image"/></svg><span class="lb">그림</span></button>
       </span>
       <!-- ⭐ 여기부터는 «상황 묶음»이다 — 지금 고른 것에 따라서만 나타난다(설계 §5-4 S3).
            리본 «끝»에 두는 것이 핵심이다. 가운데에 두면 나타났다 사라질 때마다
            왼쪽 단추들이 좌우로 밀려 손이 기억한 자리를 잃는다. -->
       <span class="tbg tbg-table" data-label="표" data-ctx="table" hidden>
-      <button class="tb" data-table="row+" title="아래에 행 추가">행＋</button>
-      <button class="tb" data-table="row-" title="이 행 지우기">행−</button>
-      <button class="tb" data-table="col+" title="오른쪽에 열 추가">열＋</button>
-      <button class="tb" data-table="col-" title="이 열 지우기">열−</button>
-      <button class="tb" data-table="head" title="머리글 행 켜기/끄기 — 머리글을 안 쓰는 표도 있다">머리글</button>
-      <button class="tb" data-table="merge" title="고른 칸 병합">병합</button>
-      <button class="tb" data-table="split" title="병합 풀기">분할</button>
-      <button class="tb" data-table="splitx" title="이 칸을 옆으로 둘로">옆 나누기</button>
-      <button class="tb" data-table="splity" title="이 칸을 아래로 둘로">아래 나누기</button>
-      <button class="tb tb-ic" data-valign="top" title="위쪽 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 1.5h14M5 4.5h8M5 7.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-valign="middle" title="가운데 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M5 3.5h8M2 7h14M5 10.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb tb-ic" data-valign="bottom" title="아래쪽 맞춤"><svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M5 6.5h8M5 9.5h8M2 12.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-      <button class="tb" data-table="del" title="표 지우기 (Ctrl+Z 로 복구)">표 지우기</button>
+      <button class="tb tb-ic" data-table="row+" title="아래에 행 추가"><svg class="ic" viewBox="0 0 18 14"><use href="#i-rowAdd"/></svg><span class="lb">행 추가</span></button>
+      <button class="tb tb-ic" data-table="row-" title="이 행 지우기"><svg class="ic" viewBox="0 0 18 14"><use href="#i-rowDel"/></svg><span class="lb">행 삭제</span></button>
+      <button class="tb tb-ic" data-table="col+" title="오른쪽에 열 추가"><svg class="ic" viewBox="0 0 18 14"><use href="#i-colAdd"/></svg><span class="lb">열 추가</span></button>
+      <button class="tb tb-ic" data-table="col-" title="이 열 지우기"><svg class="ic" viewBox="0 0 18 14"><use href="#i-colDel"/></svg><span class="lb">열 삭제</span></button>
+      <button class="tb tb-ic" data-table="head" title="머리글 행 켜기/끄기 — 머리글을 안 쓰는 표도 있다"><svg class="ic" viewBox="0 0 18 14"><use href="#i-head"/></svg><span class="lb">머리글</span></button>
+      <button class="tb tb-ic" data-table="merge" title="고른 칸 병합"><svg class="ic" viewBox="0 0 18 14"><use href="#i-merge"/></svg><span class="lb">병합</span></button>
+      <button class="tb tb-ic" data-table="split" title="병합 풀기"><svg class="ic" viewBox="0 0 18 14"><use href="#i-split"/></svg><span class="lb">분할</span></button>
+      <button class="tb tb-ic" data-table="splitx" title="이 칸을 옆으로 둘로"><svg class="ic" viewBox="0 0 18 14"><use href="#i-splitX"/></svg><span class="lb">옆 나눔</span></button>
+      <button class="tb tb-ic" data-table="splity" title="이 칸을 아래로 둘로"><svg class="ic" viewBox="0 0 18 14"><use href="#i-splitY"/></svg><span class="lb">아래 나눔</span></button>
+      <button class="tb tb-ic" data-valign="top" title="위쪽 맞춤"><svg class="ic" viewBox="0 0 18 14"><use href="#i-vTop"/></svg><span class="lb">위쪽</span></button>
+      <button class="tb tb-ic" data-valign="middle" title="가운데 맞춤"><svg class="ic" viewBox="0 0 18 14"><use href="#i-vMid"/></svg><span class="lb">중간</span></button>
+      <button class="tb tb-ic" data-valign="bottom" title="아래쪽 맞춤"><svg class="ic" viewBox="0 0 18 14"><use href="#i-vBot"/></svg><span class="lb">아래쪽</span></button>
+      <button class="tb tb-ic" data-table="del" title="표 지우기 (Ctrl+Z 로 복구)"><svg class="ic" viewBox="0 0 18 14"><use href="#i-tableDel"/></svg><span class="lb">표 삭제</span></button>
       </span>
       <span class="tbg tbg-table" data-label="그림" data-ctx="image" hidden>
-      <button class="tb" data-imgfmt="panel" title="그림 서식 — 크기(mm)·둥근 모서리·정렬. 그림을 더블클릭해도 열린다">서식</button>
-      <button class="tb" data-imgfmt="crop" title="그림 자르기 — 원본은 그대로 남고 «보이는 창»만 바뀐다. 언제든 처음 상태로 되돌릴 수 있다">자르기</button>
-      <button class="tb" data-imgfmt="round" title="둥근 모서리 켜기/끄기 — 2mm. 다른 값이 필요하면 「서식」에서 mm 로 친다">둥근 모서리</button>
-      <button class="tb" data-imgfmt="reset" title="크기·자르기·둥근 모서리를 처음 상태로 되돌린다">처음 상태로</button>
+      <button class="tb tb-ic" data-imgfmt="panel" title="그림 서식 — 크기(mm)·둥근 모서리·정렬. 그림을 더블클릭해도 열린다"><svg class="ic" viewBox="0 0 18 14"><use href="#i-fmt"/></svg><span class="lb">서식</span></button>
+      <button class="tb tb-ic" data-imgfmt="crop" title="그림 자르기 — 원본은 그대로 남고 «보이는 창»만 바뀐다. 언제든 처음 상태로 되돌릴 수 있다"><svg class="ic" viewBox="0 0 18 14"><use href="#i-crop"/></svg><span class="lb">자르기</span></button>
+      <button class="tb tb-ic" data-imgfmt="round" title="둥근 모서리 켜기/끄기 — 2mm. 다른 값이 필요하면 「서식」에서 mm 로 친다"><svg class="ic" viewBox="0 0 18 14"><use href="#i-round"/></svg><span class="lb">모서리</span></button>
+      <button class="tb tb-ic" data-imgfmt="reset" title="크기·자르기·둥근 모서리를 처음 상태로 되돌린다"><svg class="ic" viewBox="0 0 18 14"><use href="#i-reset"/></svg><span class="lb">되돌림</span></button>
       </span>
       <!-- 판(版) 묶음 — 다른 상황 묶음과 달리 «지금 고른 것»이 아니라 «이 문서에 판이 있나»로만
            켜고 끈다(vbar.js 의 refreshGroup). 그래야 칸과 블록을 오가는 동안 리본 높이가
            널뛰지 않는다. ⚠ 그래서 context.js 는 이 묶음을 건드리지 않는다(표·그림만 본다). -->
       <span class="tbg tbg-table" data-label="판" data-ctx="vars" hidden>
-      <button class="tb" data-vars="block" title="이 블록(문단·표·그림)이 어느 판에 보일지 고른다 — 지정이 없으면 모든 판">보일 판…</button>
-      <button class="tb" data-vars="row" title="이 행(세로로 묶인 행은 묶음째)이 어느 판에 보일지 고른다">행 보일 판…</button>
-      <button class="tb" data-vars="cellvals" title="이 칸이 판마다 어떤 값인지 한 창에서 보고 그 자리에서 고친다 — 판별로 만들기·공통으로 되돌리기·전부 통일까지">판별 값…</button>
+      <button class="tb tb-ic" data-vars="block" title="이 블록(문단·표·그림)이 어느 판에 보일지 고른다 — 지정이 없으면 모든 판"><svg class="ic" viewBox="0 0 18 14"><use href="#i-varBlock"/></svg><span class="lb">보일 판</span></button>
+      <button class="tb tb-ic" data-vars="row" title="이 행(세로로 묶인 행은 묶음째)이 어느 판에 보일지 고른다"><svg class="ic" viewBox="0 0 18 14"><use href="#i-varRow"/></svg><span class="lb">행 보일</span></button>
+      <button class="tb tb-ic" data-vars="cellvals" title="이 칸이 판마다 어떤 값인지 한 창에서 보고 그 자리에서 고친다 — 판별로 만들기·공통으로 되돌리기·전부 통일까지"><svg class="ic" viewBox="0 0 18 14"><use href="#i-varCell"/></svg><span class="lb">판별 값</span></button>
       <!-- ⭐ 아래 둘은 «숨어» 있다(2026-09-01 SKY: "리본에 판도 구지 필요 한가 싶기도 하네").
            하는 일이 「판별 값…」 창의 「판별로」·「전부 공통으로」와 똑같아서 리본에 둘 이유가
            없어졌다. 다만 지우지는 않는다 — 우클릭 메뉴가 이 단추를 대신 누르는 구조(M4)라
@@ -758,7 +827,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 11:41";
+window.__BUILD = "2026-09-01 12:08";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -6274,7 +6343,7 @@ const MENU_ITEMS = {
   ],
 };
 
-function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
+function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsOpen }) {
   const menu = document.createElement('div');
   menu.id = 'ctxmenu';
   menu.setAttribute('contenteditable', 'false');
@@ -6297,8 +6366,12 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
     b.className = 'q';
     b.dataset.press = sel;
     b.title = tip || src.title || '';
+    // ⚠ 리본 단추는 2026-09-01 부터 «심볼(.ic) + 작은 이름(.lb)» 두 칸이다. 통째로 베끼면
+    //   30px 짜리 작은 단추에 이름까지 들어가 글자가 접힌다 — 심볼만 가져온다.
     const svg = src.querySelector('svg');
+    const ic = src.querySelector('.ic');
     if (svg) b.appendChild(svg.cloneNode(true));
+    else if (ic) b.textContent = ic.textContent.trim();
     else b.textContent = src.textContent.trim();
     return b;
   }
@@ -6528,6 +6601,9 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
     //    서식 창이 더 자세하니 그쪽을 남긴다.
     if ((formatApi.panelOpen && formatApi.panelOpen())
       || (formatApi.cropOpen && formatApi.cropOpen())) { hideMini(); return; }
+    // ⛔ 판별 값 창·판 관리 창도 마찬가지다 — 둘 다 «종이 왼쪽»에 놓이므로 함께 뜨면
+    //    서로 포개진다(2026-09-01 SKY 1번: "판별 값 서식이랑 드래그 서식바가 겹쳐 보여").
+    if (varsOpen && varsOpen()) { hideMini(); return; }
     const ctx = ctxApi.ctxOf();
     if (ctx.kind === 'caret') { hideMini(); return; }   // 커서만 있으면 띄울 까닭이 없다
     const r = targetRect(ctx.kind);
@@ -6860,6 +6936,7 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
     close.addEventListener('click', closeMgr);
     mgrEl.append(list, add, close);
     document.body.appendChild(mgrEl);
+    열림표시();
   }
   function closeMgr() { if (mgrEl) { mgrEl.remove(); mgrEl = null; } }
 
@@ -7225,6 +7302,7 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
     valsEl.appendChild(foot);
 
     document.body.appendChild(valsEl);
+    열림표시();
     // ⭐ «종이 왼쪽 빈 자리»에 세운다 — 옛 4.4MB 프로그램의 서식바와 같은 자리다
     //    (2026-09-01 SKY: "표에 삼각형 붙은 칸 클릭 했을 때도 종이 좌측에 표시 되도록").
     //    가로는 늘 같은 자리, 세로만 누른 칸을 따라간다. 화면 가운데에 띄우면 표를 덮는다.
@@ -7236,6 +7314,28 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
   // Esc 로 닫는다 — 관리 창·고르기 팝업과 같은 규칙
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVals(); });
+
+  // ⭐ 바깥(종이·빈 자리)을 누르면 닫힌다 — 2026-09-01 SKY: "판별값이나, 판관리 눌렀을 떄
+  //    뜨는 창 들은 종이 외각 부분을 클릭 하면 취소 되도록 해줘. 창이 계속 떠있으니까."
+  // ⚠ 안 닫아야 하는 자리를 하나라도 빠뜨리면 «누르자마자 닫혀» 아무것도 못 한다:
+  //    창 자신(#vvals·#vmgr·#vpick) · 판 바 · 리본 · 판별 칸(누르면 새로 여는 자리).
+  // ⚠ pointerdown 이 아니라 click 이다 — pointerdown 으로 닫으면 창 안 단추를 누르는 순간
+  //    창이 먼저 사라져 그 단추의 click 이 영영 안 온다.
+  // ⛔ «방금 연 클릭»이 이어서 닫는 것을 막는다. 창을 여는 클릭은 열고 나서도 계속 퍼져
+  //    나가 이 처리기까지 온다 — 그러면 열리자마자 닫혀 «아무 일도 안 일어난 것»처럼 보인다.
+  //    (실측: 우클릭 메뉴 「판 관리…」 가 통째로 안 열렸다. 메뉴는 숨은 리본 단추를 대신
+  //     누르는 구조라 여는 자리가 #ctxmenu 였고, 그 자리가 허용 목록에 없었다.)
+  //    자리 목록만 늘리면 새 입구가 생길 때마다 같은 사고가 난다 — «지금 막 열렸나»로 막는다.
+  let 방금열림 = false;
+  const 열림표시 = () => { 방금열림 = true; setTimeout(() => { 방금열림 = false; }, 0); };
+  document.addEventListener('click', (e) => {
+    if (방금열림) return;
+    if (!valsEl && !mgrEl) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('#vvals, #vmgr, #vpick, #vbar, #bar, #ctxmenu, td.vcell')) return;
+    closeVals();
+    closeMgr();
+  });
 
   // ⭐ 판별 칸을 «아무 곳이나» 누르면 열린다(2026-09-01 SKY 2차 지적).
   // ⛔ 처음에는 «오른쪽 위 모서리 18×18px»만 손잡이로 삼았는데 세 가지가 잘못됐다[실측]:
@@ -7311,7 +7411,12 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
   refresh();
   // openMgr 을 내보낸다 — 판이 0개인 문서에서 관리 창을 열 유일한 길(우클릭 메뉴 → 숨은
   // 리본 단추 → 여기)이 제대로 물려 있는지 검사 도구가 직접 확인할 수 있어야 한다.
-  return { refresh, stickUnderBar, refreshGroup, openMgr };
+  // 미니 패널(드래그 서식바)이 이 창들과 겹치지 않게 알려 준다 — 둘 다 «종이 왼쪽»에
+  // 놓이므로 함께 뜨면 서로 포개진다(2026-09-01 SKY 1번, 캡처로 확인).
+  // 그림 서식 창이 이미 쓰는 규칙과 같다: 자세한 쪽(이 창)을 남기고 미니가 물러난다.
+  const panelOpen = () => !!valsEl || !!mgrEl;
+
+  return { refresh, stickUnderBar, refreshGroup, openMgr, panelOpen };
 }
 
 /* main.js */
@@ -7612,6 +7717,9 @@ const menuApi = attachMenu({
   ctxApi,
   imageApi,
   formatApi,
+  // ⚠ vbarApi 는 «아래»에서 만들어진다. 화살표 함수라 «부를 때» 값을 보므로 괜찮다 —
+  //   미니 패널을 띄우려 하는 순간은 언제나 앱이 다 세워진 뒤다.
+  varsOpen: () => !!(vbarApi && vbarApi.panelOpen && vbarApi.panelOpen()),
 });
 window.__app.menuApi = menuApi;
 
