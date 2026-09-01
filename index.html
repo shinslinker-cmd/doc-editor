@@ -132,6 +132,20 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .tb-c { min-width:42px; font-size:15px; line-height:1; }
 .tb-ic { min-width:42px; }
 .tb-ic svg { display:block; margin:0 auto; }
+/* ⭐ 좁은 화면(태블릿)에서는 리본을 낮춘다 — 2026-09-01 SKY: "리본 부분도 너무 커".
+   실측으로 리본이 4줄에 129px, 판 바까지 180px 이 문서 위를 먹고 있었다.
+   ⚠ 판 바 칩(.vchip 40px)은 그대로 둔다 — 바로 앞서 «작아서 누르기 힘들다» 고 키운 것이다.
+      줄이는 것은 리본 단추뿐이고, 그래도 36px 이라 손가락에 충분하다. */
+@media (max-width: 1200px) {
+  #bar { gap: 9px 4px; padding: 6px 10px; }
+  .tb { height: 36px; min-width: 44px; padding: 0 9px; font-size: 12px; }
+  .tb-sel { min-width: 84px; }
+  .tb-c, .tb-ic { min-width: 36px; }
+  .tb-sep { height: 22px; margin: 0 2px; }
+  .tbg { gap: 4px; }
+  .tbg-table { padding: 8px 6px 4px; row-gap: 4px; }
+  #vbar { padding: 4px 8px; }
+}
 @media print { #bar { display:none !important; } }
 /* 높이를 재는 숨은 상자 — 화면 밖에 두되 크기는 진짜 페이지와 같아야 한다 */
 #gauge { position:absolute; left:-10000px; top:0; width:674px; visibility:hidden; }
@@ -154,8 +168,12 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 표 — §8 확정값. 열 너비는 colgroup 픽셀(합 674)이 정하고 table-layout:fixed 가 지킨다 */
 /* touch-action: pan-y — 표 위에서 «세로»로 끄는 것만 브라우저에 맡긴다(화면 넘기기).
    가로로 끄는 것은 우리가 «칸 고르기»로 쓴다. 이 한 줄이 없으면 손가락 가로 끌기가
-   브라우저 손에 먼저 넘어가 칸이 안 골라진다(실측 2026-08-30). */
-.blk-table { margin:4px 0 12px; position:relative; touch-action:pan-y; }
+   브라우저 손에 먼저 넘어가 칸이 안 골라진다(실측 2026-08-30).
+   ⭐ pinch-zoom 을 «함께» 적어야 두 손가락 확대/축소가 산다(2026-09-01 SKY: "태블릿에서
+      종이 부분을 엄지와 검지로 확대/축소를 할수 있게 해줘"). pan-y 만 적으면 그 요소 위에서
+      확대/축소가 통째로 죽는데, 이 문서는 거의 표라서 «종이에서 핀치가 안 되는» 것처럼 보였다.
+   ⚠ 가로 끌기(칸 고르기)는 그대로 우리 것이다 — pan-x 는 여전히 안 준다. */
+.blk-table { margin:4px 0 12px; position:relative; touch-action:pan-y pinch-zoom; }
 .blk-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
 .blk-table td { outline:none; word-break:break-word; }
 /* ⭐ 행 여백은 2026-09-01 SKY 지시로 줄였다 — «전체적으로 표를 조금씩 줄여서 행 여백을
@@ -493,9 +511,21 @@ body { margin:0; background:var(--desk); color:var(--ink);
   gap: 8px; white-space: nowrap; flex: none;
   font: 600 12.5px 'Noto Sans KR', '맑은 고딕', sans-serif;
   transition: transform .12s, box-shadow .12s, background .12s; }
-#vbar .vchip:hover { transform: translateY(-2px); box-shadow: 0 3px 10px rgba(20, 22, 30, .12); }
 #vbar .vchip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--vc, #8a8e98); }
 #vbar .vchip.on { background: #e9f1ff; border-color: #5490ff; color: #12459b; font-weight: 800; }
+/* ⭐ «보기 고르기»는 테두리를 맞붙인 한 덩어리다(2026-09-01 SKY: 판 버튼 배치 개선).
+   라디오 단추처럼 «이 중 하나»임이 모양으로 보인다 — 옛 모양은 똑같은 네모 일곱 개가
+   죽 늘어서 있어 «고르는 것»과 «관리»가 눈으로 안 갈렸다.
+   ⚠ 켜진 칩은 z-index 로 올린다 — 안 그러면 파란 테두리가 옆 칩 테두리에 가려 한 변이 끊긴다. */
+#vbar .vseg { display: inline-flex; align-items: center; }
+#vbar .vseg .vchip { border-radius: 0; margin-left: -1px; position: relative; }
+#vbar .vseg .vchip:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+#vbar .vseg .vchip:last-child { border-radius: 0 6px 6px 0; }
+#vbar .vseg .vchip:hover { background: #f5f6f8; z-index: 1; }
+#vbar .vseg .vchip.on { z-index: 2; }
+/* 「⚙ 판 관리」 — 고르는 것이 아니라 관리다. 테두리를 없애 조용히 물러나 있는다. */
+#vbar .vchip-ghost { border-color: transparent; color: var(--sub); margin-left: 6px; }
+#vbar .vchip-ghost:hover { border-color: var(--line); background: #f5f6f8; color: var(--ink); }
 /* ⭐ 판 표지는 «본문 밖»으로 뺀다 — 2026-09-01 SKY: «이름표 자리를 종이 우측 부분에
    표시 하자. 외각에.»
    옛 방식(색줄은 블록 안쪽 그림자 · 이름표는 블록 오른쪽 위)은 글자를 덮었다[실측 2026-09-01]:
@@ -526,6 +556,13 @@ tr.vlim td:first-child { box-shadow: inset 3px 0 0 var(--vc, #8a8e98); }
 td.vcell { position: relative; }
 td.vcell::after { content: ''; position: absolute; top: 0; right: 0; border: 5px solid transparent;
   border-top-color: #8a8e98; border-right-color: #8a8e98; pointer-events: none; }
+/* ⭐ 마우스를 올리면 «누를 수 있는 칸»임을 보인다(2026-09-01 SKY: "마우스 오버 시 피드백이
+   없기도 하고"). 칸 «전체»가 손잡이라 표시도 칸 전체에 준다 — 옛 모서리 18px 손잡이는
+   표의 열 너비 손잡이(.colgrip)와 3px 겹쳐 파란 강조에 먹혔다[실측 x 688~706 vs 703~710].
+   ⚠ 아주 옅게 — 표를 읽는 데 방해되면 안 된다. 삼각형은 그때 진해져 «여기»를 가리킨다. */
+td.vcell:hover { background: rgba(84, 144, 255, .07); }
+td.vcell:hover::after { border-top-color: #5490ff; border-right-color: #5490ff; }
+@media print { td.vcell:hover { background: none; } }
 td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 /* 판 관리 창 (설계 §4-5) — 그림 서식 창과 같은 계열의 작은 창. 목록이 동적이라 JS 로 만든다 */
 #vmgr { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); z-index: 60;
@@ -538,10 +575,12 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 /* 판별 값 창 (2026-09-01 SKY) — 한 칸이 판마다 어떤 값인지 모아 보고 그 자리에서 고친다.
    판 관리 창과 같은 계열의 작은 카드다. body 에 살아서 종이가 다시 그려져도 안 흔들린다.
    ⚠ z-index 는 관리 창(60)과 같은 층 — 둘이 동시에 뜰 일이 없다(입구가 다르다). */
-#vvals { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); z-index: 60;
-  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px 12px;
-  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px; min-width: 380px;
-  max-width: min(560px, 92vw); }
+/* ⚠ 폭이 264px 인 까닭: 이 창은 «종이 왼쪽 빈 자리»에 선다(2026-09-01 SKY). 그 자리는
+   PC 1600 에서 사이드바 오른쪽 250 ~ 종이 왼쪽 528 = 278px 뿐이다[실측]. 더 넓게 만들면
+   종이를 덮는다. 그래서 이름 칸을 줄이고 단추 글자를 짧게(「판별」·「공통」) 했다. */
+#vvals { position: fixed; top: 90px; left: 8px; z-index: 60;
+  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 11px 12px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px; width: 264px; }
 #vvals .vv-ttl { display: flex; align-items: center; justify-content: space-between;
   font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
 #vvals .vv-x { border: 0; background: none; cursor: pointer; color: var(--dim);
@@ -549,15 +588,16 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 #vvals .vv-x:hover { color: var(--ink); }
 #vvals .vv-note { color: var(--point); font-size: 11.5px; line-height: 1.45; margin: 2px 0 8px; }
 /* 한 줄: [색점] 이름(60px) [값 칸 — 남는 자리 전부] [단추] */
-#vvals .vv-row { display: grid; grid-template-columns: 10px 62px 1fr auto;
-  align-items: center; gap: 7px; padding: 3px 0; }
+#vvals .vv-row { display: grid; grid-template-columns: 9px 44px 1fr auto;
+  align-items: center; gap: 6px; padding: 3px 0; }
 #vvals .vv-row .dot { width: 9px; height: 9px; border-radius: 50%; background: #8a8e98; }
 #vvals .vv-row .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#vvals .vv-row input { min-width: 0; width: 100%; height: 28px; padding: 0 7px;
+#vvals .vv-row input { min-width: 0; width: 100%; height: 28px; padding: 0 6px;
   border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
 #vvals .vv-row input:disabled { background: #f6f7fa; color: var(--dim); }
 #vvals .vv-same { color: var(--dim); font-size: 11.5px; }
-#vvals .vv-row button, #vvals .vv-foot button { height: 28px; padding: 0 9px; font-size: 12px;
+#vvals .vv-row button, #vvals .vv-foot button { height: 28px; padding: 0 7px; font-size: 11.5px;
+  white-space: nowrap;
   border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
 #vvals .vv-row button:hover, #vvals .vv-foot button:hover { background: #f5f6f8; }
 #vvals .vv-row button:disabled, #vvals .vv-foot button:disabled { opacity: .4; cursor: default; }
@@ -694,8 +734,13 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
       <button class="tb" data-vars="block" title="이 블록(문단·표·그림)이 어느 판에 보일지 고른다 — 지정이 없으면 모든 판">보일 판…</button>
       <button class="tb" data-vars="row" title="이 행(세로로 묶인 행은 묶음째)이 어느 판에 보일지 고른다">행 보일 판…</button>
       <button class="tb" data-vars="cellvals" title="이 칸이 판마다 어떤 값인지 한 창에서 보고 그 자리에서 고친다 — 판별로 만들기·공통으로 되돌리기·전부 통일까지">판별 값…</button>
-      <button class="tb" data-vars="cellmake" title="이 칸의 값을 지금 보는 판에서만 다르게 — 이후 타자는 이 판 값만 고친다. 판 보기에서만 쓸 수 있다">이 칸 판별로</button>
-      <button class="tb" data-vars="cellclear" title="이 칸의 판별 값을 전부 지우고 «지금 보이는 값»을 공통값으로 남긴다">판별 풀기</button>
+      <!-- ⭐ 아래 둘은 «숨어» 있다(2026-09-01 SKY: "리본에 판도 구지 필요 한가 싶기도 하네").
+           하는 일이 「판별 값…」 창의 「판별로」·「전부 공통으로」와 똑같아서 리본에 둘 이유가
+           없어졌다. 다만 지우지는 않는다 — 우클릭 메뉴가 이 단추를 대신 누르는 구조(M4)라
+           지우면 손에 익은 메뉴 항목까지 사라진다. 숨은 단추도 click() 은 그대로 동작한다.
+           (판 관리 단추가 이미 쓰는 방식이다.) -->
+      <button class="tb" data-vars="cellmake" hidden title="이 칸의 값을 지금 보는 판에서만 다르게 — 이후 타자는 이 판 값만 고친다. 판 보기에서만 쓸 수 있다">이 칸 판별로</button>
+      <button class="tb" data-vars="cellclear" hidden title="이 칸의 판별 값을 전부 지우고 «지금 보이는 값»을 공통값으로 남긴다">판별 풀기</button>
       <!-- ⭐ 이 단추는 «늘 숨어» 있다. 판이 0개인 문서에는 판 바도 이 묶음도 없어서 판 관리 창을
            열 길이 아예 없었다 — 우클릭 메뉴의 「판 관리…」 가 이 단추를 대신 누른다.
            숨은 단추도 click() 은 그대로 동작하므로 «메뉴는 리본 대행»(M4) 규칙이 지켜진다.
@@ -713,7 +758,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 10:11";
+window.__BUILD = "2026-09-01 11:41";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3169,6 +3214,28 @@ function scaleOf(pagesEl) {
   if (!w) return 1;
   const k = pagesEl.getBoundingClientRect().width / w;
   return (Number.isFinite(k) && k > 0.05) ? k : 1;
+}
+
+// 종이 «왼쪽 빈 자리»의 x 좌표 — 떠 있는 작은 창(서식바·판별 값 창)이 앉는 자리다.
+// 2026-09-01 SKY: "드래그를 했을 떄 뜨는 서식바는 현재 드래그한 위치의 종이 좌측에 표시
+// 되도록 했었는데, 어느 순간 변해 있어 … 이건 예전 html 과 위치가 동일해."
+// 옛 4.4MB 프로그램의 규칙과 같은 뜻이다: left = max(사이드바 오른쪽, 종이 왼쪽 − 창 폭 − 틈).
+// ⛔ «고른 것 바로 왼쪽»에 두면 안 된다 — 그러면 창이 글자 위를 덮는다(그게 지금 문제였다).
+//    가로는 늘 종이 왼쪽에 고정하고, 세로만 고른 자리를 따라간다.
+// ⚠ 자리가 모자라면(태블릿은 종이 왼쪽에 5px 밖에 없다) 사이드바 바로 옆에 붙인다 —
+//    종이를 조금 덮더라도 «늘 같은 자리»여야 손이 찾아간다.
+function leftGutterX(pagesEl, width) {
+  const side = document.getElementById('side');
+  const minX = (side ? side.getBoundingClientRect().right : 0) + 8;
+  const page = pagesEl && pagesEl.querySelector('.page');
+  if (!page) return minX;
+  return Math.max(minX, Math.round(page.getBoundingClientRect().left - width - 12));
+}
+
+// 떠 있는 창의 세로 자리 — 고른 것 높이에 맞추되 화면 밖으로 나가지 않게 접는다
+function clampTop(y, h) {
+  const max = window.innerHeight - 6 - h;
+  return Math.round(Math.max(6, Math.min(y, Math.max(6, max))));
 }
 
 /* editor.js */
@@ -6124,6 +6191,7 @@ function attachContext({ pagesEl, barEl, imageApi }) {
 }
 
 /* menu.js */
+
 // 우클릭 문맥 메뉴 + 미니 패널 — 설계_서식과우클릭.md §5-2·§5-3 (S4·S5·S6·M4·M5).
 // ⛔ 최상위 이름은 attachMenu 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
 //    파일이 달라도 최상위 이름이 겹치면 화면이 통째로 안 뜬다.
@@ -6471,16 +6539,12 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi }) {
     mini.appendChild(badge);
     mini.appendChild(quickStrip(ctx.kind));
     if (!mini.parentNode) document.body.appendChild(mini);
-    // 고른 것의 «왼쪽 바깥»에 둔다 — 글자 위를 덮지 않는다(S4).
-    const w = mini.offsetWidth;
-    const h = mini.offsetHeight;
-    let x = r.left - 8 - w;
-    if (x < 4) x = 4;                    // 자리가 없으면 덮더라도 화면 안으로 접는다
-    let y = r.top;
-    if (y + h > window.innerHeight - 6) y = window.innerHeight - 6 - h;
-    if (y < 6) y = 6;
-    mini.style.left = Math.round(x) + 'px';
-    mini.style.top = Math.round(y) + 'px';
+    // ⭐ «종이 왼쪽 빈 자리»에 세운다 — 가로는 늘 같은 자리, 세로만 고른 자리를 따라간다.
+    //    2026-09-01 SKY: "드래그를 했을 떄 뜨는 서식바는 현재 드래그한 위치의 종이 좌측에
+    //    표시 되도록 했었는데, 어느 순간 변해 있어." 옛 4.4MB 프로그램과 같은 규칙이다.
+    //    ⛔ 옛 코드는 «고른 것 바로 왼쪽»(r.left − 8 − 폭)이라 글자 위를 덮었다.
+    mini.style.left = leftGutterX(pagesEl, mini.offsetWidth) + 'px';
+    mini.style.top = clampTop(r.top, mini.offsetHeight) + 'px';
   }
 
   // 선택은 mouseup «뒤»에 확정된다 — 한 박자 뒤에 잰다
@@ -6692,10 +6756,19 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
       b.addEventListener('click', () => { setView(id); });
       return b;
     };
-    vbarEl.appendChild(chip('전체보기', null, null));
-    for (const v of defs) vbarEl.appendChild(chip(v.name, v.id, variantColor(doc, v.id).fg));
+    // ⭐ 2026-09-01 SKY: "판과 관련된 버튼들이 디자인같은거나 뭐 배치 같은데 너무 맘에 안들어."
+    //    옛 모양은 «똑같이 생긴 네모 일곱 개»가 죽 늘어서 있어, 어느 것이 «보기 고르기»이고
+    //    어느 것이 «관리»인지 눈으로 갈리지 않았다.
+    //    이제 «보기 고르기»는 테두리를 맞붙인 한 덩어리(.vseg)로 묶고 — 라디오 단추처럼
+    //    «이 중 하나»임이 모양으로 보인다 — 관리는 그 밖에 조용한 단추로 뗀다.
+    const seg = document.createElement('div');
+    seg.className = 'vseg';
+    seg.appendChild(chip('전체보기', null, null));
+    for (const v of defs) seg.appendChild(chip(v.name, v.id, variantColor(doc, v.id).fg));
+    vbarEl.appendChild(seg);
     const mgr = document.createElement('button');
-    mgr.className = 'vchip';
+    mgr.className = 'vchip vchip-ghost';
+    mgr.title = '판 추가·이름·복제·순서·삭제';
     mgr.textContent = '⚙ 판 관리';
     mgr.addEventListener('click', openMgr);
     vbarEl.appendChild(mgr);
@@ -7013,7 +7086,8 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
     return nc;
   }
 
-  function openVals(t0) {
+  // anchorEl = 누른 칸(있으면 그 높이에 창을 맞춘다). 없으면 화면 위쪽에 둔다.
+  function openVals(t0, anchorEl) {
     const t = t0 || target();
     if (!t || t.kind !== 'cell') {
       window.alert('표 칸에서 쓰는 창입니다 — 값을 볼 칸을 먼저 누르세요');
@@ -7101,7 +7175,7 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
         });
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = '공통으로';
+        btn.textContent = '공통';
         btn.title = '이 판의 값을 지우고 다시 공통값을 쓰게 한다';
         btn.addEventListener('click', () => { putCell(t, dropVal(cur(), v.id)); redraw(); 다시(); });
         r.append(inp, btn);
@@ -7111,7 +7185,7 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
         same.textContent = '공통을 씀';
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = '판별로';
+        btn.textContent = '판별';
         btn.title = '이 판만 다른 값을 갖게 한다 — 지금 공통값을 복사해 시작한다';
         btn.disabled = 그림칸;
         btn.addEventListener('click', () => {
@@ -7151,23 +7225,34 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
     valsEl.appendChild(foot);
 
     document.body.appendChild(valsEl);
+    // ⭐ «종이 왼쪽 빈 자리»에 세운다 — 옛 4.4MB 프로그램의 서식바와 같은 자리다
+    //    (2026-09-01 SKY: "표에 삼각형 붙은 칸 클릭 했을 때도 종이 좌측에 표시 되도록").
+    //    가로는 늘 같은 자리, 세로만 누른 칸을 따라간다. 화면 가운데에 띄우면 표를 덮는다.
+    const box = anchorEl ? anchorEl.getBoundingClientRect() : null;
+    valsEl.style.transform = 'none';
+    valsEl.style.left = leftGutterX(pagesEl, valsEl.offsetWidth) + 'px';
+    valsEl.style.top = clampTop(box ? box.top - 8 : 90, valsEl.offsetHeight) + 'px';
   }
 
   // Esc 로 닫는다 — 관리 창·고르기 팝업과 같은 규칙
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVals(); });
 
-  // ⭐ 판별 칸의 «모서리 삼각형»을 눌러도 열린다(SKY 원문). 삼각형은 CSS 로 그린 그림이라
-  //    누를 수가 없으므로, 칸의 오른쪽 위 모서리 18×18px 을 손잡이로 삼는다.
-  // ⚠ 태블릿에서는 이 18px 도 손가락에 작다 — 그쪽 입구는 리본 「판별 값…」 단추다.
+  // ⭐ 판별 칸을 «아무 곳이나» 누르면 열린다(2026-09-01 SKY 2차 지적).
+  // ⛔ 처음에는 «오른쪽 위 모서리 18×18px»만 손잡이로 삼았는데 세 가지가 잘못됐다[실측]:
+  //    ① 마우스를 올려도 아무 표시가 없어 누를 수 있는 줄을 모른다
+  //    ② 그 자리가 표의 «열 너비 손잡이»(.colgrip, x 703~710)와 3px 겹친다 — 손잡이가
+  //       z-index 3 으로 위에 있어서 파란 강조가 대신 뜨고 클릭도 그쪽이 먹는다
+  //    ③ 5px 짜리 삼각형은 손가락으로 못 누른다
+  //    이제 칸 전체가 손잡이다. 마우스를 올리면 칸이 옅게 물든다(styles.css td.vcell:hover).
+  // ⚠ 커서를 놓는 브라우저 기본 동작은 그대로 둔다 — 창을 열면서 칸 편집도 이어진다.
   pagesEl.addEventListener('click', (e) => {
     const td = e.target && e.target.closest && e.target.closest('td.vcell');
     if (!td) return;
-    const r = td.getBoundingClientRect();
-    if (e.clientX < r.right - 18 || e.clientY > r.top + 18) return;
+    if (e.target.closest('.colgrip')) return;      // 열 너비를 끄는 중이면 우리 일이 아니다
     const blk = td.closest('.blk');
     if (!blk) return;
     openVals({ kind: 'cell', id: blk.dataset.id,
-      cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] });
+      cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)] }, td);
   });
 
   function putCell(t, nextCell) {
