@@ -742,6 +742,45 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 #partslist .pl-add:hover { background: #e8ebf2; }
 @media print { #partslist { display: none !important; } }
 
+/* 부품 목록에서 온 값(기둥 3) — 「이 글자는 목록이 관리한다」를 아주 조용히 알린다.
+   ⛔ 인쇄에는 안 나온다. 제출 서류에 화면 표시가 찍히면 안 된다.
+   ⚠ 밑줄(u 서식)과 헷갈리지 않게 «점선»으로, 색도 옅게 둔다. */
+.pref { text-decoration: underline dotted rgba(28, 30, 36, .28);
+  text-underline-offset: 2.5px; text-decoration-thickness: 1px; }
+/* 가리키는 부품이 목록에서 사라졌다 — ⛔ 조용히 두면 개정번호를 고쳐도 이 칸만 안 바뀐다.
+   설계서 §7: "빨갛게 표시하고 목록으로 안내한다(조용히 빈칸이 되면 안 된다)". */
+.pref-x { text-decoration: underline wavy #e5231b;
+  text-underline-offset: 2.5px; text-decoration-thickness: 1px; }
+@media print { .pref, .pref-x { text-decoration: none !important; } }
+
+/* 「부품 값 넣기」 고르기 창 (기둥 3) — 부품 목록 창과 같은 계열, 더 좁다.
+   ⚠ 종이를 덜 가리도록 화면 위쪽 가운데에 둔다(문서 정보 창과 같은 자리). */
+#prefpick { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 60;
+  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px;
+  width: 460px; max-width: calc(100vw - 24px); }
+#prefpick .pp-ttl { display: flex; align-items: center; justify-content: space-between;
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
+#prefpick .pp-x { border: 0; background: none; cursor: pointer; color: var(--dim);
+  font-size: 13px; line-height: 1; padding: 2px 4px; }
+#prefpick .pp-x:hover { color: var(--ink); }
+#prefpick .pp-note { color: var(--sub); font-size: 11.5px; line-height: 1.5; margin: 0 0 9px; }
+#prefpick .pp-body { max-height: 46vh; overflow-y: auto; overflow-x: hidden; }
+#prefpick .pp-row { display: flex; align-items: center; gap: 8px; padding: 4px 0;
+  border-bottom: 1px solid var(--line-soft); }
+#prefpick .pp-nm { flex: 1; min-width: 0; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#prefpick .pp-btns { display: flex; gap: 4px; }
+#prefpick button { height: 26px; padding: 0 8px; font-size: 11.5px; border: 1px solid var(--line);
+  border-radius: 6px; background: #fff; cursor: pointer; }
+#prefpick button:hover:not(:disabled) { background: #f5f6f8; }
+#prefpick button:disabled { opacity: .35; cursor: default; }
+#prefpick .pp-foot { display: flex; justify-content: flex-end; gap: 6px;
+  border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 9px; }
+#prefpick .pp-off { margin-right: auto; color: var(--dim); }
+#prefpick .pp-off:hover { color: #e5231b; border-color: #f0b6b2; background: #fdf2f1; }
+@media print { #prefpick { display: none !important; } }
+
 /* 판별 값 창 (2026-09-01 SKY) — 한 칸이 판마다 어떤 값인지 모아 보고 그 자리에서 고친다.
    판 관리 창과 같은 계열의 작은 카드다. body 에 살아서 종이가 다시 그려져도 안 흔들린다.
    ⚠ z-index 는 관리 창(60)과 같은 층 — 둘이 동시에 뜰 일이 없다(입구가 다르다). */
@@ -814,7 +853,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
     <button id="btn-docinfo"><span class="si">▤</span>머리글 및 바닥글</button>
     <!-- 부품 목록(기둥 3) — 개정번호를 한 곳에서 고치면 그 부품이 나오는 서류가 같이 바뀐다.
          목록은 서류 폴더의 _부품목록.json 한 개다(2026-09-01 SKY 결정). -->
-    <button id="btn-parts"><span class="si">⚙</span>부품 목록</button>
+    <button id="btn-parts"><span class="si">⚙</span>안전회로 부품 목록</button>
     <div class="sg">저장</div>
     <button id="btn-save"><span class="si">💾</span>저장</button>
     <button id="btn-saveas"><span class="si">⎘</span>다른 이름으로 저장</button>
@@ -971,6 +1010,9 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
            숨은 단추도 click() 은 그대로 동작하므로 «메뉴는 리본 대행»(M4) 규칙이 지켜진다.
            사람 눈에 보이는 입구는 판 바의 「⚙ 판 관리」 칩 하나뿐이다(판이 있을 때). -->
       <button class="tb" data-vars="mgr" title="판 관리 창 열기" hidden>판 관리…</button>
+      <!-- 부품 값 넣기(기둥 3) — 리본에는 안 보이고 우클릭 메뉴가 이 단추를 대신 누른다.
+           ⚠ hidden 이라도 .tb 의 display:inline-flex 가 이기므로 CSS 에 .tb[hidden] 규칙이 있다. -->
+      <button class="tb" data-parts="cellref" hidden title="이 칸의 값을 「안전회로 부품 목록」에서 가져온다 — 이후 목록을 고치면 이 칸도 함께 바뀐다">부품 값 넣기…</button>
       </span>
     </div>
     <!-- 판(版) 바 — 판이 있는 문서에서만 보인다(설계_판.md §4-1). 인쇄에 안 찍힌다 -->
@@ -983,7 +1025,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 14:32";
+window.__BUILD = "2026-09-01 14:56";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -1681,6 +1723,35 @@ function splitCell(t, r, c) {
 }
 
 // 세로 병합으로 묶인 행 덩어리 — 장 나눔이 이 단위로만 일어난다(계획 R12).
+// 칸 하나를 읽고·갈아 끼운다. cell = [r, c] 이고 r 이 'h' 면 머리글 줄이다.
+// ⭐ 화면 쪽 여러 곳(판별 값 창·부품 값 넣기)이 같은 일을 하므로 «한 곳»에 둔다 —
+//    베껴 두면 한쪽만 고쳐져서 머리글 칸에서만 안 되는 식의 결함이 생긴다.
+function cellAt(t, cell) {
+  if (!t || t.type !== 'table' || !cell) return null;
+  const row = cell[0] === 'h' ? (t.head || [])[0] : (t.rows || [])[cell[0]];
+  return (row && row[cell[1]]) || null;
+}
+
+// ⛔ 바꿀 것이 없으면 «같은 표 객체»를 그대로 돌려준다 — 새 객체를 만들면 화면의
+//    next === doc 가드를 지나가서, 아무것도 안 바뀐 되돌리기 걸음이 쌓이고
+//    나중에 Ctrl+Z 가 헛걸음이 된다(renameVariant·commitTable 과 같은 가드다).
+function setCellAt(t, cell, next) {
+  if (!t || t.type !== 'table' || !cell) return t;
+  if (cellAt(t, cell) === next) return t;
+  if (cell[0] === 'h') {
+    if (!(t.head || [])[0]) return t;
+    const head = [t.head[0].slice()];
+    head[0][cell[1]] = next;
+    return Object.assign({}, t, { head });
+  }
+  if (!(t.rows || [])[cell[0]]) return t;
+  const rows = t.rows.slice();
+  const row = rows[cell[0]].slice();
+  row[cell[1]] = next;
+  rows[cell[0]] = row;
+  return Object.assign({}, t, { rows });
+}
+
 function rowGroups(t) {
   const groups = [];
   let r = 0;
@@ -2240,6 +2311,8 @@ async function writeDoc(dirHandle, name, text) {
 // ⚠ 이름을 밑줄로 시작한다 — 목록에 안 뜨고(.sdoc 이 아니다) 문서들보다 위에 모인다.
 // ⛔ 이름을 loadPartsFile·savePartsFile 로 짓는다 — core/parts.js 가 이미 readParts 를
 //    내보낸다. 빌드가 모듈을 한 덩어리로 합치므로 같은 이름이 둘이면 화면이 통째로 안 뜬다.
+// ⚠ 화면에 보이는 이름은 「안전회로 부품 목록」이지만 «파일 이름»은 그대로 둔다
+//    (2026-09-01 SKY: "명칭만 … 변경") — 바꾸면 이미 만들어진 목록 파일이 미아가 된다.
 const PARTS_FILE = '_부품목록.json';
 
 // 없으면 «빈 목록»을 준다 — 없다고 터지면 부품 목록을 안 쓰는 폴더에서 문서를 못 연다.
@@ -2542,6 +2615,112 @@ function syncDoc(doc, lst) {
   };
 }
 
+// ⭐ 사람이 «직접 고친» 값에서는 꼬리표를 뗀다 — 이제 손으로 쓴 값이다(설계 §8-0).
+//
+//    규칙 하나로 정리된다: **꼬리표가 붙은 글자는 늘 그 부품의 값과 같다.**
+//    다르면 사람이 그 위에 쳤다는 뜻이므로 꼬리표를 뗀다. 안 그러면 다음 «다시 맞추기»가
+//    사람이 친 글자를 조용히 되돌려 버린다 — 고쳤는데 안 고쳐지는 것처럼 보인다.
+//
+// ⛔ 부품이 «없어진» 경우(refValue === null)에는 안 뗀다. 그건 깨진 참조로 빨갛게
+//    보여 줘야 하는 것이지 조용히 지울 것이 아니다. 목록 파일을 아직 못 읽었을 때
+//    (폴더를 안 열었을 때)도 이 경우라, 이 가드가 없으면 문서를 열자마자 꼬리표가 전멸한다.
+function unrefRuns(lst, runs, log) {
+  if (!Array.isArray(runs)) return runs;
+  let hit = false;
+  const out = runs.map(r => {
+    if (!r || !r.ref) return r;
+    const now = refValue(lst, r.ref);
+    if (now === null || now === r.t) return r;
+    if (log) log.unref.push({ ref: r.ref, was: now, now: r.t });
+    const n = Object.assign({}, r);
+    delete n.ref;
+    hit = true;
+    return n;
+  });
+  return hit ? out : runs;
+}
+
+function dropStaleRefs(doc, lst) {
+  const log = { unref: [] };
+  if (!doc || !Array.isArray(doc.blocks)) return { doc, unref: [] };
+  const cell = (c) => {
+    if (!c || typeof c !== 'object') return c;
+    let next = c;
+    const runs = unrefRuns(lst, c.runs, log);
+    if (runs !== c.runs) next = Object.assign({}, next, { runs });
+    if (c.vals && typeof c.vals === 'object') {
+      let vhit = false;
+      const vals = {};
+      for (const k of Object.keys(c.vals)) {
+        const v = unrefRuns(lst, c.vals[k], log);
+        if (v !== c.vals[k]) vhit = true;
+        vals[k] = v;
+      }
+      if (vhit) next = Object.assign({}, next, { vals });
+    }
+    return next;
+  };
+  const grid = (g) => {
+    if (!Array.isArray(g)) return g;
+    let hit = false;
+    const out = g.map(row => {
+      if (!Array.isArray(row)) return row;
+      let rhit = false;
+      const rr = row.map(c => { const n = cell(c); if (n !== c) rhit = true; return n; });
+      if (rhit) { hit = true; return rr; }
+      return row;
+    });
+    return hit ? out : g;
+  };
+  let hit = false;
+  const blocks = doc.blocks.map(b => {
+    if (!b || typeof b !== 'object') return b;
+    if (b.type === 'table') {
+      const head = grid(b.head);
+      const rows = grid(b.rows);
+      if (head === b.head && rows === b.rows) return b;
+      hit = true;
+      return Object.assign({}, b, { head, rows });
+    }
+    if (Array.isArray(b.runs)) {
+      const runs = unrefRuns(lst, b.runs, log);
+      if (runs === b.runs) return b;
+      hit = true;
+      return Object.assign({}, b, { runs });
+    }
+    if (Array.isArray(b.items)) {
+      let ihit = false;
+      const items = b.items.map(it => { const n = unrefRuns(lst, it, log); if (n !== it) ihit = true; return n; });
+      if (!ihit) return b;
+      hit = true;
+      return Object.assign({}, b, { items });
+    }
+    if (Array.isArray(b.caption)) {
+      const caption = unrefRuns(lst, b.caption, log);
+      if (caption === b.caption) return b;
+      hit = true;
+      return Object.assign({}, b, { caption });
+    }
+    return b;
+  });
+  return { doc: hit ? Object.assign({}, doc, { blocks }) : doc, unref: log.unref };
+}
+
+// 이 문서가 쓰는 참조 가운데 «깨진 것»과 «무엇을 가리키는지»를 화면 쪽에 넘길 꼴로 만든다.
+function refState(doc, lst) {
+  const broken = {};
+  const label = {};
+  const 이름 = {};
+  for (const [k, l] of PART_FIELDS) 이름[k] = l;
+  for (const ref of countRefs(doc).keys()) {
+    const r = parseRef(ref);
+    const p = r ? findPart(lst, r.id) : null;
+    if (!p) { broken[ref] = 1; label[ref] = '목록에서 사라진 부품입니다 — 「안전회로 부품 목록」에서 확인하세요'; continue; }
+    label[ref] = (p.name || '(이름 없음)') + ' · ' + (이름[r.field] || r.field) + ' — 안전회로 부품 목록에서 옵니다';
+  }
+  return { broken, label };
+}
+
 // 문서가 쓰고 있는 참조를 모아 센다 — 「이 서류는 3번 부품을 4곳에서 쓴다」를 보여 줄 때.
 function countRefs(doc) {
   const out = new Map();
@@ -2590,7 +2769,7 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
       await setList(next);
       if (said && onSaved) onSaved(said);
     } catch (e) {
-      if (onErr) onErr('부품 목록을 저장하지 못했습니다 — ' + e.message);
+      if (onErr) onErr('안전회로 부품 목록을 저장하지 못했습니다 — ' + e.message);
     }
     open();                                   // 값이 바뀌었으니 다시 그린다
   }
@@ -2605,7 +2784,7 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
 
     const ttl = document.createElement('div');
     ttl.className = 'pl-ttl';
-    ttl.append(document.createTextNode('부품 목록'));
+    ttl.append(document.createTextNode('안전회로 부품 목록'));
     const x = document.createElement('button');
     x.type = 'button';
     x.className = 'pl-x';
@@ -2748,6 +2927,781 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
   });
 
   return { open, close, isOpen: () => !!el, rect: () => (el ? [el.getBoundingClientRect()] : []) };
+}
+
+/* editor-ops.js */
+// ⛔ 블록을 제자리에서 고치지 않는다. 항상 새 배열·새 객체를 만든다(되돌리기가 여기 기댄다).
+function indexOf(blocks, id) {
+  const i = blocks.findIndex(b => b.id === id);
+  if (i < 0) throw new Error('블록을 찾을 수 없다: ' + id);
+  return i;
+}
+
+function replaceBlock(blocks, id, patch) {
+  const i = indexOf(blocks, id);
+  const next = blocks.slice();
+  next[i] = Object.assign({}, blocks[i], patch);
+  return next;
+}
+
+function insertAfter(blocks, id, block) {
+  const i = indexOf(blocks, id);
+  const next = blocks.slice();
+  next.splice(i + 1, 0, block);
+  return next;
+}
+
+function removeBlock(blocks, id) {
+  const i = indexOf(blocks, id);
+  if (blocks.length <= 1) return blocks.slice();
+  const next = blocks.slice();
+  next.splice(i, 1);
+  return next;
+}
+
+/* selection.js */
+// 커서 자리를 "블록 처음부터 센 글자 번호"로 다룬다.
+// 서식이 들어가면 DOM 자식이 여러 개로 갈리므로, 몇 번째 자식인지로 세면 깨진다.
+function textLen(node) {
+  if (!node) return 0;
+  if (node.nodeType === 3) return (node.nodeValue || '').length;
+  // 그림(IMG)도 BR 처럼 «글자 1개»다 — 그래야 그림 토막(U+FFFC 1글자)과 셈이 맞는다
+  if (node.nodeType === 1 && (node.tagName === 'BR' || node.tagName === 'IMG')) return 1;
+  let n = 0;
+  for (const c of node.childNodes || []) n += textLen(c);
+  return n;
+}
+
+function offsetIn(el, node, offset) {
+  if (!el || !node) return 0;
+  if (el.contains && !el.contains(node)) return 0;
+  let count = 0;
+  let done = false;
+  const scan = (cur) => {
+    if (done || !cur) return;
+    if (cur === node) {
+      if (cur.nodeType === 3) count += Math.min(offset, (cur.nodeValue || '').length);
+      else for (let i = 0; i < offset && i < (cur.childNodes || []).length; i++) count += textLen(cur.childNodes[i]);
+      done = true;
+      return;
+    }
+    if (cur.nodeType === 3) { count += (cur.nodeValue || '').length; return; }
+    if (cur.nodeType !== 1) return;
+    if (cur.tagName === 'BR' || cur.tagName === 'IMG') { count += 1; return; }
+    for (const c of cur.childNodes || []) { scan(c); if (done) return; }
+  };
+  scan(el);
+  return count;
+}
+
+function nodeAt(el, pos) {
+  let left = Math.max(0, pos);
+  let last = { node: el, offset: 0 };
+  let done = false;
+  const scan = (cur) => {
+    if (done || !cur) return;
+    if (cur.nodeType === 3) {
+      const len = (cur.nodeValue || '').length;
+      if (left <= len) { last = { node: cur, offset: left }; done = true; return; }
+      left -= len;
+      last = { node: cur, offset: len };
+      return;
+    }
+    if (cur.nodeType !== 1) return;
+    if (cur.tagName === 'BR' || cur.tagName === 'IMG') { left = Math.max(0, left - 1); return; }
+    for (const c of cur.childNodes || []) { scan(c); if (done) return; }
+  };
+  scan(el);
+  return last;
+}
+
+// 초점은 입력판(#pages — 문서 전체가 하나의 contenteditable, D16)에 준다.
+// 커서 자리는 그 안의 아무 마디에나 놓을 수 있다.
+function focusRootOf(node, fallbackEl) {
+  const e = node && (node.nodeType === 1 ? node : node.parentElement);
+  const root = e && e.closest ? e.closest('[contenteditable="true"]') : null;
+  return root || fallbackEl;
+}
+
+function caretTo(el, pos) {
+  let at = nodeAt(el, pos);
+  // 글자가 하나도 없는 목록 항목은 글자 세기로 못 들어간다 — 항목 안에 직접 놓는다
+  if (at.node.nodeType === 1 && at.node.querySelectorAll && !at.node.matches('.lst li')) {
+    const lis = at.node.querySelectorAll('.lst li');
+    if (lis.length) at = { node: pos <= 0 ? lis[0] : lis[lis.length - 1], offset: 0 };
+  }
+  const r = document.createRange();
+  r.setStart(at.node, at.offset);
+  r.collapse(true);
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+  focusRootOf(at.node, el).focus();
+}
+
+function selectRange(el, from, to) {
+  const a = nodeAt(el, from);
+  const b = nodeAt(el, to);
+  const r = document.createRange();
+  r.setStart(a.node, a.offset);
+  r.setEnd(b.node, b.offset);
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+  focusRootOf(a.node, el).focus();
+}
+
+function rangeIn(el) {
+  const s = window.getSelection();
+  if (!el || !s || s.rangeCount === 0) return null;
+  const r = s.getRangeAt(0);
+  if (!el.contains(r.startContainer) || !el.contains(r.endContainer)) return null;
+  const a = offsetIn(el, r.startContainer, r.startOffset);
+  const b = offsetIn(el, r.endContainer, r.endOffset);
+  return { from: Math.min(a, b), to: Math.max(a, b) };
+}
+
+function activeBlockEl(pagesEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !pagesEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const blk = e.closest('.blk[data-id]');
+  return blk && pagesEl.contains(blk) ? blk : null;
+}
+
+// 화면의 글 칸(문단·제목 블록, 목록 항목)을 문서 순서대로.
+// 입력판이 하나가 된 뒤(D16)에는 속성이 아니라 블록 종류로 찾는다 — 섹션 줄은 글이 아니다.
+// ⚠ .blk-table 래퍼가 문단 선택자에 걸리면 표 전체가 «한 칸»으로 잡힌다 — 반드시 뺀다.
+// ⚠ 그림 블록(.blk-image)도 같은 이유로 뺀다 — 몸통은 글 칸이 아니다.
+//    대신 그 «캡션»(.cap)만 글 칸으로 넣는다(목록 항목·표 칸과 같은 정신).
+function editableEls(pagesEl) {
+  return Array.from(pagesEl.querySelectorAll(
+    '.blk[data-id]:not(.blk-section):not(.blk-list):not(.blk-table):not(.blk-image), '
+    + '.blk-list .lst li[data-i], .blk-table td[data-r], .blk-image .cap'));
+}
+
+// 지금 선택이 걸쳐 있는 편집 칸들을 문서 순서대로 [{el, from, to}] 로 준다.
+// 한 칸 안의 선택이면 1개, 여러 블록에 걸친 선택이면 여러 개가 나온다.
+// 지금 선택이 «한 표 안»의 칸 여럿에 걸치면, 시작 칸과 끝 칸이 만드는 «네모»를 준다.
+// ⭐ 워드·엑셀과 같은 방식이다(2026-08-30 SKY). 글자 순서로 훑으면 두 칸만 끌어도 그
+//    사이에 낀 엉뚱한 칸이 딸려 오고, 아래→위로 끌면 잡히는 칸이 달라진다.
+//    시작(anchor)·끝(focus)을 쓰므로 끄는 방향이 어느 쪽이든 같은 네모가 나온다.
+// ⚠ 병합 칸이 네모에 걸치면 그 칸을 다 품도록 네모를 넓힌다 — 반쪽 칸이 남으면 안 된다.
+function cellRectIn(pagesEl) {
+  const s = window.getSelection();
+  if (!s || s.rangeCount === 0 || s.getRangeAt(0).collapsed) return null;
+  const tdOf = (node) => {
+    const e = node && (node.nodeType === 1 ? node : node.parentElement);
+    const td = e && e.closest ? e.closest('.blk-table td[data-r]') : null;
+    return td && pagesEl.contains(td) ? td : null;
+  };
+  const a = tdOf(s.anchorNode);
+  const b = tdOf(s.focusNode);
+  if (!a || !b) return null;
+  const id = a.closest('.blk[data-id]').dataset.id;
+  if (b.closest('.blk[data-id]').dataset.id !== id) return null;   // 다른 표면 네모가 없다
+  // 장을 넘은 표는 조각이 여러 개다 — 같은 id 의 칸을 전부 모은다
+  const all = Array.from(pagesEl.querySelectorAll('.blk-table[data-id="' + id + '"] td[data-r]'));
+  const box = (td) => {                       // 머리글은 몸통 0행 «위»라 -1 로 둔다
+    const r = td.dataset.r === 'h' ? -1 : Number(td.dataset.r);
+    const c = Number(td.dataset.c);
+    return [r, r + (td.rowSpan || 1) - 1, c, c + (td.colSpan || 1) - 1];
+  };
+  const A = box(a);
+  const B = box(b);
+  let r1 = Math.min(A[0], B[0]), r2 = Math.max(A[1], B[1]);
+  let c1 = Math.min(A[2], B[2]), c2 = Math.max(A[3], B[3]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const td of all) {
+      const [x1, x2, y1, y2] = box(td);
+      if (x1 > r2 || x2 < r1 || y1 > c2 || y2 < c1) continue;      // 안 겹친다
+      if (x1 < r1) { r1 = x1; grew = true; }
+      if (x2 > r2) { r2 = x2; grew = true; }
+      if (y1 < c1) { c1 = y1; grew = true; }
+      if (y2 > c2) { c2 = y2; grew = true; }
+    }
+  }
+  const cells = all.filter(td => {
+    const [x1, x2, y1, y2] = box(td);
+    return x1 >= r1 && x2 <= r2 && y1 >= c1 && y2 <= c2;
+  });
+  return cells.length > 1 ? cells : null;     // 한 칸 «안» 선택은 글자 단위 그대로
+}
+
+function rangesIn(pagesEl) {
+  const s = window.getSelection();
+  if (!s || s.rangeCount === 0) return [];
+  const r = s.getRangeAt(0);
+  if (r.collapsed) return [];
+  const rect = cellRectIn(pagesEl);
+  if (rect) {                                 // 표 «안»의 네모 선택 — 그 칸들만, 통째로
+    return rect.map(el => ({ el, from: 0, to: textLen(el), whole: 1 })).filter(x => x.to > x.from);
+  }
+  const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
+  // ⭐ 표 칸이 다른 칸·문단과 «함께» 걸리면 그 칸은 통째로 고른 것으로 본다(워드와 같다).
+  //    반쪽만 문 칸이 남으면 화면(칸이 통째로 파랗다)과 실제 지워지는 범위가 어긋난다.
+  //    한 칸 «안»에서만 끈 것은 그대로 글자 단위다.
+  const wholeCells = hit.length > 1;
+  return hit
+    .map(el => {
+      if (wholeCells && el.matches('td[data-r]')) return { el, from: 0, to: textLen(el), whole: 1 };
+      return {
+        el,
+        from: el.contains(r.startContainer) ? offsetIn(el, r.startContainer, r.startOffset) : 0,
+        to: el.contains(r.endContainer) ? offsetIn(el, r.endContainer, r.endOffset) : textLen(el),
+      };
+    })
+    .filter(x => x.to > x.from);
+}
+
+// 지금 선택이 «칸 통째»로 무는 표 칸들 — 화면을 칠하는 쪽이 쓴다.
+// rangesIn 과 달리 빈 칸(글자 0)도 준다: 비어 있어도 «골라졌다»는 보여야 한다.
+function wholeCellsIn(pagesEl) {
+  const rect = cellRectIn(pagesEl);
+  if (rect) return rect;                      // 표 «안»의 네모 선택
+  const s = window.getSelection();
+  if (!s || s.rangeCount === 0) return [];
+  const r = s.getRangeAt(0);
+  if (r.collapsed) return [];
+  const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
+  if (hit.length < 2) return [];
+  return hit.filter(el => el.matches('td[data-r]'));   // 표 «밖»과 섞인 선택
+}
+
+// rangesIn 의 화면 요소를 모델 좌표 [{id, item|null, from, to}] 로 바꾼다.
+// 도구모음(걸침 서식)과 편집기(걸침 지우기)가 같은 좌표를 쓴다.
+function targetsIn(pagesEl) {
+  return rangesIn(pagesEl).map(p => {
+    const td = p.el.matches('td[data-r]') ? p.el : null;
+    if (td) {
+      const blk = td.closest('.blk[data-id]');
+      const r = td.dataset.r === 'h' ? 'h' : Number(td.dataset.r);
+      return { id: blk.dataset.id, item: null, cell: [r, Number(td.dataset.c)], from: p.from, to: p.to };
+    }
+    // 그림 캡션 — 블록 안의 저만의 글 칸이라 cap:1 로 표시한다(toolbar·editor 가 본다)
+    const cap = p.el.matches('.blk-image .cap') ? p.el : null;
+    if (cap) {
+      const blk2 = cap.closest('.blk[data-id]');
+      return { id: blk2.dataset.id, item: null, cap: 1, from: p.from, to: p.to };
+    }
+    const li = p.el.matches('.lst li[data-i]') ? p.el : null;
+    const blk = li ? li.closest('.blk[data-id]') : p.el;
+    return { id: blk.dataset.id, item: li ? Number(li.dataset.i) : null, from: p.from, to: p.to };
+  });
+}
+
+// 선택이 목록 항목(li) 안이면 그 li 를 준다. 목록은 항목마다 편집 칸이 따로라,
+// 글자 번호를 블록이 아니라 "그 항목 안"에서 세야 어긋나지 않는다.
+function activeItemEl(blkEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !blkEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const li = e.closest('.lst li[data-i]');
+  return li && blkEl.contains(li) ? li : null;
+}
+
+// 선택이 표 칸(td) 안이면 그 td 를 준다. 칸마다 편집 칸이 따로라
+// 글자 번호를 "그 칸 안"에서 세야 어긋나지 않는다(목록 항목과 같은 이유).
+function activeCellEl(blkEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !blkEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const td = e.closest('td[data-r]');
+  return td && blkEl.contains(td) ? td : null;
+}
+
+// 선택이 그림 캡션 안이면 그 .cap 을 준다. 캡션은 저만의 편집 칸이라(중첩 편집 호스트)
+// 글자 번호를 «캡션 안»에서 세야 어긋나지 않는다(표 칸·목록 항목과 같은 이유).
+function activeCapEl(blkEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !blkEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const cap = e.closest('.blk-image .cap');
+  return cap && blkEl.contains(cap) ? cap : null;
+}
+
+// 화면 배율 — «눈에 보이는 폭 ÷ 자리 폭». 좁은 화면에서 종이를 줄여 보여 줄 때
+// (main.js 의 자동 축소) 1 보다 작아진다.
+// ⭐ 마우스·손가락 좌표(clientX)는 «눈에 보이는» 눈금이고, 모델에 적는 크기는 «자리» 눈금이다.
+//    둘을 섞으면 축소된 화면에서 손잡이를 끌 때 그림이 끈 것보다 덜(또는 더) 커진다.
+//    그래서 화면 좌표의 «차이»를 모델 크기로 옮길 때는 이 값으로 나눈다.
+function scaleOf(pagesEl) {
+  if (!pagesEl) return 1;
+  const w = pagesEl.offsetWidth;
+  if (!w) return 1;
+  const k = pagesEl.getBoundingClientRect().width / w;
+  return (Number.isFinite(k) && k > 0.05) ? k : 1;
+}
+
+// 종이 «왼쪽 빈 자리»의 x 좌표 — 떠 있는 작은 창(서식바·판별 값 창)이 앉는 자리다.
+// 2026-09-01 SKY: "드래그를 했을 떄 뜨는 서식바는 현재 드래그한 위치의 종이 좌측에 표시
+// 되도록 했었는데, 어느 순간 변해 있어 … 이건 예전 html 과 위치가 동일해."
+// 옛 4.4MB 프로그램의 규칙과 같은 뜻이다: left = max(사이드바 오른쪽, 종이 왼쪽 − 창 폭 − 틈).
+// ⛔ «고른 것 바로 왼쪽»에 두면 안 된다 — 그러면 창이 글자 위를 덮는다(그게 지금 문제였다).
+//    가로는 늘 종이 왼쪽에 고정하고, 세로만 고른 자리를 따라간다.
+// ⚠ 자리가 모자라면(태블릿은 종이 왼쪽에 5px 밖에 없다) 사이드바 바로 옆에 붙인다 —
+//    종이를 조금 덮더라도 «늘 같은 자리»여야 손이 찾아간다.
+function leftGutterX(pagesEl, width) {
+  const side = document.getElementById('side');
+  const minX = (side ? side.getBoundingClientRect().right : 0) + 8;
+  const page = pagesEl && pagesEl.querySelector('.page');
+  if (!page) return minX;
+  return Math.max(minX, Math.round(page.getBoundingClientRect().left - width - 12));
+}
+
+// 떠 있는 창의 세로 자리 — 고른 것 높이에 맞추되 화면 밖으로 나가지 않게 접는다
+function clampTop(y, h) {
+  const max = window.innerHeight - 6 - h;
+  return Math.round(Math.max(6, Math.min(y, Math.max(6, max))));
+}
+
+// 종이 왼쪽 자리에 떠 있는 상자들을 «겹치지 않게» 쌓는다.
+// 2026-09-01 SKY: "물러나고 판별 값 창만 남는게 아니고, 둘다 표시 되는 조건이니까 둘다
+// 표시 되어야지. 겹치지만 않게." — 옛 4.4MB 프로그램의 positionBars() 도 두 바를 이렇게
+// 위아래로 붙여 놓았다(objH + gap + txtH).
+// wantY = 원래 놓고 싶은 자리 · h = 이 상자 높이 · taken = 이미 그 자리를 쓰는 상자들의 사각형
+function packInGutter(wantY, h, taken) {
+  const GAP = 8;
+  const hit = (y) => (taken || []).find(r => y < r.bottom + GAP && y + h > r.top - GAP);
+  let y = wantY;
+  for (let i = 0; i < 8; i++) { const r = hit(y); if (!r) break; y = r.bottom + GAP; }
+  // 아래로 밀다 화면 밖으로 나가면 위쪽으로 쌓아 본다
+  if (y + h > window.innerHeight - 6) {
+    y = wantY;
+    for (let i = 0; i < 8; i++) { const r = hit(y); if (!r) break; y = r.top - GAP - h; }
+  }
+  return clampTop(y, h);
+}
+
+/* partsref.js */
+// 표 칸에 «부품 값»을 걸어 둔다 (기둥 3, Task 3).
+// 설계: docs/설계_부품목록.md §4·§6
+//
+// ⭐ 무엇을 하나: 고른 칸의 글자를 「안전회로 부품 목록」의 어느 값으로 바꾸고, 그 글자에
+//    «어디서 왔는지» 꼬리표(ref)를 붙인다. 그 뒤로 목록에서 그 값을 고치면 이 칸도 바뀐다.
+//
+// ⛔ 꼬리표는 «값을 대신하는 것»이 아니라 «값에 붙은 꼬리표»다 — 글자는 늘 칸 안에 있다.
+//    목록 파일이 없어져도 서류는 그대로 보인다(core/parts.js 머리말).
+// ⛔ 최상위 이름은 attachPartsRef 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합치므로
+//    같은 이름이 둘이면 화면이 통째로 안 뜬다.
+// ⚠ 판(版)과 만나는 자리다: 판을 보고 있고 그 칸이 판별 값을 갖고 있으면 «그 판의 값»에만
+//   건다. 아니면 공통값에 건다. 새 장치를 만들지 않고 cell.vals 를 그대로 쓴다.
+
+
+
+
+
+
+function attachPartsRef({ pagesEl, barEl, getDoc, setDoc, redraw, getView, getList, onSaved }) {
+  let el = null;
+  const close = () => { if (el) { el.remove(); el = null; } };
+
+  // 지금 커서가 있는 표 칸 — 없으면 null
+  function 칸찾기() {
+    const blk = activeBlockEl(pagesEl);
+    if (!blk) return null;
+    const td = activeCellEl(blk);
+    if (!td) return null;
+    return { id: blk.dataset.id,
+             cell: [td.dataset.r === 'h' ? 'h' : Number(td.dataset.r), Number(td.dataset.c)],
+             el: td };
+  }
+
+  // 첫 토막의 서식을 그대로 나르고 글자와 꼬리표만 갈아 끼운다 — 굵게·모노가 안 풀린다.
+  // ⛔ 그림은 안 나른다(그림 칸에는 애초에 걸지 않는다).
+  function 값토막(runs, text, ref) {
+    const m = Object.assign({}, (runs && runs[0]) || {});
+    delete m.t; delete m.img; delete m.src$; delete m.crop; delete m.rad; delete m.ref;
+    return [Object.assign({ t: text }, m, { ref })];
+  }
+  const 그림있나 = (runs) => (runs || []).some(r => r && (r.img || r.src$));
+
+  function 걸기(t, part, field) {
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === t.id);
+    const cell = cellAt(b, t.cell);
+    if (!cell) return;
+    const view = getView ? getView() : null;
+    const ref = makeRef(part.id, field);
+    const text = part[field] || '';
+    // ⚠ 판을 보고 있고 그 칸이 «그 판만의 값»을 갖고 있으면 그 값에만 건다 — 아니면 공통값에.
+    //   판별이 아닌 칸을 판별로 만들지는 않는다(그건 「이 칸 판별로」가 하는 일이다).
+    const 판별 = view && cell.vals && Object.prototype.hasOwnProperty.call(cell.vals, view);
+    let next;
+    if (판별) {
+      if (그림있나(cell.vals[view])) { window.alert('그림이 든 칸에는 걸 수 없습니다'); return; }
+      const vals = Object.assign({}, cell.vals);
+      vals[view] = 값토막(cell.vals[view], text, ref);
+      next = Object.assign({}, cell, { vals });
+    } else {
+      if (그림있나(cell.runs)) { window.alert('그림이 든 칸에는 걸 수 없습니다'); return; }
+      next = Object.assign({}, cell, { runs: 값토막(cell.runs, text, ref) });
+    }
+    const nb = setCellAt(b, t.cell, next);
+    if (nb === b) return;                       // 바뀐 것이 없다 — 헛 되돌리기 걸음을 안 쌓는다
+    setDoc(Object.assign({}, doc, {
+      blocks: replaceBlock(doc.blocks, t.id, { head: nb.head, rows: nb.rows }),
+    }));
+    redraw();
+    if (onSaved) {
+      onSaved('「' + (part.name || '이름 없음') + '」 의 ' + 칸이름(field) + ' 을 넣었습니다'
+        + (판별 ? ' — 지금 보는 판만' : ''));
+    }
+  }
+
+  const 칸이름 = (k) => { const f = PART_FIELDS.find(x => x[0] === k); return f ? f[1] : k; };
+
+  // 꼬리표를 뗀다 — 글자는 그대로 두고 «이제 손으로 쓴 값»으로 만든다.
+  function 떼기(t) {
+    const doc = getDoc();
+    const b = doc.blocks.find(x => x.id === t.id);
+    const cell = cellAt(b, t.cell);
+    if (!cell) return;
+    const 벗기기 = (runs) => {
+      if (!Array.isArray(runs) || !runs.some(r => r && r.ref)) return runs;
+      return runs.map(r => { if (!r || !r.ref) return r; const n = Object.assign({}, r); delete n.ref; return n; });
+    };
+    let next = cell;
+    const runs = 벗기기(cell.runs);
+    if (runs !== cell.runs) next = Object.assign({}, next, { runs });
+    if (cell.vals) {
+      let hit = false;
+      const vals = {};
+      for (const k of Object.keys(cell.vals)) {
+        const v = 벗기기(cell.vals[k]);
+        if (v !== cell.vals[k]) hit = true;
+        vals[k] = v;
+      }
+      if (hit) next = Object.assign({}, next, { vals });
+    }
+    if (next === cell) { if (onSaved) onSaved('이 칸에는 걸린 부품 값이 없습니다'); return; }
+    const nb = setCellAt(b, t.cell, next);
+    setDoc(Object.assign({}, doc, {
+      blocks: replaceBlock(doc.blocks, t.id, { head: nb.head, rows: nb.rows }),
+    }));
+    redraw();
+    if (onSaved) onSaved('부품 값을 뗐습니다 — 글자는 그대로 두었습니다');
+  }
+
+  function open() {
+    close();
+    const t = 칸찾기();
+    if (!t) { window.alert('표 칸에서 쓰는 창입니다 — 값을 넣을 칸을 먼저 누르세요'); return; }
+    const list = getList() || { parts: [] };
+    if (!list.parts.length) {
+      window.alert('「안전회로 부품 목록」이 비어 있습니다.\n사이드바에서 부품을 먼저 적어 주세요.');
+      return;
+    }
+
+    el = document.createElement('div');
+    el.id = 'prefpick';
+    el.setAttribute('contenteditable', 'false');
+
+    const ttl = document.createElement('div');
+    ttl.className = 'pp-ttl';
+    ttl.append(document.createTextNode('부품 값 넣기'));
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'pp-x';
+    x.title = '닫기';
+    x.textContent = '✕';
+    x.addEventListener('click', close);
+    ttl.appendChild(x);
+    el.appendChild(ttl);
+
+    const note = document.createElement('div');
+    note.className = 'pp-note';
+    note.textContent = '고른 값이 이 칸에 들어가고, 앞으로 목록에서 그 값을 고치면 이 칸도 함께 바뀝니다.';
+    el.appendChild(note);
+
+    const body = document.createElement('div');
+    body.className = 'pp-body';
+    for (const p of list.parts) {
+      const row = document.createElement('div');
+      row.className = 'pp-row';
+      const nm = document.createElement('div');
+      nm.className = 'pp-nm';
+      nm.textContent = p.name || '(이름 없음)';
+      row.appendChild(nm);
+      const btns = document.createElement('div');
+      btns.className = 'pp-btns';
+      for (const [key, label] of PART_FIELDS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        const v = p[key] || '';
+        b.textContent = label;
+        // ⚠ 값이 비면 «넣을 것이 없다» — 눌러도 빈칸이 되므로 미리 막는다
+        b.disabled = !v;
+        b.title = v ? label + ' = 「' + v + '」 을 이 칸에 넣는다' : label + ' 값이 비어 있습니다';
+        b.addEventListener('click', () => { 걸기(t, p, key); close(); });
+        btns.appendChild(b);
+      }
+      row.appendChild(btns);
+      body.appendChild(row);
+    }
+    el.appendChild(body);
+
+    const foot = document.createElement('div');
+    foot.className = 'pp-foot';
+    const off = document.createElement('button');
+    off.type = 'button';
+    off.className = 'pp-off';
+    off.textContent = '이 칸의 부품 값 떼기';
+    off.title = '글자는 그대로 두고 «목록이 관리하는 값»에서만 뗀다';
+    off.addEventListener('click', () => { 떼기(t); close(); });
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = '닫기';
+    ok.addEventListener('click', close);
+    foot.append(off, ok);
+    el.appendChild(foot);
+
+    document.body.appendChild(el);
+    방금열림();
+  }
+
+  // ⛔ 리본 단추를 누르는 «순간» 글에서 선택이 풀리면 대상 칸을 잃는다 — 다른 리본 단추와
+  //    똑같이 mousedown 을 막아 선택을 붙들어 둔다. 이걸 빼면 «칸을 먼저 누르세요»만 뜬다.
+  if (barEl) barEl.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('[data-parts]')) e.preventDefault();
+  });
+  if (barEl) barEl.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-parts]');
+    if (!btn) return;
+    if (btn.dataset.parts === 'cellref') open();
+  });
+
+  // ⛔ 창을 여는 그 클릭이 열고 나서도 계속 퍼져 나가 아래 «바깥 클릭»까지 온다 —
+  //    그러면 열리자마자 닫혀 아무 일도 안 일어난 것처럼 보인다(판 창에서 겪은 그 함정).
+  let 방금 = false;
+  const 방금열림 = () => { 방금 = true; setTimeout(() => { 방금 = false; }, 0); };
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  document.addEventListener('click', (e) => {
+    if (방금 || !el) return;
+    const t = e.target;
+    if (t && t.closest && t.closest('#prefpick, [data-parts]')) return;
+    close();
+  });
+
+  return { open, close, isOpen: () => !!el, rect: () => (el ? [el.getBoundingClientRect()] : []) };
+}
+
+/* imgfmt.js */
+// 그림 서식의 «계산 한 곳»(설계_서식과우클릭.md M3). DOM 을 모른다.
+// 단위 규칙(S1): 저장·모델은 px, 입력·표시만 mm. 변환은 이 파일만 안다.
+// ⛔ 최상위 이름 주의: 빌드가 모듈을 한 덩어리로 합친다 — 여기 이름은 이 파일만 쓴다.
+const PX_PER_MM = 96 / 25.4;
+
+function mmOf(px) { return Math.round((px / PX_PER_MM) * 10) / 10; }
+function pxOf(mm) { return Math.max(1, Math.round(mm * PX_PER_MM)); }
+
+// 표시 비율의 근원 — crop 이 있으면 crop, 없으면 저장 원본(M2·M3)
+function ratioOf(obj, asset) {
+  const c = obj && obj.crop;
+  const w = c ? c.w : (asset ? asset.w : 1);
+  const h = c ? c.h : (asset ? asset.h : 1);
+  return h / Math.max(1, w);
+}
+
+function dispHeight(w, obj, asset) {
+  return Math.max(1, Math.round(w * ratioOf(obj, asset)));
+}
+
+// 감싸개(.iclip) 안에 «원본 전체»를 넣고 자르기 창만 보이게 미는 배치.
+// 표시폭 w 기준 배율 k = w / crop.w — 원본 img 크기와 음수 마진을 돌려준다.
+function clipLayout(w, obj, asset) {
+  const c = obj.crop;
+  const k = w / Math.max(1, c.w);
+  return {
+    iw: Math.max(1, Math.round(asset.w * k)),
+    ih: Math.max(1, Math.round(asset.h * k)),
+    ml: -Math.round(c.x * k),
+    mt: -Math.round(c.y * k),
+  };
+}
+
+// 자르기 창을 원본 안으로 바로잡는다. 최소 8px — 0 이 되면 나누기가 깨진다.
+function clampCrop(crop, asset) {
+  const w = Math.max(8, Math.min(Math.round(crop.w), asset.w));
+  const h = Math.max(8, Math.min(Math.round(crop.h), asset.h));
+  const x = Math.max(0, Math.min(Math.round(crop.x), asset.w - w));
+  const y = Math.max(0, Math.min(Math.round(crop.y), asset.h - h));
+  return { x, y, w, h };
+}
+
+/* runs-dom.js */
+
+
+
+// ⛔ 여기 적힌 태그·속성만 인정한다. 나머지는 껍데기를 버리고 글자만 가져온다.
+//    웹에서 복사해 붙여넣은 이상한 서식이 문서에 들어오지 못하게 하는 문이다.
+const WRAP = [['s', 'S'], ['u', 'U'], ['i', 'I'], ['b', 'B']];
+
+// 그리기 전에 문서의 그림 보관함을 등록한다 — renderPages 와 editor 의 되그리기가 부른다.
+// (인자로 다 나르면 호출부 6곳의 서명이 늘어난다 — UI 층 한정의 등록 방식을 쓴다)
+let ASSETS = {};
+function useAssets(a) { ASSETS = a || {}; }
+function assetOf(id) { return ASSETS[id] || null; }
+
+// 부품 꼬리표(기둥 3)의 «지금 상태» — 어느 참조가 깨졌는지와 무엇을 가리키는지.
+// ⚠ 그림 보관함(ASSETS)과 같은 방식으로 등록한다 — 그리는 함수 6곳의 서명을 늘리지 않는다.
+// ⛔ 이 값이 비어 있어도 글자는 그대로 그려진다. 부품 목록을 못 읽는 것이 서류를
+//    못 보는 이유가 되면 안 된다.
+let BROKEN = {};
+let LABEL = {};
+function useParts(broken, label) { BROKEN = broken || {}; LABEL = label || {}; }
+
+// 그림 하나를 DOM 으로 — crop·rad 대응(설계_서식과우클릭.md §4-3).
+// cls = 'ri'(토막) 또는 'bimg'(블록). obj = { w, crop?, rad? } (w = 표시 폭 px).
+// ⭐ 크기를 박아 두어야 높이 재기가 그림 로딩을 안 기다린다(설계 §4-1) — 감싸개가 생겨도
+//   감싸개에 폭·높이를 박으므로 그 원칙이 유지된다.
+// ⚠ 되읽기(domToRuns)용 «진실»은 data-* 에 적는다: crop 이 있으면 img 의 width 속성은
+//   «원본을 배율로 키운 크기»라서 표시 폭이 아니다. 그걸로 되읽으면 그림이 폭발한다.
+function imgNode(assetId, a, obj, cls) {
+  const w = obj.w || a.w;
+  const h = dispHeight(w, obj, a);
+  const img = document.createElement('img');
+  img.className = cls;
+  img.src = a.data;
+  if (assetId) img.dataset.img = assetId;
+  img.dataset.dw = String(w);
+  img.dataset.dh = String(h);
+  if (obj.rad) img.dataset.rad = String(obj.rad);
+  if (!obj.crop) {
+    img.width = w;
+    img.height = h;
+    if (obj.rad) img.style.borderRadius = obj.rad + 'px';
+    return img;
+  }
+  img.dataset.crop = [obj.crop.x, obj.crop.y, obj.crop.w, obj.crop.h].join(',');
+  const c = clipLayout(w, obj, a);
+  img.width = c.iw;
+  img.height = c.ih;
+  img.style.marginLeft = c.ml + 'px';
+  img.style.marginTop = c.mt + 'px';
+  img.style.display = 'block';
+  const box = document.createElement('span');
+  box.className = 'iclip';
+  box.setAttribute('contenteditable', 'false');
+  box.style.width = w + 'px';
+  box.style.height = h + 'px';
+  if (obj.rad) box.style.borderRadius = obj.rad + 'px';
+  box.appendChild(img);
+  return box;
+}
+
+function runsToNodes(runs) {
+  const out = [];
+  for (const r of runs || []) {
+    if (!r || !r.t) continue;
+    if (r.img) {
+      const a = ASSETS[r.img];
+      if (!a) continue;                        // 미아는 안 그린다(읽기 복구가 이미 막지만 방어)
+      out.push(imgNode(r.img, a, r, 'ri'));
+      continue;
+    }
+    let node = document.createTextNode(r.t);
+    for (const pair of WRAP) {
+      if (r[pair[0]]) { const e = document.createElement(pair[1]); e.appendChild(node); node = e; }
+    }
+    if (r.sz || r.c || r.mono) {
+      const sp = document.createElement('span');
+      if (r.sz) sp.style.fontSize = r.sz + 'px';
+      if (r.c) sp.style.color = r.c;
+      if (r.mono) sp.className = 'mono';
+      sp.appendChild(node);
+      node = sp;
+    }
+    // 부품 목록에서 온 값(기둥 3) — 옅은 점선 밑줄. 화면에서만 보이고 인쇄에는 안 나온다.
+    // ⛔ 꼬리표(ref)를 «DOM 에도» 적어야 한다. 글을 고칠 때 화면을 되읽어 토막을 다시
+    //    만들기 때문에(domToRuns), 여기 없으면 그 칸에 글자 하나만 쳐도 꼬리표가
+    //    통째로 사라진다 — 그런데 아무 오류도 안 난다.
+    // ⚠ 글자 마디(텍스트 노드)를 더하지 않는다 — 감싸개만 늘어난다(P9: 커서 셈이 안 어긋난다).
+    if (r.ref) {
+      const rf = document.createElement('span');
+      rf.className = BROKEN[r.ref] ? 'pref pref-x' : 'pref';
+      rf.dataset.ref = r.ref;
+      rf.title = LABEL[r.ref] || ('부품 값 · ' + r.ref);
+      rf.appendChild(node);
+      node = rf;
+    }
+    out.push(node);
+  }
+  return out;
+}
+
+function rgbToHex(v) {
+  const m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(v || '');
+  if (!m) return v || null;
+  const h = (n) => Number(n).toString(16).padStart(2, '0');
+  return '#' + h(m[1]) + h(m[2]) + h(m[3]);
+}
+
+function walk(node, mark, out) {
+  for (const child of node.childNodes) {
+    if (child.nodeType === 3) {
+      if (child.nodeValue) out.push(Object.assign({ t: child.nodeValue }, mark));
+      continue;
+    }
+    if (child.nodeType !== 1) continue;          // 주석 따위는 버린다
+    const tag = child.tagName;
+    if (tag === 'IMG') {
+      // 살아 있는 DOM 의 우리 그림은 data-img 를 갖고 있다. 밖에서 붙여 들어온 그림은
+      // src$ 로 임시 표기해 두면 flush 의 adoptImages 가 보관함에 담는다.
+      // ⛔ 크기는 data-dw/dh 가 먼저다 — 자른 그림은 width 속성이 «원본 확대 크기»라
+      //    그걸로 되읽으면 표시 폭이 배율만큼 뻥튀기된다(설계_서식과우클릭.md §4-3).
+      const ds = child.dataset || {};
+      const run = { t: OBJ,
+                    w: Number(ds.dw) || Number(child.getAttribute('width')) || 0,
+                    h: Number(ds.dh) || Number(child.getAttribute('height')) || 0 };
+      if (ds.crop) {
+        const p = ds.crop.split(',').map(Number);
+        if (p.length === 4 && p.every(n => Number.isFinite(n))) {
+          run.crop = { x: p[0], y: p[1], w: p[2], h: p[3] };
+        }
+      }
+      if (ds.rad) {
+        const rad = Number(ds.rad) || 0;
+        if (rad > 0) run.rad = rad;
+      }
+      if (ds.img) run.img = ds.img;
+      else run.src$ = child.getAttribute('src') || '';
+      out.push(run);
+      continue;
+    }
+    if (tag === 'BR') { out.push(Object.assign({ t: '\n' }, mark)); continue; }
+    const next = Object.assign({}, mark);
+    if (tag === 'B' || tag === 'STRONG') next.b = 1;
+    else if (tag === 'I' || tag === 'EM') next.i = 1;
+    else if (tag === 'U') next.u = 1;
+    else if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') next.s = 1;
+    else if (tag === 'SPAN') {
+      const st = child.style;
+      if (st && st.fontSize) next.sz = parseFloat(st.fontSize);
+      if (st && st.color) next.c = rgbToHex(st.color);
+      if (child.classList && child.classList.contains('mono')) next.mono = 1;
+      // 부품 꼬리표를 되읽는다 — 이게 없으면 그 칸에 글자 하나만 쳐도 꼬리표가 사라진다
+      if (child.dataset && child.dataset.ref) next.ref = child.dataset.ref;
+    }
+    walk(child, next, out);                      // 그 밖의 태그는 껍데기만 버리고 안으로 들어간다
+  }
+}
+
+function domToRuns(el) {
+  const out = [];
+  if (el) walk(el, {}, out);
+  return normalizeRuns(out);
 }
 
 /* autosave.js */
@@ -2978,190 +3932,6 @@ function measureAll(blocks, gaugeEl, makeEl, view) {
   }
   gaugeEl.textContent = '';
   return out;
-}
-
-/* imgfmt.js */
-// 그림 서식의 «계산 한 곳»(설계_서식과우클릭.md M3). DOM 을 모른다.
-// 단위 규칙(S1): 저장·모델은 px, 입력·표시만 mm. 변환은 이 파일만 안다.
-// ⛔ 최상위 이름 주의: 빌드가 모듈을 한 덩어리로 합친다 — 여기 이름은 이 파일만 쓴다.
-const PX_PER_MM = 96 / 25.4;
-
-function mmOf(px) { return Math.round((px / PX_PER_MM) * 10) / 10; }
-function pxOf(mm) { return Math.max(1, Math.round(mm * PX_PER_MM)); }
-
-// 표시 비율의 근원 — crop 이 있으면 crop, 없으면 저장 원본(M2·M3)
-function ratioOf(obj, asset) {
-  const c = obj && obj.crop;
-  const w = c ? c.w : (asset ? asset.w : 1);
-  const h = c ? c.h : (asset ? asset.h : 1);
-  return h / Math.max(1, w);
-}
-
-function dispHeight(w, obj, asset) {
-  return Math.max(1, Math.round(w * ratioOf(obj, asset)));
-}
-
-// 감싸개(.iclip) 안에 «원본 전체»를 넣고 자르기 창만 보이게 미는 배치.
-// 표시폭 w 기준 배율 k = w / crop.w — 원본 img 크기와 음수 마진을 돌려준다.
-function clipLayout(w, obj, asset) {
-  const c = obj.crop;
-  const k = w / Math.max(1, c.w);
-  return {
-    iw: Math.max(1, Math.round(asset.w * k)),
-    ih: Math.max(1, Math.round(asset.h * k)),
-    ml: -Math.round(c.x * k),
-    mt: -Math.round(c.y * k),
-  };
-}
-
-// 자르기 창을 원본 안으로 바로잡는다. 최소 8px — 0 이 되면 나누기가 깨진다.
-function clampCrop(crop, asset) {
-  const w = Math.max(8, Math.min(Math.round(crop.w), asset.w));
-  const h = Math.max(8, Math.min(Math.round(crop.h), asset.h));
-  const x = Math.max(0, Math.min(Math.round(crop.x), asset.w - w));
-  const y = Math.max(0, Math.min(Math.round(crop.y), asset.h - h));
-  return { x, y, w, h };
-}
-
-/* runs-dom.js */
-
-
-
-// ⛔ 여기 적힌 태그·속성만 인정한다. 나머지는 껍데기를 버리고 글자만 가져온다.
-//    웹에서 복사해 붙여넣은 이상한 서식이 문서에 들어오지 못하게 하는 문이다.
-const WRAP = [['s', 'S'], ['u', 'U'], ['i', 'I'], ['b', 'B']];
-
-// 그리기 전에 문서의 그림 보관함을 등록한다 — renderPages 와 editor 의 되그리기가 부른다.
-// (인자로 다 나르면 호출부 6곳의 서명이 늘어난다 — UI 층 한정의 등록 방식을 쓴다)
-let ASSETS = {};
-function useAssets(a) { ASSETS = a || {}; }
-function assetOf(id) { return ASSETS[id] || null; }
-
-// 그림 하나를 DOM 으로 — crop·rad 대응(설계_서식과우클릭.md §4-3).
-// cls = 'ri'(토막) 또는 'bimg'(블록). obj = { w, crop?, rad? } (w = 표시 폭 px).
-// ⭐ 크기를 박아 두어야 높이 재기가 그림 로딩을 안 기다린다(설계 §4-1) — 감싸개가 생겨도
-//   감싸개에 폭·높이를 박으므로 그 원칙이 유지된다.
-// ⚠ 되읽기(domToRuns)용 «진실»은 data-* 에 적는다: crop 이 있으면 img 의 width 속성은
-//   «원본을 배율로 키운 크기»라서 표시 폭이 아니다. 그걸로 되읽으면 그림이 폭발한다.
-function imgNode(assetId, a, obj, cls) {
-  const w = obj.w || a.w;
-  const h = dispHeight(w, obj, a);
-  const img = document.createElement('img');
-  img.className = cls;
-  img.src = a.data;
-  if (assetId) img.dataset.img = assetId;
-  img.dataset.dw = String(w);
-  img.dataset.dh = String(h);
-  if (obj.rad) img.dataset.rad = String(obj.rad);
-  if (!obj.crop) {
-    img.width = w;
-    img.height = h;
-    if (obj.rad) img.style.borderRadius = obj.rad + 'px';
-    return img;
-  }
-  img.dataset.crop = [obj.crop.x, obj.crop.y, obj.crop.w, obj.crop.h].join(',');
-  const c = clipLayout(w, obj, a);
-  img.width = c.iw;
-  img.height = c.ih;
-  img.style.marginLeft = c.ml + 'px';
-  img.style.marginTop = c.mt + 'px';
-  img.style.display = 'block';
-  const box = document.createElement('span');
-  box.className = 'iclip';
-  box.setAttribute('contenteditable', 'false');
-  box.style.width = w + 'px';
-  box.style.height = h + 'px';
-  if (obj.rad) box.style.borderRadius = obj.rad + 'px';
-  box.appendChild(img);
-  return box;
-}
-
-function runsToNodes(runs) {
-  const out = [];
-  for (const r of runs || []) {
-    if (!r || !r.t) continue;
-    if (r.img) {
-      const a = ASSETS[r.img];
-      if (!a) continue;                        // 미아는 안 그린다(읽기 복구가 이미 막지만 방어)
-      out.push(imgNode(r.img, a, r, 'ri'));
-      continue;
-    }
-    let node = document.createTextNode(r.t);
-    for (const pair of WRAP) {
-      if (r[pair[0]]) { const e = document.createElement(pair[1]); e.appendChild(node); node = e; }
-    }
-    if (r.sz || r.c || r.mono) {
-      const sp = document.createElement('span');
-      if (r.sz) sp.style.fontSize = r.sz + 'px';
-      if (r.c) sp.style.color = r.c;
-      if (r.mono) sp.className = 'mono';
-      sp.appendChild(node);
-      node = sp;
-    }
-    out.push(node);
-  }
-  return out;
-}
-
-function rgbToHex(v) {
-  const m = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(v || '');
-  if (!m) return v || null;
-  const h = (n) => Number(n).toString(16).padStart(2, '0');
-  return '#' + h(m[1]) + h(m[2]) + h(m[3]);
-}
-
-function walk(node, mark, out) {
-  for (const child of node.childNodes) {
-    if (child.nodeType === 3) {
-      if (child.nodeValue) out.push(Object.assign({ t: child.nodeValue }, mark));
-      continue;
-    }
-    if (child.nodeType !== 1) continue;          // 주석 따위는 버린다
-    const tag = child.tagName;
-    if (tag === 'IMG') {
-      // 살아 있는 DOM 의 우리 그림은 data-img 를 갖고 있다. 밖에서 붙여 들어온 그림은
-      // src$ 로 임시 표기해 두면 flush 의 adoptImages 가 보관함에 담는다.
-      // ⛔ 크기는 data-dw/dh 가 먼저다 — 자른 그림은 width 속성이 «원본 확대 크기»라
-      //    그걸로 되읽으면 표시 폭이 배율만큼 뻥튀기된다(설계_서식과우클릭.md §4-3).
-      const ds = child.dataset || {};
-      const run = { t: OBJ,
-                    w: Number(ds.dw) || Number(child.getAttribute('width')) || 0,
-                    h: Number(ds.dh) || Number(child.getAttribute('height')) || 0 };
-      if (ds.crop) {
-        const p = ds.crop.split(',').map(Number);
-        if (p.length === 4 && p.every(n => Number.isFinite(n))) {
-          run.crop = { x: p[0], y: p[1], w: p[2], h: p[3] };
-        }
-      }
-      if (ds.rad) {
-        const rad = Number(ds.rad) || 0;
-        if (rad > 0) run.rad = rad;
-      }
-      if (ds.img) run.img = ds.img;
-      else run.src$ = child.getAttribute('src') || '';
-      out.push(run);
-      continue;
-    }
-    if (tag === 'BR') { out.push(Object.assign({ t: '\n' }, mark)); continue; }
-    const next = Object.assign({}, mark);
-    if (tag === 'B' || tag === 'STRONG') next.b = 1;
-    else if (tag === 'I' || tag === 'EM') next.i = 1;
-    else if (tag === 'U') next.u = 1;
-    else if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') next.s = 1;
-    else if (tag === 'SPAN') {
-      const st = child.style;
-      if (st && st.fontSize) next.sz = parseFloat(st.fontSize);
-      if (st && st.color) next.c = rgbToHex(st.color);
-      if (child.classList && child.classList.contains('mono')) next.mono = 1;
-    }
-    walk(child, next, out);                      // 그 밖의 태그는 껍데기만 버리고 안으로 들어간다
-  }
-}
-
-function domToRuns(el) {
-  const out = [];
-  if (el) walk(el, {}, out);
-  return normalizeRuns(out);
 }
 
 /* render.js */
@@ -3695,360 +4465,6 @@ function deleteMixed(blocks, targets, cur) {
   if (!caret && out.length) caret = { id: out[0].id, item: null, pos: 0 };
   if (!caret) return null;
   return { blocks: out, caret };
-}
-
-/* editor-ops.js */
-// ⛔ 블록을 제자리에서 고치지 않는다. 항상 새 배열·새 객체를 만든다(되돌리기가 여기 기댄다).
-function indexOf(blocks, id) {
-  const i = blocks.findIndex(b => b.id === id);
-  if (i < 0) throw new Error('블록을 찾을 수 없다: ' + id);
-  return i;
-}
-
-function replaceBlock(blocks, id, patch) {
-  const i = indexOf(blocks, id);
-  const next = blocks.slice();
-  next[i] = Object.assign({}, blocks[i], patch);
-  return next;
-}
-
-function insertAfter(blocks, id, block) {
-  const i = indexOf(blocks, id);
-  const next = blocks.slice();
-  next.splice(i + 1, 0, block);
-  return next;
-}
-
-function removeBlock(blocks, id) {
-  const i = indexOf(blocks, id);
-  if (blocks.length <= 1) return blocks.slice();
-  const next = blocks.slice();
-  next.splice(i, 1);
-  return next;
-}
-
-/* selection.js */
-// 커서 자리를 "블록 처음부터 센 글자 번호"로 다룬다.
-// 서식이 들어가면 DOM 자식이 여러 개로 갈리므로, 몇 번째 자식인지로 세면 깨진다.
-function textLen(node) {
-  if (!node) return 0;
-  if (node.nodeType === 3) return (node.nodeValue || '').length;
-  // 그림(IMG)도 BR 처럼 «글자 1개»다 — 그래야 그림 토막(U+FFFC 1글자)과 셈이 맞는다
-  if (node.nodeType === 1 && (node.tagName === 'BR' || node.tagName === 'IMG')) return 1;
-  let n = 0;
-  for (const c of node.childNodes || []) n += textLen(c);
-  return n;
-}
-
-function offsetIn(el, node, offset) {
-  if (!el || !node) return 0;
-  if (el.contains && !el.contains(node)) return 0;
-  let count = 0;
-  let done = false;
-  const scan = (cur) => {
-    if (done || !cur) return;
-    if (cur === node) {
-      if (cur.nodeType === 3) count += Math.min(offset, (cur.nodeValue || '').length);
-      else for (let i = 0; i < offset && i < (cur.childNodes || []).length; i++) count += textLen(cur.childNodes[i]);
-      done = true;
-      return;
-    }
-    if (cur.nodeType === 3) { count += (cur.nodeValue || '').length; return; }
-    if (cur.nodeType !== 1) return;
-    if (cur.tagName === 'BR' || cur.tagName === 'IMG') { count += 1; return; }
-    for (const c of cur.childNodes || []) { scan(c); if (done) return; }
-  };
-  scan(el);
-  return count;
-}
-
-function nodeAt(el, pos) {
-  let left = Math.max(0, pos);
-  let last = { node: el, offset: 0 };
-  let done = false;
-  const scan = (cur) => {
-    if (done || !cur) return;
-    if (cur.nodeType === 3) {
-      const len = (cur.nodeValue || '').length;
-      if (left <= len) { last = { node: cur, offset: left }; done = true; return; }
-      left -= len;
-      last = { node: cur, offset: len };
-      return;
-    }
-    if (cur.nodeType !== 1) return;
-    if (cur.tagName === 'BR' || cur.tagName === 'IMG') { left = Math.max(0, left - 1); return; }
-    for (const c of cur.childNodes || []) { scan(c); if (done) return; }
-  };
-  scan(el);
-  return last;
-}
-
-// 초점은 입력판(#pages — 문서 전체가 하나의 contenteditable, D16)에 준다.
-// 커서 자리는 그 안의 아무 마디에나 놓을 수 있다.
-function focusRootOf(node, fallbackEl) {
-  const e = node && (node.nodeType === 1 ? node : node.parentElement);
-  const root = e && e.closest ? e.closest('[contenteditable="true"]') : null;
-  return root || fallbackEl;
-}
-
-function caretTo(el, pos) {
-  let at = nodeAt(el, pos);
-  // 글자가 하나도 없는 목록 항목은 글자 세기로 못 들어간다 — 항목 안에 직접 놓는다
-  if (at.node.nodeType === 1 && at.node.querySelectorAll && !at.node.matches('.lst li')) {
-    const lis = at.node.querySelectorAll('.lst li');
-    if (lis.length) at = { node: pos <= 0 ? lis[0] : lis[lis.length - 1], offset: 0 };
-  }
-  const r = document.createRange();
-  r.setStart(at.node, at.offset);
-  r.collapse(true);
-  const s = window.getSelection();
-  s.removeAllRanges();
-  s.addRange(r);
-  focusRootOf(at.node, el).focus();
-}
-
-function selectRange(el, from, to) {
-  const a = nodeAt(el, from);
-  const b = nodeAt(el, to);
-  const r = document.createRange();
-  r.setStart(a.node, a.offset);
-  r.setEnd(b.node, b.offset);
-  const s = window.getSelection();
-  s.removeAllRanges();
-  s.addRange(r);
-  focusRootOf(a.node, el).focus();
-}
-
-function rangeIn(el) {
-  const s = window.getSelection();
-  if (!el || !s || s.rangeCount === 0) return null;
-  const r = s.getRangeAt(0);
-  if (!el.contains(r.startContainer) || !el.contains(r.endContainer)) return null;
-  const a = offsetIn(el, r.startContainer, r.startOffset);
-  const b = offsetIn(el, r.endContainer, r.endOffset);
-  return { from: Math.min(a, b), to: Math.max(a, b) };
-}
-
-function activeBlockEl(pagesEl) {
-  const s = window.getSelection();
-  const n = s && s.anchorNode;
-  if (!n || !pagesEl) return null;
-  const e = n.nodeType === 1 ? n : n.parentElement;
-  if (!e || !e.closest) return null;
-  const blk = e.closest('.blk[data-id]');
-  return blk && pagesEl.contains(blk) ? blk : null;
-}
-
-// 화면의 글 칸(문단·제목 블록, 목록 항목)을 문서 순서대로.
-// 입력판이 하나가 된 뒤(D16)에는 속성이 아니라 블록 종류로 찾는다 — 섹션 줄은 글이 아니다.
-// ⚠ .blk-table 래퍼가 문단 선택자에 걸리면 표 전체가 «한 칸»으로 잡힌다 — 반드시 뺀다.
-// ⚠ 그림 블록(.blk-image)도 같은 이유로 뺀다 — 몸통은 글 칸이 아니다.
-//    대신 그 «캡션»(.cap)만 글 칸으로 넣는다(목록 항목·표 칸과 같은 정신).
-function editableEls(pagesEl) {
-  return Array.from(pagesEl.querySelectorAll(
-    '.blk[data-id]:not(.blk-section):not(.blk-list):not(.blk-table):not(.blk-image), '
-    + '.blk-list .lst li[data-i], .blk-table td[data-r], .blk-image .cap'));
-}
-
-// 지금 선택이 걸쳐 있는 편집 칸들을 문서 순서대로 [{el, from, to}] 로 준다.
-// 한 칸 안의 선택이면 1개, 여러 블록에 걸친 선택이면 여러 개가 나온다.
-// 지금 선택이 «한 표 안»의 칸 여럿에 걸치면, 시작 칸과 끝 칸이 만드는 «네모»를 준다.
-// ⭐ 워드·엑셀과 같은 방식이다(2026-08-30 SKY). 글자 순서로 훑으면 두 칸만 끌어도 그
-//    사이에 낀 엉뚱한 칸이 딸려 오고, 아래→위로 끌면 잡히는 칸이 달라진다.
-//    시작(anchor)·끝(focus)을 쓰므로 끄는 방향이 어느 쪽이든 같은 네모가 나온다.
-// ⚠ 병합 칸이 네모에 걸치면 그 칸을 다 품도록 네모를 넓힌다 — 반쪽 칸이 남으면 안 된다.
-function cellRectIn(pagesEl) {
-  const s = window.getSelection();
-  if (!s || s.rangeCount === 0 || s.getRangeAt(0).collapsed) return null;
-  const tdOf = (node) => {
-    const e = node && (node.nodeType === 1 ? node : node.parentElement);
-    const td = e && e.closest ? e.closest('.blk-table td[data-r]') : null;
-    return td && pagesEl.contains(td) ? td : null;
-  };
-  const a = tdOf(s.anchorNode);
-  const b = tdOf(s.focusNode);
-  if (!a || !b) return null;
-  const id = a.closest('.blk[data-id]').dataset.id;
-  if (b.closest('.blk[data-id]').dataset.id !== id) return null;   // 다른 표면 네모가 없다
-  // 장을 넘은 표는 조각이 여러 개다 — 같은 id 의 칸을 전부 모은다
-  const all = Array.from(pagesEl.querySelectorAll('.blk-table[data-id="' + id + '"] td[data-r]'));
-  const box = (td) => {                       // 머리글은 몸통 0행 «위»라 -1 로 둔다
-    const r = td.dataset.r === 'h' ? -1 : Number(td.dataset.r);
-    const c = Number(td.dataset.c);
-    return [r, r + (td.rowSpan || 1) - 1, c, c + (td.colSpan || 1) - 1];
-  };
-  const A = box(a);
-  const B = box(b);
-  let r1 = Math.min(A[0], B[0]), r2 = Math.max(A[1], B[1]);
-  let c1 = Math.min(A[2], B[2]), c2 = Math.max(A[3], B[3]);
-  let grew = true;
-  while (grew) {
-    grew = false;
-    for (const td of all) {
-      const [x1, x2, y1, y2] = box(td);
-      if (x1 > r2 || x2 < r1 || y1 > c2 || y2 < c1) continue;      // 안 겹친다
-      if (x1 < r1) { r1 = x1; grew = true; }
-      if (x2 > r2) { r2 = x2; grew = true; }
-      if (y1 < c1) { c1 = y1; grew = true; }
-      if (y2 > c2) { c2 = y2; grew = true; }
-    }
-  }
-  const cells = all.filter(td => {
-    const [x1, x2, y1, y2] = box(td);
-    return x1 >= r1 && x2 <= r2 && y1 >= c1 && y2 <= c2;
-  });
-  return cells.length > 1 ? cells : null;     // 한 칸 «안» 선택은 글자 단위 그대로
-}
-
-function rangesIn(pagesEl) {
-  const s = window.getSelection();
-  if (!s || s.rangeCount === 0) return [];
-  const r = s.getRangeAt(0);
-  if (r.collapsed) return [];
-  const rect = cellRectIn(pagesEl);
-  if (rect) {                                 // 표 «안»의 네모 선택 — 그 칸들만, 통째로
-    return rect.map(el => ({ el, from: 0, to: textLen(el), whole: 1 })).filter(x => x.to > x.from);
-  }
-  const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
-  // ⭐ 표 칸이 다른 칸·문단과 «함께» 걸리면 그 칸은 통째로 고른 것으로 본다(워드와 같다).
-  //    반쪽만 문 칸이 남으면 화면(칸이 통째로 파랗다)과 실제 지워지는 범위가 어긋난다.
-  //    한 칸 «안»에서만 끈 것은 그대로 글자 단위다.
-  const wholeCells = hit.length > 1;
-  return hit
-    .map(el => {
-      if (wholeCells && el.matches('td[data-r]')) return { el, from: 0, to: textLen(el), whole: 1 };
-      return {
-        el,
-        from: el.contains(r.startContainer) ? offsetIn(el, r.startContainer, r.startOffset) : 0,
-        to: el.contains(r.endContainer) ? offsetIn(el, r.endContainer, r.endOffset) : textLen(el),
-      };
-    })
-    .filter(x => x.to > x.from);
-}
-
-// 지금 선택이 «칸 통째»로 무는 표 칸들 — 화면을 칠하는 쪽이 쓴다.
-// rangesIn 과 달리 빈 칸(글자 0)도 준다: 비어 있어도 «골라졌다»는 보여야 한다.
-function wholeCellsIn(pagesEl) {
-  const rect = cellRectIn(pagesEl);
-  if (rect) return rect;                      // 표 «안»의 네모 선택
-  const s = window.getSelection();
-  if (!s || s.rangeCount === 0) return [];
-  const r = s.getRangeAt(0);
-  if (r.collapsed) return [];
-  const hit = editableEls(pagesEl).filter(el => r.intersectsNode(el));
-  if (hit.length < 2) return [];
-  return hit.filter(el => el.matches('td[data-r]'));   // 표 «밖»과 섞인 선택
-}
-
-// rangesIn 의 화면 요소를 모델 좌표 [{id, item|null, from, to}] 로 바꾼다.
-// 도구모음(걸침 서식)과 편집기(걸침 지우기)가 같은 좌표를 쓴다.
-function targetsIn(pagesEl) {
-  return rangesIn(pagesEl).map(p => {
-    const td = p.el.matches('td[data-r]') ? p.el : null;
-    if (td) {
-      const blk = td.closest('.blk[data-id]');
-      const r = td.dataset.r === 'h' ? 'h' : Number(td.dataset.r);
-      return { id: blk.dataset.id, item: null, cell: [r, Number(td.dataset.c)], from: p.from, to: p.to };
-    }
-    // 그림 캡션 — 블록 안의 저만의 글 칸이라 cap:1 로 표시한다(toolbar·editor 가 본다)
-    const cap = p.el.matches('.blk-image .cap') ? p.el : null;
-    if (cap) {
-      const blk2 = cap.closest('.blk[data-id]');
-      return { id: blk2.dataset.id, item: null, cap: 1, from: p.from, to: p.to };
-    }
-    const li = p.el.matches('.lst li[data-i]') ? p.el : null;
-    const blk = li ? li.closest('.blk[data-id]') : p.el;
-    return { id: blk.dataset.id, item: li ? Number(li.dataset.i) : null, from: p.from, to: p.to };
-  });
-}
-
-// 선택이 목록 항목(li) 안이면 그 li 를 준다. 목록은 항목마다 편집 칸이 따로라,
-// 글자 번호를 블록이 아니라 "그 항목 안"에서 세야 어긋나지 않는다.
-function activeItemEl(blkEl) {
-  const s = window.getSelection();
-  const n = s && s.anchorNode;
-  if (!n || !blkEl) return null;
-  const e = n.nodeType === 1 ? n : n.parentElement;
-  if (!e || !e.closest) return null;
-  const li = e.closest('.lst li[data-i]');
-  return li && blkEl.contains(li) ? li : null;
-}
-
-// 선택이 표 칸(td) 안이면 그 td 를 준다. 칸마다 편집 칸이 따로라
-// 글자 번호를 "그 칸 안"에서 세야 어긋나지 않는다(목록 항목과 같은 이유).
-function activeCellEl(blkEl) {
-  const s = window.getSelection();
-  const n = s && s.anchorNode;
-  if (!n || !blkEl) return null;
-  const e = n.nodeType === 1 ? n : n.parentElement;
-  if (!e || !e.closest) return null;
-  const td = e.closest('td[data-r]');
-  return td && blkEl.contains(td) ? td : null;
-}
-
-// 선택이 그림 캡션 안이면 그 .cap 을 준다. 캡션은 저만의 편집 칸이라(중첩 편집 호스트)
-// 글자 번호를 «캡션 안»에서 세야 어긋나지 않는다(표 칸·목록 항목과 같은 이유).
-function activeCapEl(blkEl) {
-  const s = window.getSelection();
-  const n = s && s.anchorNode;
-  if (!n || !blkEl) return null;
-  const e = n.nodeType === 1 ? n : n.parentElement;
-  if (!e || !e.closest) return null;
-  const cap = e.closest('.blk-image .cap');
-  return cap && blkEl.contains(cap) ? cap : null;
-}
-
-// 화면 배율 — «눈에 보이는 폭 ÷ 자리 폭». 좁은 화면에서 종이를 줄여 보여 줄 때
-// (main.js 의 자동 축소) 1 보다 작아진다.
-// ⭐ 마우스·손가락 좌표(clientX)는 «눈에 보이는» 눈금이고, 모델에 적는 크기는 «자리» 눈금이다.
-//    둘을 섞으면 축소된 화면에서 손잡이를 끌 때 그림이 끈 것보다 덜(또는 더) 커진다.
-//    그래서 화면 좌표의 «차이»를 모델 크기로 옮길 때는 이 값으로 나눈다.
-function scaleOf(pagesEl) {
-  if (!pagesEl) return 1;
-  const w = pagesEl.offsetWidth;
-  if (!w) return 1;
-  const k = pagesEl.getBoundingClientRect().width / w;
-  return (Number.isFinite(k) && k > 0.05) ? k : 1;
-}
-
-// 종이 «왼쪽 빈 자리»의 x 좌표 — 떠 있는 작은 창(서식바·판별 값 창)이 앉는 자리다.
-// 2026-09-01 SKY: "드래그를 했을 떄 뜨는 서식바는 현재 드래그한 위치의 종이 좌측에 표시
-// 되도록 했었는데, 어느 순간 변해 있어 … 이건 예전 html 과 위치가 동일해."
-// 옛 4.4MB 프로그램의 규칙과 같은 뜻이다: left = max(사이드바 오른쪽, 종이 왼쪽 − 창 폭 − 틈).
-// ⛔ «고른 것 바로 왼쪽»에 두면 안 된다 — 그러면 창이 글자 위를 덮는다(그게 지금 문제였다).
-//    가로는 늘 종이 왼쪽에 고정하고, 세로만 고른 자리를 따라간다.
-// ⚠ 자리가 모자라면(태블릿은 종이 왼쪽에 5px 밖에 없다) 사이드바 바로 옆에 붙인다 —
-//    종이를 조금 덮더라도 «늘 같은 자리»여야 손이 찾아간다.
-function leftGutterX(pagesEl, width) {
-  const side = document.getElementById('side');
-  const minX = (side ? side.getBoundingClientRect().right : 0) + 8;
-  const page = pagesEl && pagesEl.querySelector('.page');
-  if (!page) return minX;
-  return Math.max(minX, Math.round(page.getBoundingClientRect().left - width - 12));
-}
-
-// 떠 있는 창의 세로 자리 — 고른 것 높이에 맞추되 화면 밖으로 나가지 않게 접는다
-function clampTop(y, h) {
-  const max = window.innerHeight - 6 - h;
-  return Math.round(Math.max(6, Math.min(y, Math.max(6, max))));
-}
-
-// 종이 왼쪽 자리에 떠 있는 상자들을 «겹치지 않게» 쌓는다.
-// 2026-09-01 SKY: "물러나고 판별 값 창만 남는게 아니고, 둘다 표시 되는 조건이니까 둘다
-// 표시 되어야지. 겹치지만 않게." — 옛 4.4MB 프로그램의 positionBars() 도 두 바를 이렇게
-// 위아래로 붙여 놓았다(objH + gap + txtH).
-// wantY = 원래 놓고 싶은 자리 · h = 이 상자 높이 · taken = 이미 그 자리를 쓰는 상자들의 사각형
-function packInGutter(wantY, h, taken) {
-  const GAP = 8;
-  const hit = (y) => (taken || []).find(r => y < r.bottom + GAP && y + h > r.top - GAP);
-  let y = wantY;
-  for (let i = 0; i < 8; i++) { const r = hit(y); if (!r) break; y = r.bottom + GAP; }
-  // 아래로 밀다 화면 밖으로 나가면 위쪽으로 쌓아 본다
-  if (y + h > window.innerHeight - 6) {
-    y = wantY;
-    for (let i = 0; i < 8; i++) { const r = hit(y); if (!r) break; y = r.top - GAP - h; }
-  }
-  return clampTop(y, h);
 }
 
 /* editor.js */
@@ -7075,6 +7491,8 @@ const MENU_ITEMS = {
     { label: '이 칸 판별로', press: '[data-vars="cellmake"]', when: 'vars' },
     { label: '판별 풀기', press: '[data-vars="cellclear"]', when: 'vars' },
     { label: '판 관리…', press: '[data-vars="mgr"]' },
+    // 부품 목록(기둥 3) — 이 칸의 값을 목록에서 가져온다. 판이 없는 문서에서도 쓴다.
+    { label: '부품 값 넣기…', press: '[data-parts="cellref"]' },
   ],
   text: [
     { label: '복사', run: 'copy' }, { label: '잘라내기', run: 'cut' },
@@ -8477,6 +8895,8 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
+
 // ⛔ 머리글 높이는 «한 곳»에서만 정한다 — 쪽 나눔을 재는 JS(measure.js HDR_H)와 그리는
 //    CSS 가 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다. JS 값을 CSS 에 넣어 준다.
 document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
@@ -8484,7 +8904,10 @@ document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
 const APP_NAME = '문서 편집기';
 document.title = APP_NAME;
 
-const state = { doc: null, view: null };   // view: null=전체보기 · 'v1'=판 보기(설계_판.md)
+// ⚠ parts 를 여기서 «먼저» 만든다 — applyDoc·draw 가 첫 그리기부터 이 값을 읽는다.
+//   아래 폴더 절에서만 만들면 첫 그리기 때 undefined 를 읽는다(지금은 안 터지지만,
+//   꼬리표가 있는 문서를 나중에 그 자리에서 열면 터진다).
+const state = { doc: null, view: null, parts: { parts: [] } };   // view: null=전체보기 · 'v1'=판 보기(설계_판.md)
 
 function demoDoc() {
   const doc = createDocument({ title: '신청 모델의 세부 사양서' });
@@ -8554,6 +8977,12 @@ function draw(opt = {}) {
     }
   }
 
+  // 부품 꼬리표의 «지금 상태»를 그리는 쪽에 넘긴다 — 어느 참조가 깨졌고 무엇을 가리키는지.
+  // ⚠ 목록이 비어 있어도 글자는 그대로 그려진다(꼬리표 표시만 없다).
+  {
+    const st = refState(state.doc, state.parts);
+    useParts(st.broken, st.label);
+  }
   // 보고 있던 판이 지워졌으면 전체보기로 돌아간다(설계 §4-5)
   if (state.view && !(state.doc.variants || []).some(v => v.id === state.view)) state.view = null;
   const r = renderPages(state.doc, pagesEl, document.getElementById('gauge'), state.view);
@@ -8659,9 +9088,14 @@ function selSnapshot() {
 
 // 편집이 문서를 바꿀 때는 항상 이 문으로 들어와 기록이 쌓인다
 const applyDoc = (d) => {
-  state.doc = d;
-  history.push(d.blocks, selSnapshot(), d.variants);
+  // ⭐ 부품 꼬리표가 붙은 글자를 사람이 «직접 고쳤으면» 꼬리표를 뗀다 — 이제 손으로 쓴 값이다.
+  //    안 그러면 다음 «다시 맞추기»가 사람이 친 글자를 조용히 되돌려 버린다.
+  //    ⛔ 부품이 없어졌거나 목록을 아직 못 읽었을 때는 안 뗀다(core/parts.js dropStaleRefs).
+  const r = dropStaleRefs(d, state.parts);
+  state.doc = r.doc;
+  history.push(state.doc.blocks, selSnapshot(), state.doc.variants);
   markDirty();
+  if (r.unref.length) toast('부품 값을 직접 고치셨습니다 — 이제 목록과 따로 갑니다');
 };
 
 // 되돌린 편집의 선택을 되살린다. 그 블록이 이 상태에 없으면(문단 가르기 되돌림 등)
@@ -8806,11 +9240,24 @@ const partsApi = attachPartsList({
   },
   getDoc: () => state.doc,
   warn: () => (state.dir ? null
-    : '부품 목록은 «서류 폴더»에 파일 하나로 저장됩니다. 먼저 「📁 문서 폴더 열기」를 눌러 주세요.'),
+    : '안전회로 부품 목록은 «서류 폴더»에 파일 하나로 저장됩니다. 먼저 「📁 문서 폴더 열기」를 눌러 주세요.'),
   onSaved: toast,
   onErr: toastErr,
 });
 window.__app.partsApi = partsApi;
+
+// 표 칸에 부품 값 걸기(기둥 3 Task 3) — 우클릭 「부품 값 넣기…」 가 숨은 리본 단추를 누른다.
+const partsRefApi = attachPartsRef({
+  pagesEl: document.getElementById('pages'),
+  barEl: document.getElementById('bar'),
+  getDoc: () => state.doc,
+  setDoc: applyDoc,
+  redraw: draw,
+  getView: () => state.view,
+  getList: () => state.parts,
+  onSaved: toast,
+});
+window.__app.partsRefApi = partsRefApi;
 
 // 판(版) 바 — 판이 있는 문서에서만 리본 아래에 나타난다(설계_판.md §4-1).
 // ⚠ mainEl·docName 은 「판별 PDF」가 쓰던 것이라 그 기능과 함께 뺐다(2026-09-01 SKY).
@@ -8831,7 +9278,6 @@ window.__app.vbarApi = vbarApi;
 // ---- 문서 폴더 열기·저장 ----
 state.dir = null;
 state.name = null;
-state.parts = { parts: [] };        // 부품 목록 — 폴더를 열 때 그 폴더의 파일에서 읽는다
 
 // #folder-msg 는 «지금 상태»(어느 폴더인가)를 적는 조용한 줄이다 — 그대로 둔다.
 // 「방금 무슨 일이 일어났나」는 토스트가 알린다(2026-09-01 SKY: "저장을 했는데 뭐 했는데
