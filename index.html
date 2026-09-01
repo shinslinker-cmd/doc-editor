@@ -25,6 +25,15 @@ body { margin:0; background:var(--desk); color:var(--ink);
    표처럼 헤어라인 구획. 머리는 문서 머리글 모티프(굵은 아래 경계 + 왼쪽 끝 64px만 빨강).
    화면을 내려도 왼쪽에 붙어 있는다 — 높이는 화면만큼, 넘치면 저 혼자 스크롤 */
 /* 세로로 쌓되 맨 아래 «판» 표시를 바닥에 붙인다(margin-top:auto 가 먹으려면 flex 여야 한다) */
+/* ⛔ 사이드바·리본·판 바의 글자는 «고를 수 없게» 한다(user-select:none).
+   2026-09-01 SKY 실기기 지적: 태블릿에서 문서 목록의 «글자 부분»을 누르면 화면 아래에
+   검은 사전 상자가 떴다(«제:어-반 · 명사 · 기계·장치의 원격 조작에…»). 이것은 크롬의
+   «탭해서 검색(Touch to Search)» 으로, 링크·단추가 아닌 «그냥 글»을 탭하면 뜬다.
+   목록 항목이 href 없는 <a> 라 크롬이 링크로 안 보고 글로 봤고, 글이 골라지면서 사전이
+   떴다. 배경을 누르면 글이 안 골라지니 그때만 제대로 열렸던 것이다.
+   조작부의 글자는 «내용»이 아니므로 못 고르게 하는 것이 맞다.
+   ⚠ #pages(문서)에는 절대 걸지 않는다 — 거기서는 글을 골라야 한다. */
+#side, #bar, #vbar { -webkit-user-select:none; user-select:none; }
 #side { width:250px; flex:none; background:#fff; color:var(--ink);
         border-right:1px solid var(--line); padding:0;
         display:flex; flex-direction:column;
@@ -39,7 +48,11 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* ⛔ min-width:0 이 없으면 이 칸이 «안의 내용만큼» 커져 화면 밖으로 나간다(flex 기본값이
    min-width:auto 라서다). 리본의 표 묶음이 좁은 화면에서 잘려 보이던 진짜 원인이었다
    (실측 2026-08-30: 화면 800px 인데 main 이 884px). 이게 있어야 안쪽 max-width 가 통한다. */
-#main { flex:1; min-width:0; padding:0 0 60px; }
+/* overflow-x:clip — 전체보기의 판 이름표가 종이 «밖»에 서므로, 화면이 좁으면 그 이름표가
+   오른쪽으로 삐져나가 가로 스크롤을 만든다(태블릿에서 가로 스크롤은 이미 사고를 냈다).
+   ⛔ hidden 이 아니라 clip 이어야 한다 — hidden 은 스크롤 상자를 만들어 리본의
+      position:sticky 를 죽인다. clip 은 자르기만 하고 스크롤 상자를 안 만든다. */
+#main { flex:1; min-width:0; padding:0 0 60px; overflow-x:clip; }
 /* 입력판(D16) — 문서 전체가 하나의 contenteditable 이라 초점 테두리를 끈다 */
 /* position:relative 는 그림 크기 손잡이(#imgui)의 좌표 기준이다 — 없으면 손잡이가
    엉뚱한 곳(화면 왼쪽 위)에 뜬다 */
@@ -132,13 +145,16 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .blk-table { margin:4px 0 12px; position:relative; touch-action:pan-y; }
 .blk-table table { width:100%; border-collapse:collapse; table-layout:fixed; }
 .blk-table td { outline:none; word-break:break-word; }
+/* ⭐ 행 여백은 2026-09-01 SKY 지시로 줄였다 — «전체적으로 표를 조금씩 줄여서 행 여백을
+   줄이자. 앞으로 표를 생성해도 그걸 기본값으로 하고.» 설계서 §8 의 옛 값은 머리글 7px ·
+   본문 6.5px 이었다. 표 기본값이 CSS 한 곳이라 새로 만드는 표도 자동으로 이 값을 쓴다. */
 .blk-table thead td { background:#f6f7fa; border-bottom:1.5px solid var(--ink);
-                      padding:7px 8px; font-size:10.5px; font-weight:700; color:#454a58;
-                      text-align:center; line-height:1.35; letter-spacing:-.1px; }
+                      padding:5.5px 8px; font-size:10.5px; font-weight:700; color:#454a58;
+                      text-align:center; line-height:1.3; letter-spacing:-.1px; }
 /* ⭐ 세로 맞춤 기본은 «가운데»다 (2026-08-30 SKY) — 한 칸만 아래로 나누면 같은 행의 안 나뉜
    칸이 위쪽에 붙어 어긋나 보였다. 칸마다 위/가운데/아래를 따로 고를 수 있다(엑셀과 같다). */
-.blk-table tbody td { padding:6.5px 8px; font-size:11.5px; border-bottom:1px solid var(--line-soft);
-                      color:#2b2f3a; font-variant-numeric:tabular-nums; line-height:1.4;
+.blk-table tbody td { padding:4.5px 8px; font-size:11.5px; border-bottom:1px solid var(--line-soft);
+                      color:#2b2f3a; font-variant-numeric:tabular-nums; line-height:1.35;
                       vertical-align:middle; }
 .blk-table thead td { vertical-align:middle; }
 .blk-table tbody tr:last-child td { border-bottom:1px solid #d8dbe3; }
@@ -190,16 +206,21 @@ body { margin:0; background:var(--desk); color:var(--ink);
 #folder-msg { padding:2px 18px 6px; color:var(--dim); line-height:1.7; word-break:break-all;
               font:500 10px 'IBM Plex Mono',Consolas,monospace; letter-spacing:.4px; }
 /* 문서 목록 — §8 표의 행과 같은 문법: 아래선 헤어라인 · 모노 번호 · 고른 것은 기준 행(옅은 빨강) */
+/* ⚠ 목록 항목은 <a> 가 아니라 <button> 이다 — href 없는 <a> 는 브라우저가 «링크»로 안 보고
+   «그냥 글»로 봐서, 태블릿에서 글자를 탭하면 크롬의 «탭해서 검색» 사전이 떴다(위 #side 주석).
+   <button> 은 누가 봐도 단추라 그 일이 없고 키보드(Tab·Enter)로도 눌린다. */
 #doclist { counter-reset:doc; }
-#doclist a { display:flex; gap:10px; align-items:baseline; counter-increment:doc;
-             color:#454a58; text-decoration:none; font-size:12.5px;
-             padding:11px 18px; border-bottom:1px solid var(--line-soft); cursor:pointer; }
-#doclist a:first-child { border-top:1px solid var(--line-soft); }
-#doclist a::before { content:counter(doc, decimal-leading-zero);
-                     font:600 10.5px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8; }
-#doclist a:hover { background:#f6f7fa; color:var(--ink); }
-#doclist a.on { background:#fdf5f4; color:var(--ink); font-weight:700; }
-#doclist a.on::before { color:var(--point); font-weight:700; }
+#doclist button { display:flex; gap:10px; align-items:baseline; counter-increment:doc;
+             color:#454a58; text-decoration:none; font-size:12.5px; text-align:left;
+             width:100%; border:0; border-bottom:1px solid var(--line-soft); background:none;
+             font-family:inherit; padding:11px 18px; cursor:pointer; }
+#doclist button:first-child { border-top:1px solid var(--line-soft); }
+#doclist button::before { content:counter(doc, decimal-leading-zero);
+                     font:600 10.5px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8;
+                     flex:none; }
+#doclist button:hover { background:#f6f7fa; color:var(--ink); }
+#doclist button.on { background:#fdf5f4; color:var(--ink); font-weight:700; }
+#doclist button.on::before { color:var(--point); font-weight:700; }
 
 /* 스크립트가 막힌 곳(구글드라이브 미리보기 등)에서만 보이는 안내 */
 .nojs { background:var(--point); color:#fff; font-size:14px; font-weight:700;
@@ -402,6 +423,18 @@ body { margin:0; background:var(--desk); color:var(--ink);
 @media print { #ctxmenu, #minibar, .mtoast { display:none !important; } }
 
 @media print {
+  /* ⭐ 2026-09-01 SKY 지적 — «인쇄 미리보기에서 바닥글 1/1 이 2페이지로 넘어가서 표시된다».
+     원인은 «두 가지가 겹친 것»이었다[실측: 진짜 PDF 를 뽑아 쪽수를 세어 확인].
+     ① 브라우저 기본 인쇄 여백(사방 0.4in ≈ 38px) 때문에 찍을 수 있는 높이가 1123px 보다
+        작았다 → @page 로 종이를 우리 종이와 똑같이 못 박는다.
+     ② ⛔ 진짜 범인은 이쪽이다 — #pages 의 위쪽 여백 28px 이 인쇄에서 안 지워져, 종이가
+        28px 아래에서 시작했다. 그만큼 아래가 밀려 «쪽 번호(바닥에서 14px)만» 다음 장으로
+        넘어갔다. 아래 #pages 규칙의 padding-top:0 이 그것이다.
+        (gap 은 이미 0 으로 껐는데 padding-top 은 빠져 있었다.)
+     ⚠ A4 라고만 적으면 210×297mm = 793.7px 폭이라 우리 종이(794px)보다 좁다. px 로 적으면
+       크롬이 pt 로 반올림해 794.56×1122.56px 을 준다 — 폭이 넉넉해 안전하다.
+       크기는 A4 와 사실상 같다(209.9×296.9mm). */
+  @page { size: 794px 1123px; margin: 0; }
   /* ⛔ 좁은 화면에서 줄여 보여 주던 배율은 인쇄에서 반드시 1 이어야 한다 —
      줄어든 채로 인쇄되면 A4 한복판에 작게 찍힌다(ui/fit.js) */
   #pages { zoom:1 !important; }
@@ -417,7 +450,9 @@ body { margin:0; background:var(--desk); color:var(--ink);
   body { background:#fff; }
   /* ⛔ 확대/축소가 인쇄에 남으면 A4 밖으로 잘린다 (설계서 §12-10) */
   #main { padding:0 !important; transform:none !important; zoom:1 !important; }
-  #pages { gap:0 !important; }
+  /* ⛔ padding-top 도 함께 꺼야 한다 — 화면에서 종이 위에 두던 28px 틈이 인쇄에 남으면
+     종이가 28px 아래에서 시작해 아래쪽이 다음 장으로 밀린다(위 @page 주석 ②). */
+  #pages { gap:0 !important; padding-top:0 !important; }
   .nojs { display:none !important; }
   .page { box-shadow:none !important; margin:0 !important;
           page-break-after:always; break-after:page; }
@@ -435,14 +470,37 @@ body { margin:0; background:var(--desk); color:var(--ink);
   border-bottom: 1px solid #e4e5e9; flex-wrap: wrap;
   position: sticky; top: 0; z-index: 4; }
 #vbar[hidden] { display: none; }
-#vbar .vchip { font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid #d5d7dd;
-  background: #fff; color: #454a58; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-#vbar .vchip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vc, #8a8e98); }
-#vbar .vchip.on { background: #e9f1ff; border-color: #5490ff; color: #12459b; }
-.blk.vlim { position: relative; box-shadow: inset 3px 0 0 var(--vc, #8a8e98); }
-.blk.vlim::after { content: attr(data-vnames); position: absolute; top: -1px; right: 0;
-  font: 600 9px/1.4 'IBM Plex Mono', monospace; color: var(--vc, #8a8e98);
-  background: var(--vcb, #f2f3f6); padding: 0 4px; border-radius: 0 0 0 4px; pointer-events: none; }
+/* ⭐ 칩은 리본 단추(.tb)와 «같은 물건»으로 보여야 한다 — 2026-09-01 SKY: «판 선택 버튼이
+   작아서 클릭 하기 힘들어. 다른 버튼처럼 모서리 굴곡 같은거도 통일 하자.»
+   옛 값은 알약 모양(border-radius:999px)에 높이 24px 이라 태블릿에서 손가락으로 누르기
+   어려웠다. 이제 모서리 6px · 높이 40px 로 리본과 맞춘다(리본 42px 보다 2px 낮게 둬
+   판 바가 리본보다 얇아 보이게 한다 — 판 바가 문서 자리를 먹는 느낌을 줄인다). */
+#vbar .vchip { height: 40px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line);
+  background: #fff; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center;
+  gap: 8px; white-space: nowrap; flex: none;
+  font: 600 12.5px 'Noto Sans KR', '맑은 고딕', sans-serif;
+  transition: transform .12s, box-shadow .12s, background .12s; }
+#vbar .vchip:hover { transform: translateY(-2px); box-shadow: 0 3px 10px rgba(20, 22, 30, .12); }
+#vbar .vchip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--vc, #8a8e98); }
+#vbar .vchip.on { background: #e9f1ff; border-color: #5490ff; color: #12459b; font-weight: 800; }
+/* ⭐ 판 표지는 «본문 밖»으로 뺀다 — 2026-09-01 SKY: «이름표 자리를 종이 우측 부분에
+   표시 하자. 외각에.»
+   옛 방식(색줄은 블록 안쪽 그림자 · 이름표는 블록 오른쪽 위)은 글자를 덮었다[실측 2026-09-01]:
+     · 이름표가 표 머리글 마지막 칸(「기준」)을 가로 27~120px 덮었다. 그 칸 폭이 128px 이라
+       이름표가 길면 글자가 통째로 안 보였다.
+     · 왼쪽 3px 색줄은 섹션 번호(01·02)의 왼쪽 여백이 0px 이라 첫 글자를 물었다.
+   이제 색줄은 왼쪽 여백(−14px, 종이 안)에, 이름표는 종이 오른쪽 «밖»에 세운다.
+   ⚠ 이름표가 종이 밖으로 나가려면 .page 의 overflow 를 풀어야 한다 → #pages.vall 참고. */
+.blk.vlim { position: relative; }
+.blk.vlim::before { content: ''; position: absolute; left: -14px; top: 0; bottom: 0; width: 3px;
+  background: var(--vc, #8a8e98); border-radius: 2px; pointer-events: none; }
+.blk.vlim::after { content: attr(data-vnames); position: absolute; top: 0; left: calc(100% + 12px);
+  font: 600 9px/1.6 'IBM Plex Mono', monospace; color: var(--vc, #8a8e98);
+  background: var(--vcb, #f2f3f6); padding: 1px 5px; border-radius: 4px;
+  white-space: nowrap; pointer-events: none; }
+/* 전체보기에서만 종이 밖으로 나가는 것을 허락한다 — 판 보기·판 없는 문서는 종전대로
+   .page 가 내용을 가둔다(render.js 가 #pages 에 vall 을 붙였다 뗀다). */
+#pages.vall .page { overflow: visible; }
 tr.vlim td:first-child { box-shadow: inset 3px 0 0 var(--vc, #8a8e98); }
 td.vcell { position: relative; }
 td.vcell::after { content: ''; position: absolute; top: 0; right: 0; border: 5px solid transparent;
@@ -467,7 +525,10 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
   #vmgr { display: none; }
   #vpick { display: none; }
   .blk.vlim { box-shadow: none; }
+  .blk.vlim::before { content: none; }
   .blk.vlim::after { content: none; }
+  /* 인쇄에서는 종이가 다시 내용을 가둔다 — 표지가 없으니 밖으로 나갈 것도 없다 */
+  #pages.vall .page { overflow: hidden; }
   tr.vlim td:first-child { box-shadow: none; }
   td.vcell::after { content: none; }
 }
@@ -598,7 +659,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-08-31 21:19";
+window.__BUILD = "2026-09-01 09:23";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -2491,6 +2552,11 @@ function tableEl(block, part, view) {
 // 판 표지(설계_판.md §4-2·§4-3) — 화면 전용. 글자 노드를 만들지 않는다(P9).
 // ⚠ 장을 넘은 표는 같은 data-id 의 .blk 조각이 여러 개다 — 조각마다 따로 표지를 붙인다.
 function applyVariantMarks(doc, pagesEl, cur) {
+  // 전체보기(cur 없음) + 판 있는 문서에서만 이름표가 종이 «밖»에 선다 — 그때만 종이의
+  // 내용 가두기(overflow:hidden)를 푼다(styles.css `#pages.vall .page`).
+  // ⛔ 아래 «판 없으면 그만» 보다 «먼저» 꺼야 한다 — 판을 다 지운 문서에서 클래스가 남으면
+  //    그 문서는 영영 내용을 안 가두게 된다.
+  pagesEl.classList.toggle('vall', !cur && !!(doc.variants || []).length);
   if (!(doc.variants || []).length) return;
   const names = (list) => (list || []).map(id => variantName(doc, id)).filter(Boolean).join('·');
   const byId = new Map(doc.blocks.map(b => [b.id, b]));
@@ -6405,10 +6471,9 @@ function attachFit({ mainEl, pagesEl, getDoc }) {
 
 
 
-
 // 리본의 「판」 상황 묶음도 이 파일이 맡는다(설계 §4-4) — 판 바와 같은 문(setDoc)으로
 // 문서를 고쳐야 되돌리기가 한 걸음으로 맞는다.
-function attachVbar({ mainEl, pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, docName, imageApi }) {
+function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, imageApi }) {
   const vbarEl = document.getElementById('vbar');
 
   // 문서와 판 바를 맞춘다. draw() 안에서 부르지 않는다 — draw 는 이 문이 생기기 «전»에도
@@ -6453,12 +6518,9 @@ function attachVbar({ mainEl, pagesEl, barEl, getDoc, setDoc, redraw, getView, s
     mgr.textContent = '⚙ 판 관리';
     mgr.addEventListener('click', openMgr);
     vbarEl.appendChild(mgr);
-    const pdf = document.createElement('button');
-    pdf.className = 'vchip';
-    pdf.textContent = '판별 PDF';
-    pdf.title = '판마다 PDF 저장 창이 한 번씩 뜹니다 — 파일 이름은 「문서명_판이름」으로 제안됩니다';
-    pdf.addEventListener('click', () => printVariants(defs));
-    vbarEl.appendChild(pdf);
+    // ⛔ 「판별 PDF」(판 전부를 한 번에 뽑기)는 2026-09-01 SKY 지시로 뺐다 —
+    //    «어차피 pdf 저장은 한 판씩 내가 고르고 pdf 추출 하면 돼. 전체 판 pdf 기능은 제외.»
+    //    판을 고른 뒤 사이드바 「PDF 저장」을 누르면 파일 이름이 «문서명_판이름» 으로 나온다.
   }
 
   // 판 정의 변경은 전부 이 문으로 — applyDoc(setDoc) 을 거쳐 Ctrl+Z 한 걸음이 된다(P5).
@@ -6771,16 +6833,6 @@ function attachVbar({ mainEl, pagesEl, barEl, getDoc, setDoc, redraw, getView, s
     if (mgrEl) closeMgr();
   });
 
-  // 판별 PDF(설계 §5-2·Q2) — 판 순서대로 보기 전환→그림→인쇄. 저장 창이 판마다 한 번씩 뜬다.
-  function printVariants(defs) {
-    const was = getView();
-    for (const v of defs) {
-      setView(v.id);
-      printDoc(mainEl, docName() + '_' + v.name);
-    }
-    setView(was);
-  }
-
   // 판 바를 리본 «바로 아래»에 붙여 둔다(styles.css 가 position:sticky 를 준다).
   // ⛔ top 을 CSS 에 숫자로 적을 수 없다 — 리본은 상황 묶음(표·그림·판)이 나타나면
   //    한 줄에서 두세 줄로 커진다(실측 247→317px). 숫자로 박으면 리본이 커진 순간
@@ -6801,7 +6853,7 @@ function attachVbar({ mainEl, pagesEl, barEl, getDoc, setDoc, redraw, getView, s
   refresh();
   // openMgr 을 내보낸다 — 판이 0개인 문서에서 관리 창을 열 유일한 길(우클릭 메뉴 → 숨은
   // 리본 단추 → 여기)이 제대로 물려 있는지 검사 도구가 직접 확인할 수 있어야 한다.
-  return { refresh, printVariants, stickUnderBar, refreshGroup, openMgr };
+  return { refresh, stickUnderBar, refreshGroup, openMgr };
 }
 
 /* main.js */
@@ -7105,9 +7157,9 @@ const fitApi = attachFit({
 window.__app.fitApi = fitApi;
 
 // 판(版) 바 — 판이 있는 문서에서만 리본 아래에 나타난다(설계_판.md §4-1).
-// docName 은 판별 PDF 의 파일 이름 앞머리다 — 저장된 파일 이름이 있으면 그것을, 없으면 제목을 쓴다.
+// ⚠ mainEl·docName 은 「판별 PDF」가 쓰던 것이라 그 기능과 함께 뺐다(2026-09-01 SKY).
+//   한 판씩 뽑는 길(사이드바 「PDF 저장」)은 아래 btn-pdf 가 그대로 맡는다.
 const vbarApi = attachVbar({
-  mainEl: document.getElementById('main'),
   pagesEl: document.getElementById('pages'),
   barEl: document.getElementById('bar'),
   getDoc: () => state.doc,
@@ -7115,7 +7167,6 @@ const vbarApi = attachVbar({
   redraw: draw,
   getView: () => state.view,
   setView,
-  docName: () => (state.name ? state.name.replace(DOC_EXT, '') : (state.doc.meta.title || '문서')),
   // 리본 「보일 판…」 이 «고른 그림 여러 장»을 한 번에 지정할 때 그 목록을 읽는다(§4-4)
   imageApi,
 });
@@ -7139,7 +7190,10 @@ async function refreshList() {
   box.textContent = '';
   if (!state.dir) return;
   for (const name of await listDocs(state.dir)) {
-    const a = document.createElement('a');
+    // ⚠ <a> 가 아니라 <button> 이다 — href 없는 <a> 는 태블릿 크롬이 «그냥 글»로 봐서
+    //    글자를 탭하면 «탭해서 검색» 사전 상자가 화면 아래에 떴다(2026-09-01 SKY 실기기).
+    const a = document.createElement('button');
+    a.type = 'button';
     a.textContent = name.replace(DOC_EXT, '');
     a.className = name === state.name ? 'on' : '';
     // ⛔ 실패를 조용히 삼키면 «눌러도 아무 일 없음» 이 된다 — 판 5 문서를 옛 프로그램으로 열면
@@ -7323,12 +7377,12 @@ document.getElementById('btn-pdf').addEventListener('click', () => {
     printDoc(mainEl, name + '_' + (v ? v.name : ''));
     return;
   }
-  // 전체보기 + 판 있는 문서 — 전체보기 화면(전 판 합본)은 인쇄물이 아니다(설계 §5-2).
-  // 판별 PDF 로 안내한다: 확인하면 판 순서대로 전부, 취소하면 아무 일도 없다.
-  if (window.confirm('판이 있는 문서입니다. 판별로 PDF 를 뽑을까요?\n'
-      + '(판마다 저장 창이 한 번씩 뜹니다 — 한 판만 뽑으려면 위 판 바에서 판을 고른 뒤 다시 누르세요)')) {
-    vbarApi.printVariants(defs);
-  }
+  // 전체보기 + 판 있는 문서 — 전체보기 화면은 «판을 견주어 보는 화면»이지 인쇄물이 아니다
+  // (판마다 다른 블록이 전부 겹쳐 나와 어느 판도 아닌 종이가 된다).
+  // ⛔ 「판별 PDF」(전부 한 번에)는 2026-09-01 SKY 지시로 뺐다 — 한 판씩 골라 뽑는다.
+  window.alert('전체보기는 판을 견주어 보는 화면이라 그대로 인쇄하면 판이 뒤섞입니다.\n'
+    + '위 판 바에서 판을 하나 고른 뒤 「PDF 저장」을 누르세요 '
+    + '— 파일 이름이 「문서명_판이름」으로 나옵니다.');
 });
 
 })();
