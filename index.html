@@ -585,7 +585,16 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .qs .q { width:30px; height:30px; padding:0; flex:none; display:flex; align-items:center;
   justify-content:center; border:1px solid transparent; border-radius:var(--u-r-ctl);
   background:var(--u-surface); color:var(--u-text); font:inherit; cursor:pointer; }
-.qs .q:hover { background:var(--u-surface-mute); border-color:var(--u-border); }
+/* ⭐ 리본 단추(.tb)와 «같은 기준» (2026-09-01 SKY: "우클릭 했을 떄 뜨는 서식바도 상단
+   리본 같은 기준을 적용 해줘") — 호버 그림자·눌림 되먹임을 리본과 똑같이 맞춘다.
+   ⚠ 크기(30px)는 안 키운다. 리본은 58×44 인데 그대로 쓰면 서식바가 377px 이 되어
+     종이를 덮는다 — 종이 왼쪽 빈 자리는 PC 1600 에서 258px · PC 1280 에서 98px ·
+     태블릿에서 38px 뿐이다[실측 2026-09-01]. 이름은 말풍선(title)이 대신 알려 준다. */
+.qs .q:hover { background:var(--u-surface-mute); border-color:var(--u-border);
+  box-shadow:0 2px 8px rgba(20,22,30,.10); }
+.qs .q:active { background:var(--u-accent-light); border-color:var(--u-border);
+  box-shadow:0 1px 2px rgba(20,22,30,.10); }
+#ctxmenu .mlist button:active { background:var(--u-accent-light); }
 .qs .q-b { font-weight:900; }
 .qs .q-i { font-style:italic; }
 .qs .q-u { text-decoration:underline; }
@@ -602,9 +611,13 @@ body { margin:0; background:var(--desk); color:var(--ink);
 #minibar .qs, #minibar2 .qs { padding-bottom:0; }
 #minibar, #minibar2 { width:211px; }
 /* 알림 — 붙여넣기가 브라우저에 막혔을 때 «막혔다»고 말해 준다. 조용히 삼키지 않는다. */
-.mtoast { position:fixed; z-index:130; max-width:300px; padding:9px 12px; border-radius:8px;
-  background:var(--ink); color:#fff; font-size:12px; line-height:1.5;
-  box-shadow:0 6px 20px rgba(20,22,30,.28); }
+/* ⚠ 이 규칙은 도구 토큰 훑기에서 빠져 있었다(도구 선택자 목록에 .mtoast 가 없었다) —
+   2026-09-01 에 손으로 맞췄다. 토큰을 쓰는 규칙과 안 쓰는 규칙이 섞이면 다음에 색을
+   고칠 때 한쪽만 바뀐다. */
+.mtoast { position:fixed; z-index:130; max-width:300px; padding:9px 12px;
+  border-radius:var(--u-r-card);
+  background:var(--u-text-strong); color:var(--u-surface); font-size:var(--u-fs-body);
+  line-height:1.5; box-shadow:0 6px 20px rgba(20,22,30,.28); }
 @media print { #ctxmenu, #minibar, #minibar2, .mtoast { display:none !important; } }
 
 @media print {
@@ -820,6 +833,16 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 #partslist .pl-add:hover { background: var(--u-surface-mute); }
 @media print { #partslist { display: none !important; } }
 
+/* 열 너비 수치 말풍선 (2026-09-01 SKY: "행열의 너비 수치를 알고 싶어.")
+   ⛔ 종이 안에 두지 않는다 — 편집층의 글자 번호 셈에 끼어든다(P9). body 에 띄운다.
+   ⚠ 손끝 «위»에 뜬다(translate 로 위로 올린다) — 손가락·마우스에 가리지 않게. */
+#colsize { position: fixed; z-index: 70; transform: translate(-50%, -100%);
+  background: var(--u-text-strong); color: #fff; border-radius: var(--u-r-badge);
+  padding: 3px 8px; font: 600 var(--u-fs-small) 'IBM Plex Mono', Consolas, monospace;
+  white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .1s ease; }
+#colsize.on { opacity: 1; }
+@media print { #colsize { display: none !important; } }
+
 /* ── 도구 단추의 호버·눌림 — CP 관리시스템과 같게 (2026-09-01 SKY) ──────────────
    근거: _디자인_기준.md §0 「클릭 가능한 것은 호버 시 lift(translateY(-2px)) + 그림자」
    ⛔ 리본 단추(.tb)에는 걸지 않는다 — 58×44px 이 촘촘히 붙은 격자라, 하나가 들리면
@@ -920,11 +943,40 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 @media print { #vvals { display: none !important; } }
 
 /* 「보일 판」 고르기 팝업 (설계 §4-4) — 판 관리 창(60) «위»에 뜬다(61). 목록이 동적이라 JS 로 만든다 */
+/* ⭐ 2026-09-01 SKY: "보일판, 행 보일 버튼 눌러서 뜨는 팝업창도 보기좋게 양식 변경."
+   → 다른 창(머리글·부품 목록·판별 값)과 «같은 양식»이다: 제목줄 + ✕ · 한 줄 설명 ·
+     목록 · 아래 단추. 사람이 창마다 다른 규칙을 익힐 필요가 없다. */
 #vpick { position: fixed; top: 130px; left: 50%; transform: translateX(-50%); z-index: 61;
-  background: var(--u-surface); border: 1px solid var(--u-border); border-radius:var(--u-r-card); padding: 10px 12px;
+  background: var(--u-surface); border: 1px solid var(--u-border);
+  border-radius:var(--u-r-card); padding: 12px 14px;
   box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size:var(--u-fs-body);
-  display: flex; flex-direction: column; gap: 4px; }
-#vpick label { display: flex; align-items: center; gap: 4px; }
+  width: 300px; max-width: calc(100vw - 24px); }
+#vpick .vp-ttl { display: flex; align-items: center; justify-content: space-between;
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--u-border-card); }
+#vpick .vp-x { border: 0; background: none; cursor: pointer; color: var(--u-text-faint);
+  font-size:var(--u-fs-body); line-height: 1; padding: 2px 4px; }
+#vpick .vp-x:hover { color: var(--u-text); }
+#vpick .vp-note { color: var(--u-text-sub); font-size:var(--u-fs-small); line-height: 1.5;
+  margin: 0 0 9px; }
+/* 판이 많아지면 목록만 스크롤한다 — 제목과 아래 단추는 늘 보인다 */
+#vpick .vp-body { max-height: 44vh; overflow-y: auto; }
+#vpick .vp-row { display: flex; align-items: center; gap: 7px; padding: 4px 2px;
+  cursor: pointer; border-radius: var(--u-r-ctl); }
+#vpick .vp-row:hover { background: var(--u-surface-mute); }
+/* 판 색 점 — 판 바의 칩·이름표와 같은 색이라 «어느 판인지»가 눈으로 이어진다 */
+#vpick .vp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+#vpick .vp-nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+#vpick .vp-foot { display: flex; justify-content: flex-end; gap: 6px;
+  border-top: 1px solid var(--u-border-card); margin-top: 10px; padding-top: 9px; }
+#vpick button { height: 28px; padding: 0 9px; font-size:var(--u-fs-body);
+  border: 1px solid var(--u-border); border-radius: var(--u-r-ctl);
+  background: var(--u-surface); cursor: pointer; }
+#vpick button:hover { background: var(--u-surface-mute); }
+/* 「모두」 는 왼쪽 끝 — 오른쪽 끝은 「취소」 자리라 손에 익은 자리를 바꾸지 않는다 */
+#vpick .vp-all { margin-right: auto; color: var(--u-text-sub); }
+#vpick .vp-ok { font-weight: 700; border-color: #c9ced8; background: var(--u-surface-mute); }
 @media print {
   #vbar { display: none; }
   #vmgr { display: none; }
@@ -1130,7 +1182,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 17:16";
+window.__BUILD = "2026-09-01 17:31";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -5344,6 +5396,28 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
   document.addEventListener('pointerup', endPick);
   document.addEventListener('pointercancel', endPick);
 
+  // ⭐ 끄는 동안 «몇 px 인지»를 보여 준다 (2026-09-01 SKY: "행열의 너비 수치를 알고 싶어.")
+  //    전에는 눈으로 어림잡을 수밖에 없어서, 두 표의 열을 같게 맞추는 일이 거의 불가능했다.
+  // ⚠ 양쪽 폭을 «둘 다» 보여 준다 — 열 하나를 넓히면 옆 열이 그만큼 좁아지므로, 한쪽만
+  //   보면 «전체가 늘어난다»고 오해한다.
+  // ⛔ 종이 안에 넣지 않는다 — body 에 띄운다. 종이 안에 두면 편집층(#pages)의 글자 번호
+  //    셈에 끼어들어 커서가 엉뚱한 곳을 문다(설계_판.md P9 와 같은 이유).
+  let 수치el = null;
+  function 수치보이기(anchor, w1, w2) {
+    if (!수치el) {
+      수치el = document.createElement('div');
+      수치el.id = 'colsize';
+      수치el.setAttribute('contenteditable', 'false');
+      document.body.appendChild(수치el);
+    }
+    수치el.textContent = Math.round(w1) + ' px  |  ' + Math.round(w2) + ' px';
+    const r = anchor.getBoundingClientRect();
+    수치el.style.left = Math.round(r.x + r.width / 2) + 'px';
+    수치el.style.top = Math.round(r.top - 6) + 'px';
+    수치el.classList.add('on');
+  }
+  function 수치숨기기() { if (수치el) 수치el.classList.remove('on'); }
+
   // ── 열 너비 끌기 — 끄는 동안은 colgroup 만 미리보기로 바꾸고, 놓으면 모델에 적는다 ──
   let grip = null;   // { id, col, startX, startW, pairW, cols:[colgroup,…] }
   pagesEl.addEventListener('pointerdown', (e) => {
@@ -5364,6 +5438,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
       grips: Array.from(pagesEl.querySelectorAll(
         '.blk-table[data-id="' + b.id + '"] .colgrip[data-col="' + col + '"]')) };
     g.classList.add('on');
+    수치보이기(g, grip.startW, grip.pairW - grip.startW);
     try { g.setPointerCapture(e.pointerId); } catch (err) { /* 합성 이벤트에는 없다 */ }
   });
   pagesEl.addEventListener('pointermove', (e) => {
@@ -5375,6 +5450,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
     }
     // ⭐ 눈금도 손끝을 따라간다 — 전에는 놓는 순간에야 제자리를 찾아 «선이 안 따라온다» 고 보였다
     for (const gg of grip.grips) gg.style.left = (grip.left0 + w - 3) + 'px';
+    수치보이기(grip.grips[0], w, grip.pairW - w);
   });
   // ⚠ 어느 경계를 끌었는지는 e.target 이 아니라 grip 에서 읽는다 — setPointerCapture 덕에
   //   손잡이 밖에서 놓아도 이벤트는 오지만, target 을 믿으면 꼬인다.
@@ -5383,6 +5459,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
     const { id, col, startX, startW, pairW } = grip;
     grip = null;
     pagesEl.querySelectorAll('.colgrip.on').forEach(x => x.classList.remove('on'));
+    수치숨기기();
     const w = Math.max(30, Math.min(startW + (e.clientX - startX), pairW - 30));
     const doc = getDoc();
     const b = doc.blocks.find(x => x.id === id);
@@ -8809,25 +8886,74 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
     return { kind: 'blocks', ids: [blk.dataset.id] };
   }
 
-  // 체크 목록 팝업 — 「보일 판」 고르기. onDone(list|null) : null = 모든 판
+  // 체크 목록 창 — 「보일 판」 고르기. onDone(list|null) : null = 모든 판
+  // ⭐ 2026-09-01 SKY: "보일판, 행 보일 버튼 눌러서 뜨는 팝업창도 보기좋게 양식 변경.
+  //    추가로 서식바 처럼 서식바 외각 부분을 클릭하면 창에 닫히도록 같이 적용."
+  //    → 다른 창(머리글·부품 목록·판별 값)과 «같은 양식»으로 만든다: 제목줄 + ✕ ·
+  //      무엇을 하는 창인지 한 줄 · 목록 · 아래 단추. 바깥을 누르면 닫힌다.
+  // ⭐ 「무엇을 하는 창인지」 한 줄을 넣는다 — SKY 가 "어떻게 사용해야 하는지 모르겠어"
+  //    라고 했다. 이름을 바꾸는 것은 뒤로 미뤘으니(SKY: "일단 유지"), 설명으로 메운다.
   let pickEl = null;
-  function openPick(current, onDone) {
+  function openPick(current, onDone, 무엇) {
     closePick();
     const doc = getDoc();
     pickEl = document.createElement('div');
     pickEl.id = 'vpick';
+    pickEl.setAttribute('contenteditable', 'false');
+
+    const ttl = document.createElement('div');
+    ttl.className = 'vp-ttl';
+    ttl.append(document.createTextNode((무엇 && 무엇.제목) || '보일 판'));
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'vp-x';
+    x.title = '닫기';
+    x.textContent = '✕';
+    x.addEventListener('click', closePick);
+    ttl.appendChild(x);
+    pickEl.appendChild(ttl);
+
+    const note = document.createElement('div');
+    note.className = 'vp-note';
+    note.textContent = (무엇 && 무엇.설명)
+      || '체크한 판에서만 보입니다. 전부 체크하면 모든 판에 보입니다(공통).';
+    pickEl.appendChild(note);
+
+    const body = document.createElement('div');
+    body.className = 'vp-body';
     const boxes = [];
     for (const v of doc.variants || []) {
       const label = document.createElement('label');
+      label.className = 'vp-row';
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.value = v.id;
       cb.checked = !Array.isArray(current) || current.includes(v.id);
       boxes.push(cb);
-      label.append(cb, document.createTextNode(' ' + v.name));
-      pickEl.appendChild(label);
+      const dot = document.createElement('span');
+      dot.className = 'vp-dot';
+      const c = variantColor(doc, v.id);
+      dot.style.background = c.fg;
+      const nm = document.createElement('span');
+      nm.className = 'vp-nm';
+      nm.textContent = v.name;
+      label.append(cb, dot, nm);
+      body.appendChild(label);
     }
+    pickEl.appendChild(body);
+
+    const foot = document.createElement('div');
+    foot.className = 'vp-foot';
+    // 「모두」 — 판이 많으면 하나씩 누르는 것이 번거롭다
+    const all = document.createElement('button');
+    all.type = 'button';
+    all.className = 'vp-all';
+    all.textContent = '모두';
+    all.title = '모든 판에 보이게 한다(= 공통)';
+    all.addEventListener('click', () => { for (const b of boxes) b.checked = true; });
     const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'vp-ok';
     ok.textContent = '적용';
     ok.addEventListener('click', () => {
       const on = boxes.filter(b => b.checked).map(b => b.value);
@@ -8838,10 +8964,14 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
       onDone(on.length === (getDoc().variants || []).length ? null : on);   // 전부 체크 = 공통
     });
     const no = document.createElement('button');
+    no.type = 'button';
     no.textContent = '취소';
     no.addEventListener('click', closePick);
-    pickEl.append(ok, no);
+    foot.append(all, ok, no);
+    pickEl.appendChild(foot);
+
     document.body.appendChild(pickEl);
+    열림표시();
   }
   function closePick() { if (pickEl) { pickEl.remove(); pickEl = null; } }
 
@@ -8887,7 +9017,9 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
         if (!바뀌었나) return;
         setDoc(Object.assign({}, getDoc(), { blocks }));
         redraw({ keepCaret: true });
-      });
+      }, { 제목: '보일 판 — 이 덩어리',
+           설명: '문단 하나 · 표 하나 · 그림 하나가 «통째로» 어느 판에 보일지 고릅니다. '
+               + '체크한 판에서만 보이고, 전부 체크하면 모든 판에 보입니다.' });
       return;
     }
     if (kind === 'row' && t.kind === 'cell' && t.cell[0] !== 'h') {
@@ -8909,7 +9041,9 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
         setDoc(Object.assign({}, getDoc(), {
           blocks: replaceBlock(getDoc().blocks, t.id, { rows: next.rows, rowv: next.rowv }) }));
         redraw({ keepCaret: true });
-      });
+      }, { 제목: '행 보일 판 — 이 줄',
+           설명: '표의 «이 한 줄»이 어느 판에 보일지 고릅니다. '
+               + '세로로 묶인 줄은 묶음째 함께 움직입니다.' });
       return;
     }
     if ((kind === 'cellmake' || kind === 'cellclear') && t.kind === 'cell') {
@@ -9127,12 +9261,18 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
   const 열림표시 = () => { 방금열림 = true; setTimeout(() => { 방금열림 = false; }, 0); };
   document.addEventListener('click', (e) => {
     if (방금열림) return;
-    if (!valsEl && !mgrEl) return;
+    // ⭐ «보일 판» 고르기 창(#vpick)도 바깥을 누르면 닫는다 (2026-09-01 SKY:
+    //    "서식바 외각 부분을 클릭하면 창에 닫히도록 같이 적용").
+    //    전에는 «닫지 않는 자리»로만 들어 있어서 종이를 눌러도 계속 떠 있었다.
+    if (!valsEl && !mgrEl && !pickEl) return;
     const t = e.target;
     if (t && t.closest && t.closest('#vvals, #vmgr, #vpick, #vbar, #bar, #ctxmenu, td.vcell')) return;
     closeVals();
     closeMgr();
+    closePick();
   });
+  // Esc 로도 닫힌다 — 다른 창과 같다
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePick(); });
 
   // ⭐ 판별 칸을 «아무 곳이나» 누르면 열린다(2026-09-01 SKY 2차 지적).
   // ⛔ 처음에는 «오른쪽 위 모서리 18×18px»만 손잡이로 삼았는데 세 가지가 잘못됐다[실측]:
