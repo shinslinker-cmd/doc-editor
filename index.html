@@ -10,9 +10,45 @@
 <meta name="theme-color" content="#1c1e24">
 <style>
 :root {
+  /* ── 종이(인쇄물) 값 — ⛔ CP 관리시스템 기준을 여기에 들이지 않는다 ─────────────
+     2026-09-01 SKY: "Q1 종이 부분은 제외, 도구 부분만 진행 해줘."
+     종이는 «인쇄되는 서류»다. 화면 도구의 파랑·그림자·14px 본문을 넣으면 제출 서류가
+     웹 화면처럼 된다. 종이 값은 docs/설계서.md §8 확정값을 따른다. */
   --point:#e5231b; --ink:#1c1e24; --sub:#5a5e6a; --dim:#8a8e98;
   --line:#e4e5e9; --line-soft:#eef0f4; --paper:#fff; --desk:#e8e9ec;
   --page-w:794px; --page-h:1123px;
+
+  /* ── 도구(사이드바·리본·창·단추) 값 — CP 관리시스템과 같게 ────────────────────
+     근거: C:\cp-inspection-system\_디자인_기준.md (§1 색 · §2 모양 · §0 취향)
+     ⭐ 왜 맞추나: SKY 가 두 도구를 번갈아 쓴다. 같은 성격의 것이 다르게 보이면
+        «다른 프로그램»처럼 느껴진다(§0 「일관성 최우선」).
+     ⚠ 글자 «크기»는 아직 안 건드린다 — CP 본문은 14px 인데 여기 도구는 10.5~13.5px 이고,
+       전부 올리면 리본·사이드바가 눈에 띄게 커진다. 재서 보고한 뒤 정한다. */
+  --u-accent:#2563EB;        /* 채움 + 흰 글자 (blue-600) */
+  --u-accent-dark:#1D4ED8;   /* 눌림 · 호버 */
+  --u-accent-mid:#3B82F6;    /* 글자를 안 올리는 곳 — 아이콘 · 선 */
+  --u-accent-light:#DBEAFE;  /* 옅은 강조 바탕 */
+  --u-accent-ring:rgba(37,99,235,.15);
+  --u-surface-blue:#EFF6FF;  /* 고른 줄 */
+  --u-text-strong:#111827;   /* 제목 · 라벨 */
+  --u-text:#1F2937;          /* 본문 */
+  --u-text-sub:#4B5563;      /* 설명 · 보조 */
+  --u-text-faint:#9CA3AF;    /* 안내문구 — ⛔ 본문 금지 */
+  --u-border:#D1D5DB;        /* 입력칸 · 단추 (손으로 만지는 것) */
+  --u-border-card:#E5E7EB;   /* 창 · 카드 */
+  --u-surface:#fff;          /* L1 */
+  --u-surface-soft:#F9FAFB;  /* L2 — 카드 안에서만 */
+  --u-surface-mute:#F3F4F6;  /* 카드 안의 옅은 바탕 */
+  /* 모서리는 세 가지뿐이다(§2) — 전에는 9가지가 흩어져 있었다 */
+  --u-r-card:10px;           /* 창 · 카드 · 패널 */
+  --u-r-ctl:6px;             /* 단추 · 입력칸 · 세그먼트 */
+  --u-r-badge:4px;           /* 배지 · 칩 */
+  /* 글자 크기 — 세 가지로만 쓴다. ⚠ CP 의 14px 을 그대로 들이지 않는다
+     (2026-09-01 SKY: "크기 기준은 14px 같은건 무시 해. 크기는 그냥 통일만 하면 돼.")
+     ⛔ 값은 «지금 쓰는 것 가운데 가장 흔한 것»으로 골랐다 — 리본·사이드바가 커지지 않게. */
+  --u-fs-body:12.5px;        /* 창 본문 · 입력칸 · 단추 (전에 12·12.5·13px 로 흩어져 있었다) */
+  --u-fs-small:11.5px;       /* 설명 · 작은 라벨 · 배지 (전에 10.5·11·11.5px) */
+  --u-fs-mini:9.5px;         /* 리본 단추 아래 이름 · 묶음 이름 (전에 8.5·9.5·10px) */
 }
 * { box-sizing:border-box; }
 /* ⛔ 가로로 쓸어도 «뒤로 가기»가 되지 않게 한다 — 태블릿에서 표를 손가락으로 끌면
@@ -40,8 +76,8 @@ body { margin:0; background:var(--desk); color:var(--ink);
    ⚠ 사람이 손으로 정한 폭이 있으면 그것이 이긴다(스크립트가 :root 에 직접 넣는다). */
 :root { --sbw: 250px; }
 @media (max-width: 1200px) { :root { --sbw: 190px; } }
-#side { width:var(--sbw); flex:none; background:#fff; color:var(--ink);
-        border-right:1px solid var(--line); padding:0;
+#side { width:var(--sbw); flex:none; background:var(--u-surface); color:var(--u-text);
+        border-right:1px solid var(--u-border); padding:0;
         display:flex; flex-direction:column;
         position:sticky; top:0; height:100vh; overflow-y:auto; }
 /* 너비 손잡이 — 사이드바가 스크롤되는 상자라 그 «안»에 두면 같이 굴러간다. fixed 로 띄운다.
@@ -49,14 +85,14 @@ body { margin:0; background:var(--desk); color:var(--ink);
 #sbresize { position:fixed; top:0; bottom:0; left:calc(var(--sbw) - 3px); width:7px; z-index:20;
             cursor:ew-resize; touch-action:none; }
 #sbresize::after { content:''; position:absolute; inset:0 3px; background:transparent; }
-#sbresize:hover::after, #sbresize.on::after { background:#5490ff; }
+#sbresize:hover::after, #sbresize.on::after { background:var(--u-accent-mid); }
 @media print { #sbresize { display:none !important; } }
 #side .side-ttl, #side .side-btns, #folder-msg { flex:none; }
-#side .side-ttl { padding:24px 18px 16px; border-bottom:1.5px solid var(--ink); position:relative; }
+#side .side-ttl { padding:24px 18px 16px; border-bottom:1.5px solid var(--u-text); position:relative; }
 #side .side-ttl::after { content:''; position:absolute; left:0; bottom:-1.5px;
                          width:64px; height:3px; background:var(--point); }
 .s-name { font-size:19px; font-weight:900; letter-spacing:-.3px; }
-.s-eyebrow { font:600 9px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8;
+.s-eyebrow { font:600 var(--u-fs-mini) 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8;
              letter-spacing:1.4px; margin-top:6px; }
 /* ⛔ min-width:0 이 없으면 이 칸이 «안의 내용만큼» 커져 화면 밖으로 나간다(flex 기본값이
    min-width:auto 라서다). 리본의 표 묶음이 좁은 화면에서 잘려 보이던 진짜 원인이었다
@@ -80,8 +116,8 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 위쪽 도구모음 — 화면에 붙어 있고 문서와 함께 스크롤되지 않는다 */
 /* 줄 사이는 조금 넓게 — 표 묶음의 「표」 이름표가 윗줄에 붙어 답답해 보였다(캡처 실측) */
 #bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:10px 5px;
-       align-items:center; padding:7px 14px; background:#fff;
-       border-bottom:1px solid var(--line); box-shadow:0 1px 6px rgba(20,22,30,.06); }
+       align-items:center; padding:7px 14px; background:var(--u-surface);
+       border-bottom:1px solid var(--u-border); box-shadow:0 1px 6px rgba(20,22,30,.06); }
 /* ⛔ 버튼 글자는 꺾지 않는다(white-space) · 버튼도 줄이지 않는다(flex:none) —
    자리가 모자라면 글자가 두 줄이 되는 게 아니라 버튼 줄이 다음 줄로 내려간다 */
 /* ⭐ 단추는 «심볼 + 작은 이름»의 두 칸이고 크기가 하나로 고정이다 (2026-09-01 SKY:
@@ -90,25 +126,25 @@ body { margin:0; background:var(--desk); color:var(--ink);
    옛 모양은 «글자 길이만큼» 넓어져 「굵게」는 56px, 「아래 나누기」는 100px 이라
    줄이 들쭉날쭉했다. 이제 전부 60×52 라 격자처럼 줄이 맞는다.
    ⚠ 이름(.lb)은 5글자를 넘기지 않는다 — 넘으면 60px 을 벗어나 잘린다. */
-.tb { width:58px; height:44px; padding:0; border:1px solid var(--line);
-      border-radius:6px; background:#fff; color:var(--ink); cursor:pointer;
+.tb { width:58px; height:44px; padding:0; border:1px solid var(--u-border);
+      border-radius:var(--u-r-ctl); background:var(--u-surface); color:var(--u-text); cursor:pointer;
       white-space:nowrap; flex:none; overflow:hidden;
       display:inline-flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-      font:600 12.5px 'Noto Sans KR','맑은 고딕',sans-serif;
+      font:600 var(--u-fs-body) 'Noto Sans KR','맑은 고딕',sans-serif;
       transition:box-shadow .12s, background .12s, border-color .12s; }
 .tb .ic { display:flex; align-items:center; justify-content:center;
           height:15px; font-size:13.5px; line-height:1; }
 .tb .ic svg, svg.ic { width:17px; height:13px; display:block; }
-.tb .lb { font-size:9.5px; font-weight:600; color:var(--dim); line-height:1;
+.tb .lb { font-size:var(--u-fs-mini); font-weight:600; color:var(--u-text-faint); line-height:1;
           letter-spacing:-.2px; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 /* ⛔ 이 한 줄이 없으면 숨긴 단추(hidden)가 그대로 보인다 — 위의 display:inline-flex 가
    브라우저 기본 [hidden]{display:none} 을 이기기 때문이다. .tbg 에서 이미 한 번 겪은
    함정인데 .tb 를 flex 로 바꾸는 순간 똑같이 되살아났다(2026-09-01 캡처로 발견:
    숨겨야 할 「이 칸 판별로」·「판별 풀기」·「판 관리…」 셋이 리본에 나와 격자를 깨고 있었다). */
 .tb[hidden] { display:none !important; }
-.tb:hover { background:#f5f6f8; box-shadow:0 2px 8px rgba(20,22,30,.10); }
-.tb:hover .lb { color:var(--sub); }
-.tb.on .lb { color:#12459b; }
+.tb:hover { background:var(--u-surface-mute); box-shadow:0 2px 8px rgba(20,22,30,.10); }
+.tb:hover .lb { color:var(--u-text-sub); }
+.tb.on .lb { color:var(--u-accent-dark); }
 /* 글자 크기 고르기 — 폭·높이가 다른 단추와 똑같다(2026-09-01 SKY). 고르는 칸 자체가
    지금 값을 보여 주므로 아래 이름표는 두지 않는다 — 「크기」가 두 번 나온다.
    ⚠ 글자를 10px 로 줄여야 «12.5 본문» 같은 힌트가 잘리지 않고 들어간다(58px 안에). */
@@ -117,15 +153,15 @@ body { margin:0; background:var(--desk); color:var(--ink);
    바깥 단추 테두리 하나만 쓰고, 속의 고르는 칸은 테두리 없이 그 안을 꽉 채운다. */
 .tb-selwrap { cursor:default; padding:0; }
 .tb-selwrap .tb-sel { width:100%; height:100%; padding:0 4px; border:0; outline:none;
-      border-radius:5px; background:transparent; color:var(--ink); cursor:pointer;
+      border-radius:var(--u-r-ctl); background:transparent; color:var(--u-text); cursor:pointer;
       text-align:center; text-align-last:center;
-      font:600 10px 'Noto Sans KR','맑은 고딕',sans-serif; }
-.tb-selwrap:hover { background:#f5f6f8; }
+      font:600 var(--u-fs-mini) 'Noto Sans KR','맑은 고딕',sans-serif; }
+.tb-selwrap:hover { background:var(--u-surface-mute); }
 /* 눌린 상태(켜짐) — ⛔ 검은 배경은 너무 튀고(SKY 2026-08-28), 옅은 회색은 «꺼진 것과
    차이가 없어» 켠 건지 끈 건지 알 수가 없었다(SKY 2026-08-31: «선택/해제가 구분이 없어서
    헷갈려»). 그래서 이 앱이 «고른 것»에 쓰는 그 파랑을 그대로 쓴다 — 옅은 파란 바탕 +
    파란 테두리 + 진한 파란 글자. 종이를 덮지 않으면서 켜진 것이 한눈에 보인다. */
-.tb.on { background:#e9f1ff; border-color:#5490ff; color:#12459b; font-weight:800;
+.tb.on { background:var(--u-accent-light); border-color:var(--u-accent-mid); color:var(--u-accent-dark); font-weight:800;
          box-shadow:inset 0 1px 3px rgba(84,144,255,.28); }
 .tb:disabled { opacity:.4; cursor:default; transform:none; box-shadow:none; }
 .blk-list { margin:0 0 6px; }
@@ -138,10 +174,10 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 같은 기능 묶음 — 줄바꿈될 때 묶음째 다음 줄로 내려간다 (2026-08-30 SKY) */
 /* 사이드바 맨 아래 «판» 표시 — 평소엔 아주 작은 회색 글씨,
    새 판이 올라오면 눌러서 새로고침하는 단추가 된다 (2026-08-30 SKY) */
-#ver { margin-top:auto; padding:10px 18px 14px; font-size:10px; color:var(--dim);
+#ver { margin-top:auto; padding:10px 18px 14px; font-size:var(--u-fs-mini); color:var(--u-text-faint);
        letter-spacing:.2px; }
 #ver.new { margin:12px 12px 14px; padding:9px 10px; border-radius:8px; cursor:pointer;
-           background:var(--point); color:#fff; font-size:11.5px; font-weight:700;
+           background:var(--point); color:var(--u-surface); font-size:var(--u-fs-small); font-weight:700;
            text-align:center; letter-spacing:0; }
 @media print { #ver { display:none !important; } }
 .tbg { display:flex; gap:6px; align-items:center; flex:none; }
@@ -153,12 +189,12 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* 표 묶음 — 「표」 이름표가 붙은 한 덩어리로 보이게 (2026-08-30 SKY).
    ⚠ 버튼이 13개라 태블릿 폭에서는 묶음 자체가 화면보다 넓어져 «가로 스크롤»이 생겼다(실측).
       묶음은 하나로 두되 «묶음 안에서» 접히게 한다 — 상자는 하나로 보이고 줄만 늘어난다. */
-.tbg-table { position:relative; padding:9px 8px 5px; border:1px solid var(--line); border-radius:8px;
+.tbg-table { position:relative; padding:9px 8px 5px; border:1px solid var(--u-border); border-radius:var(--u-r-card);
              flex:0 1 auto; min-width:0; max-width:100%; flex-wrap:wrap; row-gap:6px; }
 .tbg-table::before { content:attr(data-label); position:absolute; top:-1px; left:9px;
-                     transform:translateY(-50%); padding:0 5px; background:#fff;
-                     font-size:9.5px; font-weight:700; letter-spacing:.4px; color:var(--dim); }
-.tb-sep { width:1px; height:26px; background:var(--line); margin:0 4px; }
+                     transform:translateY(-50%); padding:0 5px; background:var(--u-surface);
+                     font-size:var(--u-fs-mini); font-weight:700; letter-spacing:.4px; color:var(--u-text-faint); }
+.tb-sep { width:1px; height:26px; background:var(--u-border); margin:0 4px; }
 /* ⚠ 옛 폭 지정(.tb-sel 96px · .tb-c 42px · .tb-ic 42px)은 없앴다 — 이제 .tb 하나가
    모든 단추의 크기를 정한다. 클래스 이름은 남긴다(menu.js·검사가 셀렉터로 쓴다). */
 .tb-c .ic { font-size:15px; }
@@ -171,8 +207,8 @@ body { margin:0; background:var(--desk); color:var(--ink);
   .tb { width: 50px; height: 40px; gap: 1px; }
   .tb .ic { height: 14px; font-size: 12.5px; }
   .tb .ic svg, svg.ic { width: 16px; height: 12px; }
-  .tb .lb { font-size: 8.5px; }
-  .tb-selwrap .tb-sel { font-size: 9.5px; }
+  .tb .lb { font-size:var(--u-fs-mini); }
+  .tb-selwrap .tb-sel { font-size:var(--u-fs-mini); }
   .tb-sep { height: 22px; margin: 0 2px; }
   .tbg { gap: 3px; }
   .tbg-table { padding: 8px 5px 4px; row-gap: 4px; }
@@ -307,51 +343,54 @@ body { margin:0; background:var(--desk); color:var(--ink);
 
 /* ⭐ 묶음 이름 — CP 검사성적서 관리시스템의 사이드바와 같은 방식(2026-09-01 SKY).
    작고 조용한 글씨로 «여기서부터 무슨 묶음인가»만 알린다. */
-.sg { font:700 10px 'Noto Sans KR','맑은 고딕',sans-serif; color:#9aa0b4; letter-spacing:.6px;
+.sg { font:700 var(--u-fs-mini) 'Noto Sans KR','맑은 고딕',sans-serif; color:var(--u-text-faint); letter-spacing:.6px;
       padding:0 4px; margin:12px 0 5px; }
 .sg:first-child { margin-top:2px; }
 .sg-list { margin:14px 16px 6px; }
 /* 단추 앞 기호 — 폭을 고정해 글자 시작 자리가 모든 단추에서 같다(줄이 맞는다) */
 .side-btns .si { display:inline-flex; width:17px; flex:none; justify-content:center;
-                 font-size:12.5px; line-height:1; }
+                 font-size:var(--u-fs-body); line-height:1; }
 .side-btns { display:flex; flex-direction:column; gap:4px; margin:12px 12px; }
+/* ⚠ 테두리는 «만지는 것»의 색을 쓴다(--u-border, gray-300) — CP 기준 §1:
+   카드는 옅게, 입력칸·단추는 한 단계 진하게. 전에는 종이 쪽 --line 을 쓰고 있었다. */
 .side-btns button { display:flex; align-items:center; gap:8px; text-align:left;
-      border:1px solid var(--line); border-radius:6px; padding:10px 12px;
-                    cursor:pointer; font:600 13px 'Noto Sans KR',sans-serif;
-                    background:#fff; color:#454a58; }
-.side-btns button:hover { background:#f6f7fa; }
-/* ⭐ 누른 순간 «눌렸다»가 보이게 — 2026-09-01 SKY: "뭔가 했다는걸 좀 더 효과를 추가 해줘" */
-.side-btns button:active { transform:translateY(1px); background:#eef0f4; }
-.side-btns button.pri:active { background:var(--point); color:#fff; }
+      border:1px solid var(--u-border); border-radius:var(--u-r-ctl); padding:10px 12px;
+                    cursor:pointer; font:600 var(--u-fs-body) 'Noto Sans KR',sans-serif;
+                    background:var(--u-surface); color:var(--u-text); }
+.side-btns button:hover { background:var(--u-surface-soft); }
+/* ⭐ 누른 순간 «눌렸다»가 보이게 — 2026-09-01 SKY: "뭔가 했다는걸 좀 더 효과를 추가 해줘"
+   ⚠ 위의 lift 규칙이 :active 에서 translateY(0) 로 되돌리므로 여기서는 배경만 바꾼다 */
+.side-btns button:active { background:var(--u-surface-mute); }
+.side-btns button.pri:active { background:var(--point); color:var(--u-surface); }
 
 /* 잠깐 뜨는 알림 — 「방금 무엇을 했는지」. 화면 아래 가운데. */
 #toast { position:fixed; left:50%; bottom:26px; transform:translate(-50%, 14px); z-index:200;
-  max-width:min(520px, 86vw); padding:11px 16px; border-radius:9px;
-  background:var(--ink); color:#fff; font-size:12.5px; font-weight:600; letter-spacing:-.1px;
+  max-width:min(520px, 86vw); padding:11px 16px; border-radius:var(--u-r-card);
+  background:var(--u-text); color:var(--u-surface); font-size:var(--u-fs-body); font-weight:600; letter-spacing:-.1px;
   box-shadow:0 10px 30px rgba(20,22,30,.30);
   opacity:0; pointer-events:none; transition:opacity .16s, transform .16s; }
 #toast.on { opacity:1; transform:translate(-50%, 0); }
 #toast.err { background:var(--point); }
 @media print { #toast { display:none !important; } }
 .side-btns button.pri { border:1.5px solid var(--point); color:var(--point); font-weight:800; }
-.side-btns button.pri:hover { background:var(--point); color:#fff; }
-#folder-msg { padding:2px 18px 6px; color:var(--dim); line-height:1.7; word-break:break-all;
-              font:500 10px 'IBM Plex Mono',Consolas,monospace; letter-spacing:.4px; }
+.side-btns button.pri:hover { background:var(--point); color:var(--u-surface); }
+#folder-msg { padding:2px 18px 6px; color:var(--u-text-faint); line-height:1.7; word-break:break-all;
+              font:500 var(--u-fs-mini) 'IBM Plex Mono',Consolas,monospace; letter-spacing:.4px; }
 /* 문서 목록 — §8 표의 행과 같은 문법: 아래선 헤어라인 · 모노 번호 · 고른 것은 기준 행(옅은 빨강) */
 /* ⚠ 목록 항목은 <a> 가 아니라 <button> 이다 — href 없는 <a> 는 브라우저가 «링크»로 안 보고
    «그냥 글»로 봐서, 태블릿에서 글자를 탭하면 크롬의 «탭해서 검색» 사전이 떴다(위 #side 주석).
    <button> 은 누가 봐도 단추라 그 일이 없고 키보드(Tab·Enter)로도 눌린다. */
 #doclist { counter-reset:doc; }
 #doclist button { display:flex; gap:10px; align-items:baseline; counter-increment:doc;
-             color:#454a58; text-decoration:none; font-size:12.5px; text-align:left;
-             width:100%; border:0; border-bottom:1px solid var(--line-soft); background:none;
+             color:var(--u-text); text-decoration:none; font-size:var(--u-fs-body); text-align:left;
+             width:100%; border:0; border-bottom:1px solid var(--u-border-card); background:none;
              font-family:inherit; padding:11px 18px; cursor:pointer; }
-#doclist button:first-child { border-top:1px solid var(--line-soft); }
+#doclist button:first-child { border-top:1px solid var(--u-border-card); }
 #doclist button::before { content:counter(doc, decimal-leading-zero);
-                     font:600 10.5px 'IBM Plex Mono',Consolas,monospace; color:#aeb0b8;
+                     font:600 var(--u-fs-small) 'IBM Plex Mono',Consolas,monospace; color:var(--u-text-faint);
                      flex:none; }
-#doclist button:hover { background:#f6f7fa; color:var(--ink); }
-#doclist button.on { background:#fdf5f4; color:var(--ink); font-weight:700; }
+#doclist button:hover { background:var(--u-surface-soft); color:var(--u-text); }
+#doclist button.on { background:#fdf5f4; color:var(--u-text); font-weight:700; }
 #doclist button.on::before { color:var(--point); font-weight:700; }
 
 /* 스크립트가 막힌 곳(구글드라이브 미리보기 등)에서만 보이는 안내 */
@@ -479,7 +518,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
 #imgpanel .fp-edit .fp-del { color:var(--point); }
 /* 켜짐 표시는 리본 단추와 «같은 모양»이어야 한다 — 어디서 눌러도 같은 뜻으로 읽힌다 */
 #imgpanel button.on, #ctxmenu .q.on, #minibar .q.on, #minibar2 .q.on {
-  background:#e9f1ff !important; border-color:#5490ff !important; color:#12459b !important;
+  background:var(--u-accent-light) !important; border-color:var(--u-accent-mid) !important; color:var(--u-accent-dark) !important;
   font-weight:800; }
 @media print { #imgpanel { display:none !important; } }
 
@@ -520,12 +559,12 @@ body { margin:0; background:var(--desk); color:var(--ink);
 /* ── 우클릭 문맥 메뉴 · 미니 패널 (설계_서식과우클릭.md §5-2·§5-3) ──
    ⭐ 맨 위 «뱃지»가 지금 무엇을 고른 상태인지 말해 준다 — 「▦ 표 · 3칸 고름」처럼.
       메뉴가 왜 이 모습인지 알려 주는 한 줄이라 이것부터 읽게 크기를 잡았다. */
-#ctxmenu, #minibar, #minibar2 { position:fixed; z-index:120; background:#fff; color:var(--ink);
-  border:1px solid var(--line); border-radius:10px; padding:8px;
-  box-shadow:0 8px 28px rgba(20,22,30,.20); font-size:12px; }
+#ctxmenu, #minibar, #minibar2 { position:fixed; z-index:120; background:var(--u-surface); color:var(--u-text);
+  border:1px solid var(--u-border); border-radius:var(--u-r-card); padding:8px;
+  box-shadow:0 8px 28px rgba(20,22,30,.20); font-size:var(--u-fs-body); }
 #minibar, #minibar2 { z-index:115; }
 #ctxmenu { width:264px; }
-#ctxmenu .mbadge, #minibar .mbadge, #minibar2 .mbadge { font-size:10.5px; color:var(--dim); letter-spacing:.2px;
+#ctxmenu .mbadge, #minibar .mbadge, #minibar2 .mbadge { font-size:var(--u-fs-small); color:var(--u-text-faint); letter-spacing:.2px;
   padding:0 2px 6px; }
 /* 빠른 줄 — 기호만 쓴 작은 단추. 뜻이 같은 것끼리(.qg) 줄을 나눈다:
    글자꼴(B I U A＋ A−) / 색(■■■ ✕) / 정렬·맞춤. 한 줄로 죽 늘어놓으면 폭에 따라
@@ -538,19 +577,19 @@ body { margin:0; background:var(--desk); color:var(--ink);
 .qs { display:flex; flex-direction:column; gap:3px; padding-bottom:6px; }
 .qs .qg { display:grid; grid-template-columns:repeat(6, 30px); gap:3px; justify-content:start; }
 .qs .q { width:30px; height:30px; padding:0; flex:none; display:flex; align-items:center;
-  justify-content:center; border:1px solid transparent; border-radius:6px;
-  background:#fff; color:var(--ink); font:inherit; cursor:pointer; }
-.qs .q:hover { background:#f2f3f6; border-color:var(--line); }
+  justify-content:center; border:1px solid transparent; border-radius:var(--u-r-ctl);
+  background:var(--u-surface); color:var(--u-text); font:inherit; cursor:pointer; }
+.qs .q:hover { background:var(--u-surface-mute); border-color:var(--u-border); }
 .qs .q-b { font-weight:900; }
 .qs .q-i { font-style:italic; }
 .qs .q-u { text-decoration:underline; }
 /* 목록은 2열이다 — 세로로 길면 손이 아래까지 내려가야 해서 태블릿에서 특히 나빴다 */
 #ctxmenu .mlist { display:grid; grid-template-columns:1fr 1fr; gap:3px;
-  border-top:1px solid var(--line-soft); padding-top:6px; }
+  border-top:1px solid var(--u-border-card); padding-top:6px; }
 #ctxmenu .mlist button { height:31px; padding:0 8px; text-align:left; border:1px solid transparent;
-  border-radius:6px; background:#fff; color:var(--ink); font:inherit; cursor:pointer;
+  border-radius:var(--u-r-ctl); background:var(--u-surface); color:var(--u-text); font:inherit; cursor:pointer;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-#ctxmenu .mlist button:hover { background:#f2f3f6; border-color:var(--line); }
+#ctxmenu .mlist button:hover { background:var(--u-surface-mute); border-color:var(--u-border); }
 #minibar, #minibar2 { padding:6px; }
 /* 두 서식바(글자·표)가 나란히 뜨므로 폭이 같아야 나란해 보인다 — 격자 6칸이 그 폭을 정한다
    (30×6 + 3×5 틈 = 195px). max-width 로 «접히게» 두면 내용에 따라 폭이 달라진다. */
@@ -606,7 +645,7 @@ body { margin:0; background:var(--desk); color:var(--ink);
       커진다(실측 247→317px). vbar.js 의 stickUnderBar() 가 리본 높이를 재서 style.top 에
       넣는다(여기 top:0 은 스크립트가 아직 안 잰 첫 순간용 기본값이다).
    ⚠ z-index 는 리본(5)보다 낮게 둔다 — 높이가 바뀌는 한순간에도 리본을 가리지 않는다. */
-#vbar { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: #fff;
+#vbar { display: flex; align-items: center; gap: 6px; padding: 5px 10px; background: var(--u-surface);
   border-bottom: 1px solid #e4e5e9; flex-wrap: wrap;
   position: sticky; top: 0; z-index: 4; }
 #vbar[hidden] { display: none; }
@@ -615,13 +654,13 @@ body { margin:0; background:var(--desk); color:var(--ink);
    옛 값은 알약 모양(border-radius:999px)에 높이 24px 이라 태블릿에서 손가락으로 누르기
    어려웠다. 이제 모서리 6px · 높이 40px 로 리본과 맞춘다(리본 42px 보다 2px 낮게 둬
    판 바가 리본보다 얇아 보이게 한다 — 판 바가 문서 자리를 먹는 느낌을 줄인다). */
-#vbar .vchip { height: 40px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--line);
-  background: #fff; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center;
+#vbar .vchip { height: 40px; padding: 0 12px; border-radius:var(--u-r-ctl); border: 1px solid var(--u-border);
+  background: var(--u-surface); color: var(--u-text); cursor: pointer; display: inline-flex; align-items: center;
   gap: 8px; white-space: nowrap; flex: none;
-  font: 600 12.5px 'Noto Sans KR', '맑은 고딕', sans-serif;
+  font: 600 var(--u-fs-body) 'Noto Sans KR', '맑은 고딕', sans-serif;
   transition: transform .12s, box-shadow .12s, background .12s; }
 #vbar .vchip .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--vc, #8a8e98); }
-#vbar .vchip.on { background: #e9f1ff; border-color: #5490ff; color: #12459b; font-weight: 800; }
+#vbar .vchip.on { background: var(--u-accent-light); border-color: var(--u-accent-mid); color: var(--u-accent-dark); font-weight: 800; }
 /* ⭐ «보기 고르기»는 테두리를 맞붙인 한 덩어리다(2026-09-01 SKY: 판 버튼 배치 개선).
    라디오 단추처럼 «이 중 하나»임이 모양으로 보인다 — 옛 모양은 똑같은 네모 일곱 개가
    죽 늘어서 있어 «고르는 것»과 «관리»가 눈으로 안 갈렸다.
@@ -630,11 +669,11 @@ body { margin:0; background:var(--desk); color:var(--ink);
 #vbar .vseg .vchip { border-radius: 0; margin-left: -1px; position: relative; }
 #vbar .vseg .vchip:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
 #vbar .vseg .vchip:last-child { border-radius: 0 6px 6px 0; }
-#vbar .vseg .vchip:hover { background: #f5f6f8; z-index: 1; }
+#vbar .vseg .vchip:hover { background: var(--u-surface-mute); z-index: 1; }
 #vbar .vseg .vchip.on { z-index: 2; }
 /* 「⚙ 판 관리」 — 고르는 것이 아니라 관리다. 테두리를 없애 조용히 물러나 있는다. */
-#vbar .vchip-ghost { border-color: transparent; color: var(--sub); margin-left: 6px; }
-#vbar .vchip-ghost:hover { border-color: var(--line); background: #f5f6f8; color: var(--ink); }
+#vbar .vchip-ghost { border-color: transparent; color: var(--u-text-sub); margin-left: 6px; }
+#vbar .vchip-ghost:hover { border-color: var(--u-border); background: var(--u-surface-mute); color: var(--u-text); }
 /* ⭐ 판 표지는 «본문 밖»으로 뺀다 — 2026-09-01 SKY: «이름표 자리를 종이 우측 부분에
    표시 하자. 외각에.»
    옛 방식(색줄은 블록 안쪽 그림자 · 이름표는 블록 오른쪽 위)은 글자를 덮었다[실측 2026-09-01]:
@@ -675,59 +714,62 @@ td.vcell:hover::after { border-top-color: #5490ff; border-right-color: #5490ff; 
 td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 /* 판 관리 창 (설계 §4-5) — 그림 서식 창과 같은 계열의 작은 창. 목록이 동적이라 JS 로 만든다 */
 #vmgr { position: fixed; top: 90px; left: 50%; transform: translateX(-50%); z-index: 60;
-  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px;
-  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); min-width: 340px; font-size: 12.5px; }
+  background: var(--u-surface); border: 1px solid var(--u-border); border-radius:var(--u-r-card); padding: 12px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); min-width: 340px; font-size:var(--u-fs-body); }
 #vmgr .vmgr-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
 #vmgr .vmgr-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vc, #8a8e98); }
 #vmgr .vmgr-row .nm { flex: 1; font-weight: 600; }
-#vmgr button { font-size: 12px; padding: 2px 8px; }
+#vmgr button { font-size:var(--u-fs-body); padding: 2px 8px; }
 /* 문서 정보 창 — 머리글·바닥글 값(제목·문서번호·개정·날짜·회사·로고)을 고친다.
    판 관리 창과 같은 계열의 작은 카드다. body 에 살아서 종이가 다시 그려져도 안 흔들린다. */
 #docinfo { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 60;
-  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px;
-  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px; width: 380px; }
+  background: var(--u-surface); border: 1px solid var(--u-border); border-radius:var(--u-r-card); padding: 12px 14px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size:var(--u-fs-body); width: 380px; }
 #docinfo .di-ttl { display: flex; align-items: center; justify-content: space-between;
-  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
-#docinfo .di-x { border: 0; background: none; cursor: pointer; color: var(--dim);
-  font-size: 13px; line-height: 1; padding: 2px 4px; }
-#docinfo .di-x:hover { color: var(--ink); }
-#docinfo .di-note { color: var(--sub); font-size: 11.5px; line-height: 1.5; margin: 0 0 9px; }
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--u-border-card); }
+#docinfo .di-x { border: 0; background: none; cursor: pointer; color: var(--u-text-faint);
+  font-size:var(--u-fs-body); line-height: 1; padding: 2px 4px; }
+#docinfo .di-x:hover { color: var(--u-text); }
+#docinfo .di-note { color: var(--u-text-sub); font-size:var(--u-fs-small); line-height: 1.5; margin: 0 0 9px; }
 #docinfo .di-row { display: grid; grid-template-columns: 58px 1fr; align-items: center;
   gap: 8px; padding: 3px 0; }
-#docinfo .di-row .nm { font-weight: 700; color: var(--sub); }
+#docinfo .di-row .nm { font-weight: 700; color: var(--u-text-sub); }
 #docinfo .di-row input[type=text] { min-width: 0; width: 100%; height: 28px; padding: 0 7px;
-  border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
+  border: 1px solid var(--u-border); border-radius:var(--u-r-ctl); font: inherit; color: var(--u-text); }
 #docinfo .di-logo { grid-template-columns: 58px 1fr auto auto; }
-#docinfo .di-logoview { display: flex; align-items: center; height: 30px; color: var(--dim);
-  font-size: 11.5px; }
+#docinfo .di-logoview { display: flex; align-items: center; height: 30px; color: var(--u-text-faint);
+  font-size:var(--u-fs-small); }
 #docinfo .di-logoview img { max-height: 28px; max-width: 150px; }
-#docinfo button { height: 28px; padding: 0 9px; font-size: 12px; border: 1px solid var(--line);
-  border-radius: 6px; background: #fff; cursor: pointer; }
-#docinfo button:hover { background: #f5f6f8; }
+#docinfo button { height: 28px; padding: 0 9px; font-size:var(--u-fs-body); border: 1px solid var(--u-border);
+  border-radius:var(--u-r-ctl); background: var(--u-surface); cursor: pointer; }
+#docinfo button:hover { background: var(--u-surface-mute); }
 #docinfo button:disabled { opacity: .4; cursor: default; }
 #docinfo .di-foot { display: flex; justify-content: flex-end; gap: 6px;
-  border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 9px; }
+  border-top: 1px solid var(--u-border-card); margin-top: 10px; padding-top: 9px; }
 /* 「저장」만 눈에 띄게 — 이 창에서 «해야 하는 일»은 저장 하나다(2026-09-01 SKY).
    나머지(기본으로·기본 넣기·닫기)는 가끔 쓰는 것이라 평범한 단추로 둔다.
    ⚠ 왼쪽 끝에 세운다 — 오른쪽 끝은 「닫기」 자리라 손에 익은 자리를 바꾸면 잘못 누른다. */
 #docinfo .di-foot .di-save { margin-right: auto; font-weight: 700;
-  border-color: #c9ced8; background: #f2f4f8; }
-#docinfo .di-foot .di-save:hover { background: #e8ebf2; }
+  border-color: var(--u-border); background: var(--u-surface-mute); }
+#docinfo .di-foot .di-save:hover { background: var(--u-surface-mute); }
 @media print { #docinfo { display: none !important; } }
 
 /* 「부품 목록」 창 (기둥 3, 2026-09-01) — 문서 정보 창과 같은 계열이되 «표»라서 더 넓다.
    ⚠ 폭 640px 은 칸 4개(이름·도면번호·개정·개정일자)＋지움 단추가 한 줄에 들어가는 최소다.
    ⚠ 좁은 화면(태블릿 세로 753)에서는 화면 폭에 맞춰 줄인다 — 안 그러면 창이 화면 밖으로 나간다. */
 #partslist { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 60;
-  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px;
-  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px;
-  width: 720px; max-width: calc(100vw - 24px); }
+  background: var(--u-surface); border: 1px solid var(--u-border); border-radius:var(--u-r-card); padding: 12px 14px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size:var(--u-fs-body);
+  /* ⚠ 넓힌 까닭: 2026-09-01 SKY — "이름 항목 같은경우 잘려서 보이지 않는게 있어. 이 창을
+     좀 더 크게 보이게끔 하자". 이름에 「SICON-4000EKZi(5.5kW~15kW)표준」 처럼 30자 넘는
+     것이 있다. 좁은 화면에서는 화면 폭에 맞춰 줄어든다(max-width). */
+  width: 1080px; max-width: calc(100vw - 24px); }
 #partslist .pl-ttl { display: flex; align-items: center; justify-content: space-between;
-  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
-#partslist .pl-x { border: 0; background: none; cursor: pointer; color: var(--dim);
-  font-size: 13px; line-height: 1; padding: 2px 4px; }
-#partslist .pl-x:hover { color: var(--ink); }
-#partslist .pl-note { color: var(--sub); font-size: 11.5px; line-height: 1.5; margin: 0 0 9px; }
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--u-border-card); }
+#partslist .pl-x { border: 0; background: none; cursor: pointer; color: var(--u-text-faint);
+  font-size:var(--u-fs-body); line-height: 1; padding: 2px 4px; }
+#partslist .pl-x:hover { color: var(--u-text); }
+#partslist .pl-note { color: var(--u-text-sub); font-size:var(--u-fs-small); line-height: 1.5; margin: 0 0 9px; }
 /* 부품이 많아지면 창이 화면을 넘는다 — 목록만 스크롤한다(머리줄·바닥은 늘 보인다) */
 #partslist .pl-body { max-height: 52vh; overflow-y: auto; overflow-x: hidden; }
 /* 칸 다섯(구분·이름·도면번호·개정·개정일자) + 지움 단추.
@@ -737,35 +779,67 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 /* 갈래 제목 — 2026-09-01 SKY: "구분은 필요해". 56개가 한 덩어리면 무엇이 무엇인지 안 갈린다 */
 /* 갈래 제목 줄 — 이름을 그 자리에서 고치고, 그 갈래에 부품을 바로 더한다(2026-09-01 SKY) */
 #partslist .pl-group { display: flex; align-items: center; gap: 6px;
-  background: #f2f4f8; border-radius: 5px; padding: 2px 6px; margin: 7px 0 3px;
+  background: var(--u-surface-mute); border-radius:var(--u-r-ctl); padding: 2px 6px; margin: 7px 0 3px;
   position: sticky; top: 0; z-index: 1; }
 #partslist .pl-group .pl-gname { flex: 1; min-width: 0; height: 24px; padding: 0 6px;
-  font: inherit; font-weight: 800; font-size: 11.5px; color: var(--ink);
-  background: transparent; border: 1px solid transparent; border-radius: 5px; }
+  font: inherit; font-weight: 800; font-size:var(--u-fs-small); color: var(--u-text);
+  background: transparent; border: 1px solid transparent; border-radius:var(--u-r-ctl); }
 /* ⚠ 가만히 있을 때 테두리를 안 보인다 — 제목처럼 읽히게. 만지면 «고칠 수 있는 것»으로 바뀐다 */
-#partslist .pl-group .pl-gname:hover { border-color: var(--line); background: #fff; }
-#partslist .pl-group .pl-gname:focus { border-color: var(--line); background: #fff; outline: none; }
-#partslist .pl-group .pl-gcnt { color: var(--dim); font-size: 11px; }
-#partslist .pl-group .pl-gadd { height: 22px; padding: 0 7px; font-size: 11px; }
+#partslist .pl-group .pl-gname:hover { border-color: var(--u-border); background: var(--u-surface); }
+#partslist .pl-group .pl-gname:focus { border-color: var(--u-border); background: var(--u-surface); outline: none; }
+#partslist .pl-group .pl-gcnt { color: var(--u-text-faint); font-size:var(--u-fs-small); }
+#partslist .pl-group .pl-gadd { height: 22px; padding: 0 7px; font-size:var(--u-fs-small); }
 #partslist .pl-group:first-child { margin-top: 0; }
-#partslist .pl-row .pl-note { color: var(--sub); }
-#partslist .pl-head { font-weight: 700; color: var(--sub); font-size: 11.5px;
-  padding-bottom: 4px; border-bottom: 1px solid var(--line-soft); margin-bottom: 4px; }
+#partslist .pl-row .pl-note { color: var(--u-text-sub); }
+/* 머리줄 — 스크롤 상자 «밖»에 있어 늘 보인다(2026-09-01 SKY: "헤더도 고정 되서 스크롤").
+   ⭐ 가운데 정렬 — SKY: "헤더는 가운데 정렬 배치 하고".
+   ⚠ 맨 끝 칸(지움 단추 자리)의 머리글은 비어 있다 — 자리만 지킨다. */
+#partslist .pl-head { font-weight: 700; color: var(--u-text-sub); font-size:var(--u-fs-small);
+  text-align: center; padding-bottom: 5px;
+  border-bottom: 1px solid var(--u-border); margin-bottom: 0; }
+#partslist .pl-body { padding-top: 4px; }
 #partslist .pl-row input[type=text] { min-width: 0; width: 100%; height: 28px; padding: 0 7px;
-  border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
-#partslist .pl-empty { color: var(--dim); font-size: 12px; padding: 14px 2px; text-align: center; }
-#partslist button { height: 28px; padding: 0 9px; font-size: 12px; border: 1px solid var(--line);
-  border-radius: 6px; background: #fff; cursor: pointer; }
-#partslist button:hover { background: #f5f6f8; }
-#partslist .pl-del { color: var(--dim); padding: 0 7px; }
+  border: 1px solid var(--u-border); border-radius:var(--u-r-ctl); font: inherit; color: var(--u-text); }
+#partslist .pl-empty { color: var(--u-text-faint); font-size:var(--u-fs-body); padding: 14px 2px; text-align: center; }
+#partslist button { height: 28px; padding: 0 9px; font-size:var(--u-fs-body); border: 1px solid var(--u-border);
+  border-radius:var(--u-r-ctl); background: var(--u-surface); cursor: pointer; }
+#partslist button:hover { background: var(--u-surface-mute); }
+#partslist .pl-del { color: var(--u-text-faint); padding: 0 7px; }
 /* ⚠ 지움은 되돌릴 수 없다 — 마우스를 올렸을 때 빨갛게 해서 «무거운 단추»임을 알린다 */
 #partslist .pl-del:hover { color: #e5231b; border-color: #f0b6b2; background: #fdf2f1; }
 #partslist .pl-foot { display: flex; justify-content: flex-end; gap: 6px;
-  border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 9px; }
+  border-top: 1px solid var(--u-border-card); margin-top: 10px; padding-top: 9px; }
 #partslist .pl-add { margin-right: auto; font-weight: 700;
-  border-color: #c9ced8; background: #f2f4f8; }
-#partslist .pl-add:hover { background: #e8ebf2; }
+  border-color: var(--u-border); background: var(--u-surface-mute); }
+#partslist .pl-add:hover { background: var(--u-surface-mute); }
 @media print { #partslist { display: none !important; } }
+
+/* ── 도구 단추의 호버·눌림 — CP 관리시스템과 같게 (2026-09-01 SKY) ──────────────
+   근거: _디자인_기준.md §0 「클릭 가능한 것은 호버 시 lift(translateY(-2px)) + 그림자」
+   ⛔ 리본 단추(.tb)에는 걸지 않는다 — 58×44px 이 촘촘히 붙은 격자라, 하나가 들리면
+      옆 것들과 어긋나 «리본이 흔들리는» 것처럼 보인다. 리본은 배경으로만 알린다.
+   ⚠ 눌림은 lift 를 되돌린다 — 들렸다가 눌리는 것이 «손에 닿는» 느낌을 준다. */
+.side-btns button, #docinfo .di-foot button, #partslist .pl-foot button,
+#prefpick .pp-foot button {
+  transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+}
+.side-btns button:hover:not(:disabled), #docinfo .di-foot button:hover:not(:disabled),
+#partslist .pl-foot button:hover:not(:disabled), #prefpick .pp-foot button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(17, 24, 39, .10);
+}
+.side-btns button:active:not(:disabled), #docinfo .di-foot button:active:not(:disabled),
+#partslist .pl-foot button:active:not(:disabled), #prefpick .pp-foot button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(17, 24, 39, .10);
+}
+/* ⚠ 「움직임 줄이기」를 켠 기기에서는 들지 않는다 — 어지럼을 겪는 사람이 있다 */
+@media (prefers-reduced-motion: reduce) {
+  .side-btns button, #docinfo .di-foot button, #partslist .pl-foot button,
+  #prefpick .pp-foot button { transition: none; }
+  .side-btns button:hover, #docinfo .di-foot button:hover,
+  #partslist .pl-foot button:hover, #prefpick .pp-foot button:hover { transform: none; }
+}
 
 /* 부품 목록에서 온 값(기둥 3) — 「이 글자는 목록이 관리한다」를 아주 조용히 알린다.
    ⛔ 인쇄에는 안 나온다. 제출 서류에 화면 표시가 찍히면 안 된다.
@@ -781,28 +855,28 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 /* 「부품 값 넣기」 고르기 창 (기둥 3) — 부품 목록 창과 같은 계열, 더 좁다.
    ⚠ 종이를 덜 가리도록 화면 위쪽 가운데에 둔다(문서 정보 창과 같은 자리). */
 #prefpick { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 60;
-  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 12px 14px;
-  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px;
+  background: var(--u-surface); border: 1px solid var(--u-border); border-radius:var(--u-r-card); padding: 12px 14px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size:var(--u-fs-body);
   width: 460px; max-width: calc(100vw - 24px); }
 #prefpick .pp-ttl { display: flex; align-items: center; justify-content: space-between;
-  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
-#prefpick .pp-x { border: 0; background: none; cursor: pointer; color: var(--dim);
-  font-size: 13px; line-height: 1; padding: 2px 4px; }
-#prefpick .pp-x:hover { color: var(--ink); }
-#prefpick .pp-note { color: var(--sub); font-size: 11.5px; line-height: 1.5; margin: 0 0 9px; }
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--u-border-card); }
+#prefpick .pp-x { border: 0; background: none; cursor: pointer; color: var(--u-text-faint);
+  font-size:var(--u-fs-body); line-height: 1; padding: 2px 4px; }
+#prefpick .pp-x:hover { color: var(--u-text); }
+#prefpick .pp-note { color: var(--u-text-sub); font-size:var(--u-fs-small); line-height: 1.5; margin: 0 0 9px; }
 #prefpick .pp-body { max-height: 46vh; overflow-y: auto; overflow-x: hidden; }
 #prefpick .pp-row { display: flex; align-items: center; gap: 8px; padding: 4px 0;
-  border-bottom: 1px solid var(--line-soft); }
+  border-bottom: 1px solid var(--u-border-card); }
 #prefpick .pp-nm { flex: 1; min-width: 0; font-weight: 700;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #prefpick .pp-btns { display: flex; gap: 4px; }
-#prefpick button { height: 26px; padding: 0 8px; font-size: 11.5px; border: 1px solid var(--line);
-  border-radius: 6px; background: #fff; cursor: pointer; }
-#prefpick button:hover:not(:disabled) { background: #f5f6f8; }
+#prefpick button { height: 26px; padding: 0 8px; font-size:var(--u-fs-small); border: 1px solid var(--u-border);
+  border-radius:var(--u-r-ctl); background: var(--u-surface); cursor: pointer; }
+#prefpick button:hover:not(:disabled) { background: var(--u-surface-mute); }
 #prefpick button:disabled { opacity: .35; cursor: default; }
 #prefpick .pp-foot { display: flex; justify-content: flex-end; gap: 6px;
-  border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 9px; }
-#prefpick .pp-off { margin-right: auto; color: var(--dim); }
+  border-top: 1px solid var(--u-border-card); margin-top: 10px; padding-top: 9px; }
+#prefpick .pp-off { margin-right: auto; color: var(--u-text-faint); }
 #prefpick .pp-off:hover { color: #e5231b; border-color: #f0b6b2; background: #fdf2f1; }
 @media print { #prefpick { display: none !important; } }
 
@@ -813,36 +887,36 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
    PC 1600 에서 사이드바 오른쪽 250 ~ 종이 왼쪽 528 = 278px 뿐이다[실측]. 더 넓게 만들면
    종이를 덮는다. 그래서 이름 칸을 줄이고 단추 글자를 짧게(「판별」·「공통」) 했다. */
 #vvals { position: fixed; top: 90px; left: 8px; z-index: 60;
-  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 11px 12px;
-  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px; width: 264px; }
+  background: var(--u-surface); border: 1px solid var(--u-border); border-radius:var(--u-r-card); padding: 11px 12px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size:var(--u-fs-body); width: 264px; }
 #vvals .vv-ttl { display: flex; align-items: center; justify-content: space-between;
-  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--line-soft); }
-#vvals .vv-x { border: 0; background: none; cursor: pointer; color: var(--dim);
-  font-size: 13px; line-height: 1; padding: 2px 4px; }
-#vvals .vv-x:hover { color: var(--ink); }
-#vvals .vv-note { color: var(--point); font-size: 11.5px; line-height: 1.45; margin: 2px 0 8px; }
+  font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--u-border-card); }
+#vvals .vv-x { border: 0; background: none; cursor: pointer; color: var(--u-text-faint);
+  font-size:var(--u-fs-body); line-height: 1; padding: 2px 4px; }
+#vvals .vv-x:hover { color: var(--u-text); }
+#vvals .vv-note { color: var(--point); font-size:var(--u-fs-small); line-height: 1.45; margin: 2px 0 8px; }
 /* 한 줄: [색점] 이름(60px) [값 칸 — 남는 자리 전부] [단추] */
 #vvals .vv-row { display: grid; grid-template-columns: 9px 44px 1fr auto;
   align-items: center; gap: 6px; padding: 3px 0; }
 #vvals .vv-row .dot { width: 9px; height: 9px; border-radius: 50%; background: #8a8e98; }
 #vvals .vv-row .nm { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #vvals .vv-row input { min-width: 0; width: 100%; height: 28px; padding: 0 6px;
-  border: 1px solid var(--line); border-radius: 6px; font: inherit; color: var(--ink); }
-#vvals .vv-row input:disabled { background: #f6f7fa; color: var(--dim); }
-#vvals .vv-same { color: var(--dim); font-size: 11.5px; }
-#vvals .vv-row button, #vvals .vv-foot button { height: 28px; padding: 0 7px; font-size: 11.5px;
+  border: 1px solid var(--u-border); border-radius:var(--u-r-ctl); font: inherit; color: var(--u-text); }
+#vvals .vv-row input:disabled { background: var(--u-surface-soft); color: var(--u-text-faint); }
+#vvals .vv-same { color: var(--u-text-faint); font-size:var(--u-fs-small); }
+#vvals .vv-row button, #vvals .vv-foot button { height: 28px; padding: 0 7px; font-size:var(--u-fs-small);
   white-space: nowrap;
-  border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
-#vvals .vv-row button:hover, #vvals .vv-foot button:hover { background: #f5f6f8; }
+  border: 1px solid var(--u-border); border-radius:var(--u-r-ctl); background: var(--u-surface); cursor: pointer; }
+#vvals .vv-row button:hover, #vvals .vv-foot button:hover { background: var(--u-surface-mute); }
 #vvals .vv-row button:disabled, #vvals .vv-foot button:disabled { opacity: .4; cursor: default; }
 #vvals .vv-foot { display: flex; gap: 6px; justify-content: flex-end;
-  border-top: 1px solid var(--line-soft); margin-top: 9px; padding-top: 9px; }
+  border-top: 1px solid var(--u-border-card); margin-top: 9px; padding-top: 9px; }
 @media print { #vvals { display: none !important; } }
 
 /* 「보일 판」 고르기 팝업 (설계 §4-4) — 판 관리 창(60) «위»에 뜬다(61). 목록이 동적이라 JS 로 만든다 */
 #vpick { position: fixed; top: 130px; left: 50%; transform: translateX(-50%); z-index: 61;
-  background: #fff; border: 1px solid #d5d7dd; border-radius: 10px; padding: 10px 12px;
-  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size: 12.5px;
+  background: var(--u-surface); border: 1px solid var(--u-border); border-radius:var(--u-r-card); padding: 10px 12px;
+  box-shadow: 0 8px 30px rgba(28, 30, 36, .18); font-size:var(--u-fs-body);
   display: flex; flex-direction: column; gap: 4px; }
 #vpick label { display: flex; align-items: center; gap: 4px; }
 @media print {
@@ -1050,7 +1124,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-01 16:50";
+window.__BUILD = "2026-09-01 17:06";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -2495,9 +2569,21 @@ function dupPart(p) {
 
 const dupList = (lst) => ((lst && lst.parts) || []).map(dupPart);
 
+// ⭐ 새 부품은 «그 갈래의 맨 아래»에 들어간다 (2026-09-01 SKY: "+ 부품을 눌러서 추가
+//    하니까, 같은 구분의 맨 아래 행에 추가 되는게 아니고, 진짜 맨 끝에 행에 추가 되고 있어.")
+// ⛔ 갈래(구분)는 «이어진 줄»로 묶어 보여 준다. 그래서 맨 끝에 붙이면 같은 이름의 갈래가
+//    둘로 갈라져 보인다 — 캡처에서 「1245」 갈래가 두 번 나왔다.
+// ⚠ 그 갈래가 아직 없으면 종전대로 맨 끝에 붙는다(새 갈래가 하나 생기는 것이다).
 function addPart(lst, props = {}) {
-  const p = Object.assign({ id: partId() }, props);
-  return { parts: dupList(lst).concat([dupPart(p)]) };
+  const p = dupPart(Object.assign({ id: partId() }, props));
+  const parts = dupList(lst);
+  const 갈래 = p.note || '';
+  // 그 갈래의 «마지막 줄»을 찾는다
+  let 자리 = -1;
+  for (let i = 0; i < parts.length; i++) if ((parts[i].note || '') === 갈래) 자리 = i;
+  if (자리 < 0) return { parts: parts.concat([p]) };
+  parts.splice(자리 + 1, 0, p);
+  return { parts };
 }
 
 function updatePart(lst, id, props = {}) {
@@ -2867,10 +2953,10 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
       return;
     }
 
-    const body = document.createElement('div');
-    body.className = 'pl-body';
-
-    // 머리줄 — 「구분」 은 부품에서 «가져다 쓰는 값»이 아니라 갈래 이름이라 따로 둔다
+    // ⭐ 머리줄은 스크롤 상자 «밖»에 둔다 — 2026-09-01 SKY: "구분 이름 도면번호 같은
+    //    헤더도 고정 되서 스크롤 되게 해줘." 상자 «안»에 두고 sticky 를 걸면 갈래 제목
+    //    (그것도 sticky)과 같은 자리를 다투어 겹친다. 밖으로 내면 다툴 일이 없다.
+    // ⚠ 「구분」 은 부품에서 «가져다 쓰는 값»이 아니라 갈래 이름이라 따로 둔다.
     const head = document.createElement('div');
     head.className = 'pl-row pl-head';
     for (const label of ['구분'].concat(PART_FIELDS.map(f => f[1]))) {
@@ -2881,7 +2967,10 @@ function attachPartsList({ getList, setList, getDoc, warn, onSaved, onErr }) {
     const sp = document.createElement('span');
     sp.textContent = '';
     head.appendChild(sp);
-    body.appendChild(head);
+    el.appendChild(head);
+
+    const body = document.createElement('div');
+    body.className = 'pl-body';
 
     // 갈래 제목 줄 — 이름을 그 자리에서 고치고, 그 갈래에 부품을 바로 더한다
     // (2026-09-01 SKY: "+부품 추가 버튼도 각 구분 항목에 추가 할수 있고, 그리고 구분 갈래도
