@@ -581,15 +581,28 @@ body { margin:0; background:var(--desk); color:var(--ink);
    따라 달라져 두 바가 나란히 뜰 때 들쭉날쭉했다.
    이제 모든 묶음이 «6칸 격자»다 — 묶음이 달라도 세로줄이 맞고, 바의 폭도 늘 같다. */
 .qs { display:flex; flex-direction:column; gap:3px; padding-bottom:6px; }
-.qs .qg { display:grid; grid-template-columns:repeat(6, 30px); gap:3px; justify-content:start; }
-.qs .q { width:30px; height:30px; padding:0; flex:none; display:flex; align-items:center;
-  justify-content:center; border:1px solid transparent; border-radius:var(--u-r-ctl);
-  background:var(--u-surface); color:var(--u-text); font:inherit; cursor:pointer; }
+/* ⭐ 리본과 «같은 기준» — 심볼 + 그 아래 작은 이름 (2026-09-02 SKY: ⓒ).
+   ⚠ 크기는 36×40 이다(리본은 58×44). 리본 크기를 그대로 쓰면 바가 377px 이 되어
+     종이를 덮는다 — 종이 왼쪽 빈 자리는 PC 1600 258px · 1280 98px · 태블릿 38px 뿐이다[실측].
+     36px 이면 바가 245px 이라 PC 1600 에 들어간다. 3글자 이름(강조색·가운데)도 담긴다. */
+.qs .qg { display:grid; grid-template-columns:repeat(var(--qcols, 6), 36px); gap:3px; justify-content:start; }
+.qs .q { width:36px; height:40px; padding:0; flex:none; display:flex;
+  flex-direction:column; align-items:center; justify-content:center; gap:1px;
+  border:1px solid transparent; border-radius:var(--u-r-ctl);
+  background:var(--u-surface); color:var(--u-text); font:inherit; cursor:pointer;
+  overflow:hidden; }
+.qs .q .qi { display:flex; align-items:center; justify-content:center; height:16px;
+  line-height:1; font-size:var(--u-fs-body); }
+.qs .q .qi svg { width:16px; height:13px; }
+/* 이름 — 리본의 .lb 와 같은 크기·색. 3글자까지 담긴다(강조색·가운데) */
+.qs .q .ql { font-size:var(--u-fs-mini); color:var(--u-text-faint); line-height:1.1;
+  white-space:nowrap; }
+.qs .q:hover .ql { color:var(--u-text-sub); }
 /* ⭐ 리본 단추(.tb)와 «같은 기준» (2026-09-01 SKY: "우클릭 했을 떄 뜨는 서식바도 상단
    리본 같은 기준을 적용 해줘") — 호버 그림자·눌림 되먹임을 리본과 똑같이 맞춘다.
-   ⚠ 크기(30px)는 안 키운다. 리본은 58×44 인데 그대로 쓰면 서식바가 377px 이 되어
-     종이를 덮는다 — 종이 왼쪽 빈 자리는 PC 1600 에서 258px · PC 1280 에서 98px ·
-     태블릿에서 38px 뿐이다[실측 2026-09-01]. 이름은 말풍선(title)이 대신 알려 준다. */
+   ⚠ 크기는 36×40 이다 — 리본(58×44)을 그대로 쓰면 서식바가 377px 이 되어 종이를 덮는다.
+     종이 왼쪽 빈 자리는 PC 1600 에서 258px · PC 1400 에서 158px · PC 1280 에서 98px ·
+     태블릿에서 38px 뿐이다[실측 2026-09-02]. 좁으면 --qcols 로 칸수를 줄여 접는다. */
 .qs .q:hover { background:var(--u-surface-mute); border-color:var(--u-border);
   box-shadow:0 2px 8px rgba(20,22,30,.10); }
 .qs .q:active { background:var(--u-accent-light); border-color:var(--u-border);
@@ -606,10 +619,12 @@ body { margin:0; background:var(--desk); color:var(--ink);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 #ctxmenu .mlist button:hover { background:var(--u-surface-mute); border-color:var(--u-border); }
 #minibar, #minibar2 { padding:6px; }
-/* 두 서식바(글자·표)가 나란히 뜨므로 폭이 같아야 나란해 보인다 — 격자 6칸이 그 폭을 정한다
-   (30×6 + 3×5 틈 = 195px). max-width 로 «접히게» 두면 내용에 따라 폭이 달라진다. */
+/* 두 서식바(글자·표)가 나란히 뜨므로 폭이 같아야 나란해 보인다 — 격자 칸수가 그 폭을 정하고
+   (36×6 + 3×5 틈 + 여백 = 245px) 두 바에 같은 --qcols 를 준다. */
 #minibar .qs, #minibar2 .qs { padding-bottom:0; }
-#minibar, #minibar2 { width:211px; }
+/* ⭐ 폭은 «단추 칸수»가 정한다 — 종이 왼쪽 빈 자리가 좁으면 menu.js 가 --qcols 를 줄이고
+   바는 그만큼 좁아진다(2026-09-02). ⛔ 245px 로 못박으면 좁은 화면에서 종이를 덮는다. */
+#minibar, #minibar2 { width:fit-content; max-width:245px; }
 /* 알림 — 붙여넣기가 브라우저에 막혔을 때 «막혔다»고 말해 준다. 조용히 삼키지 않는다. */
 /* ⚠ 이 규칙은 도구 토큰 훑기에서 빠져 있었다(도구 선택자 목록에 .mtoast 가 없었다) —
    2026-09-01 에 손으로 맞췄다. 토큰을 쓰는 규칙과 안 쓰는 규칙이 섞이면 다음에 색을
@@ -846,6 +861,8 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
   padding: 3px 8px; font: 600 var(--u-fs-small) 'IBM Plex Mono', Consolas, monospace;
   white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .1s ease; }
 #colsize.on { opacity: 1; }
+/* 행 높이는 «줄 왼쪽 바깥»에 띄운다 — 글자를 안 가린다(열 너비는 손끝 위에 띄운다) */
+#colsize.row { transform: translate(-100%, -50%); }
 @media print { #colsize { display: none !important; } }
 
 /* ── 도구 단추의 호버·눌림 — CP 관리시스템과 같게 (2026-09-01 SKY) ──────────────
@@ -1191,7 +1208,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-02 08:31";
+window.__BUILD = "2026-09-02 09:02";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3548,6 +3565,28 @@ function leftGutterX(pagesEl, width) {
   return Math.max(minX, Math.round(page.getBoundingClientRect().left - width - 12));
 }
 
+// 종이 왼쪽 «빈 자리»가 몇 px 인가 — 떠 있는 바가 이 안에 들어가야 종이를 안 덮는다.
+// ⛔ 왜 필요한가 (2026-09-02): 서식바를 리본과 같은 짜임(심볼+이름)으로 바꾸며 폭이
+//    128 → 245px 이 됐다. 그런데 이 빈 자리는 화면 폭에 딸려 있다[실측]:
+//      1920 → 418px · 1600 → 258px · 1400 → 158px · 1280 → 98px
+//    좁은 화면에서 245px 짜리 바를 억지로 밀어 넣으면 종이 위로 올라타 «방금 고른 글»을
+//    가리고, 그 자리를 누르면 글자가 아니라 바가 눌린다(우클릭 메뉴 검사가 이걸로 터졌다).
+// ⭐ 그래서 바를 «옮기지» 않고 «접는다» — 한 줄에 놓을 단추 칸수를 이 자리에 맞춰 줄인다.
+function gutterRoom(pagesEl) {
+  const side = document.getElementById('side');
+  const page = pagesEl && pagesEl.querySelector('.page');
+  if (!page) return 9999;
+  const 사이드 = side ? side.getBoundingClientRect().right : 0;
+  return Math.round(page.getBoundingClientRect().left - 사이드 - 20);
+}
+
+// 그 자리에 들어가는 «단추 칸수» — 단추 36px + 틈 1px, 상자 안쪽 여백 20px 기준[실측].
+// ⚠ 2칸 밑으로는 안 줄인다 — 그보다 좁으면 바가 세로로 너무 길어져 화면을 넘는다.
+function quickCols(room, 최대) {
+  const n = Math.floor((room - 20) / 37);
+  return Math.max(2, Math.min(최대 || 6, n));
+}
+
 // 떠 있는 창의 세로 자리 — 고른 것 높이에 맞추되 화면 밖으로 나가지 않게 접는다
 function clampTop(y, h) {
   const max = window.innerHeight - 6 - h;
@@ -5510,9 +5549,43 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
     const r = anchor.getBoundingClientRect();
     수치el.style.left = Math.round(r.x + r.width / 2) + 'px';
     수치el.style.top = Math.round(r.top - 6) + 'px';
+    수치el.classList.remove('row');
     수치el.classList.add('on');
   }
   function 수치숨기기() { if (수치el) 수치el.classList.remove('on'); }
+
+  // ⭐ 행 높이도 보여 준다 (2026-09-02 SKY: "행열의 너비 수치를 알고 싶어" → 행은 ⓐ «마우스를
+  //    올리면»으로 정했다). 행 높이는 «끌어서» 정하는 것이 아니라 «글 양»이 정하므로
+  //    보여 줄 «순간»이 없다 — 그래서 그 줄 위에 손이 머물면 왼쪽에 잠깐 띄운다.
+  // ⚠ 열 너비를 끄는 중에는 안 띄운다 — 두 수치가 겹쳐 보이면 어느 쪽인지 헷갈린다.
+  // ⚠ 높이는 «그 줄(tr) 전체»를 잰다. 칸 하나만 재면 세로 병합된 칸에서 엉뚱한 값이 나온다.
+  let 행타이머 = 0;
+  pagesEl.addEventListener('pointermove', (e) => {
+    if (grip) return;                       // 열 너비를 끄는 중이면 그쪽이 먼저다
+    if (e.pointerType === 'touch') return;  // 손가락은 «머무는» 동작이 없다
+    const tr = e.target && e.target.closest ? e.target.closest('.blk-table tbody tr') : null;
+    if (!tr) { clearTimeout(행타이머); 수치숨기기(); return; }
+    clearTimeout(행타이머);
+    행타이머 = setTimeout(() => {
+      if (grip) return;
+      const r = tr.getBoundingClientRect();
+      const 높이 = Math.round(r.height);
+      const 칸 = tr.querySelector('td[data-c]');
+      const 열 = 칸 ? Math.round(칸.getBoundingClientRect().width) : 0;
+      if (!수치el) {
+        수치el = document.createElement('div');
+        수치el.id = 'colsize';
+        수치el.setAttribute('contenteditable', 'false');
+        document.body.appendChild(수치el);
+      }
+      수치el.textContent = '이 줄 ' + 높이 + ' px' + (열 ? '  |  첫 열 ' + 열 + ' px' : '');
+      // 줄 «왼쪽 바깥»에 띄운다 — 글자를 안 가린다
+      수치el.style.left = Math.round(r.x - 8) + 'px';
+      수치el.style.top = Math.round(r.y + r.height / 2) + 'px';
+      수치el.classList.add('on', 'row');
+    }, 450);                                 // 살짝 머물러야 뜬다 — 지나가기만 하면 안 뜬다
+  });
+  pagesEl.addEventListener('pointerleave', () => { clearTimeout(행타이머); 수치숨기기(); });
 
   // ── 열 너비 끌기 — 끄는 동안은 colgroup 만 미리보기로 바꾸고, 놓으면 모델에 적는다 ──
   let grip = null;   // { id, col, startX, startW, pairW, cols:[colgroup,…] }
@@ -7976,24 +8049,61 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsRects }) 
     b.className = 'q';
     b.dataset.press = sel;
     b.title = tip || src.title || '';
-    // ⚠ 리본 단추는 2026-09-01 부터 «심볼(.ic) + 작은 이름(.lb)» 두 칸이다. 통째로 베끼면
-    //   30px 짜리 작은 단추에 이름까지 들어가 글자가 접힌다 — 심볼만 가져온다.
+    // ⭐ 리본과 «같은 기준»으로 만든다 — 심볼 + 그 아래 작은 이름 (2026-09-02 SKY: ⓒ).
+    //    리본 단추는 58×44 인데 그대로 쓰면 서식바가 377px 이 되어 종이를 덮는다.
+    //    그래서 «같은 짜임, 작은 크기»(36×40)로 만든다 → 바 폭 245px.
+    // ⚠ 이름이 없으면 그림만 나온다(리본에 .lb 가 없는 단추도 있다).
     const svg = src.querySelector('svg');
     const ic = src.querySelector('.ic');
-    if (svg) b.appendChild(svg.cloneNode(true));
-    else if (ic) b.textContent = ic.textContent.trim();
-    else b.textContent = src.textContent.trim();
+    const lb = src.querySelector('.lb');
+    if (svg) {
+      const w = document.createElement('span');
+      w.className = 'qi';
+      w.appendChild(svg.cloneNode(true));
+      b.appendChild(w);
+    } else if (ic) {
+      const w = document.createElement('span');
+      w.className = 'qi';
+      w.textContent = ic.textContent.trim();
+      b.appendChild(w);
+    } else {
+      const w = document.createElement('span');
+      w.className = 'qi';
+      w.textContent = src.textContent.trim();
+      b.appendChild(w);
+    }
+    if (lb && lb.textContent.trim()) {
+      const t = document.createElement('span');
+      t.className = 'ql';
+      t.textContent = lb.textContent.trim();
+      b.appendChild(t);
+    }
     return b;
   }
   function markBtn(m) {
-    if (!barEl.querySelector(m.sel)) return null;
+    const src = barEl.querySelector(m.sel);
+    if (!src) return null;
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'q' + (m.cls ? ' ' + m.cls : '');
     b.dataset.press = m.sel;
     b.title = m.tip;
-    b.textContent = m.txt;
-    if (m.color) b.style.color = m.color;
+    // ⭐ 리본과 «같은 기준» — 심볼 + 그 아래 작은 이름 (2026-09-02 SKY: ⓒ).
+    //    이름은 «리본 단추에 실제로 쓰인 글자»를 그대로 가져온다 — 리본에 「강조색」 이라
+    //    적혀 있는데 여기만 「포인트색」 이면 같은 단추로 안 보인다.
+    const ic = document.createElement('span');
+    ic.className = 'qi';
+    ic.textContent = m.txt;
+    if (m.color) ic.style.color = m.color;
+    b.appendChild(ic);
+    const lb = src.querySelector('.lb');
+    const 이름 = (lb && lb.textContent.trim()) || m.tip || '';
+    if (이름) {
+      const t = document.createElement('span');
+      t.className = 'ql';
+      t.textContent = 이름;
+      b.appendChild(t);
+    }
     return b;
   }
 
@@ -8249,6 +8359,14 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsRects }) 
     //    ⛔ 옛 코드는 «고른 것 바로 왼쪽»(r.left − 8 − 폭)이라 글자 위를 덮었다.
     // ⭐ 판별 값 창·판 관리 창이 떠 있으면 «물러나지 않고» 그 아래에 쌓는다
     //    (2026-09-01 SKY: "둘다 표시 되는 조건이니까 둘다 표시 되어야지. 겹치지만 않게").
+    // ⛔ 화면이 좁으면 종이 옆 빈 자리에 245px 짜리 바가 «안 들어간다»(2026-09-02 실측:
+    //    1400px 이하). 그렇다고 바를 종이 위로 옮기면 «방금 고른 글»을 가리고, 그 자리를
+    //    눌러도 글자가 아니라 바가 눌린다(우클릭 메뉴 검사·판별 값 검사가 이걸로 터졌다).
+    // ⭐ 그래서 «옮기지 않고 접는다» — 빈 자리에 맞춰 한 줄 단추 칸수를 줄여 바를 좁게 만든다.
+    const 칸수 = quickCols(gutterRoom(pagesEl));
+    mini.style.setProperty('--qcols', 칸수);
+    mini2.style.setProperty('--qcols', 칸수);
+
     const taken = (varsRects && varsRects()) || [];
     const put = (el) => {
       el.style.left = leftGutterX(pagesEl, el.offsetWidth) + 'px';
