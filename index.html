@@ -1208,7 +1208,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-02 10:51";
+window.__BUILD = "2026-09-02 11:36";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -8669,7 +8669,11 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsRects, ge
     const e = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
     const blk = e && e.closest ? e.closest('#pages .blk') : null;
     if (!blk) return null;
-    const m = /blk-(\w+)/.exec(blk.className);
+    // ⛔ 여기에 보이지 않는 문자(0x08)가 박혀 있었다 — 셸 heredoc 이 \b 를 진짜
+    //    백스페이스 바이트로 바꿔 넣었고, 그래서 이 정규식이 «절대 안 맞았다».
+    //    화면에도 편집기에도 안 보여서 눈으로는 못 찾는다(2026-09-02 실측으로 잡음).
+    //    ⭐ 백슬래시가 든 코드는 반드시 Write·Edit 도구로 쓴다. build.js 가 이제 막는다.
+    const m = /(?:^|\s)blk-([a-z]+)/.exec(blk.className);
     return m ? m[1] : null;
   }
 
