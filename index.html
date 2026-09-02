@@ -1208,7 +1208,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-02 10:24";
+window.__BUILD = "2026-09-02 10:51";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3989,53 +3989,87 @@ function attachNewline({ pagesEl, barEl, getDoc, setDoc, redraw, onDone }) {
 }
 
 /* gapcaret.js */
-// 빈 곳을 누르면 커서가 간다 — 워드와 같은 손버릇 (2026-09-02 SKY).
+// 빈 곳을 누르면 «그 자리»에 커서가 간다 — 워드의 «눌러서 바로 쓰기» (2026-09-02 SKY).
 //
-// SKY 원문: "워드파일처럼 아무런 문구가 없던 곳도, 마우스로 클릭하면 커서가 표시 되게 해줘.
-//   이거 때문에 표 아래 내용을 추가 하거나 하는게 헷갈려. 만약 표와 내용 사이에 커서를 대면
-//   그 사이에 새로운 행이 추가 되고, 만약 아무 값도 추가 하지 않고 다른 부분을 다시 클릭 하면
-//   되돌아 오게. 보통 워드와 같아."
+// SKY 원문 ①: "워드파일처럼 아무런 문구가 없던 곳도, 마우스로 클릭하면 커서가 표시 되게 해줘.
+//   … 만약 표와 내용 사이에 커서를 대면 그 사이에 새로운 행이 추가 되고, 만약 아무 값도
+//   추가 하지 않고 다른 부분을 다시 클릭 하면 되돌아 오게. 보통 워드와 같아."
+// SKY 원문 ② (그림으로 짚어 주심): "아무것도 없는 종이 부분에 만약 워드면 초록색 원 부분을
+//   클릭 하면 거기 부분에 커서가 생기는데, 지금은 초록색 부분을 클릭해도 빨간색 부분에
+//   원이 생긴다고." — 초록색 = 글보다 한참 아래 빈 자리 · 빨간색 = 마지막 글의 끝.
 //
-// ⛔ 무엇이 문제였나: 표·절 제목·그림은 «고칠 수 없는 섬»이라 그 사이 9px 틈을 눌러도
-//    커서가 이웃 블록으로 튄다. 마지막 글 아래 빈 자리(44px)를 누르면 커서가 문서 «밖»으로
-//    나간다[실측 2026-09-02]. 그래서 표 아래에 글을 덧붙일 길이 아예 없었다.
+// ⛔ 무엇이 문제였나: ①을 만들 때 «바로 위가 글 줄이면 그 글 끝으로 커서만 옮긴다»로 했다.
+//    그래서 종이 한복판 빈 자리를 눌러도 커서가 저 위 마지막 글 끝으로 튀었다. 워드는
+//    그렇지 않다 — 누른 «그 줄»까지 빈 줄을 채우고 거기에 커서를 놓는다(눌러서 바로 쓰기).
 //
-// ⭐ 규칙 두 줄 — 워드와 같게 갈래를 나눈다:
-//    ⓐ 누른 자리 «바로 위»가 글 블록(문단·목록)이면 → 그 글 «끝»으로 커서만 옮긴다.
-//       (워드도 마지막 줄 아래를 누르면 그 줄 끝에 커서를 놓지, 줄을 만들지 않는다)
-//    ⓑ 바로 위가 «고칠 수 없는 섬»(표·절 제목·그림)이면 → 그 아래에 빈 줄을 하나 만든다.
-//       아무것도 안 치고 다른 데를 누르면 그 빈 줄은 조용히 사라진다(SKY: "되돌아 오게").
+// ⭐ 규칙
+//    ⓐ 누른 자리가 위 블록 «바로 아래»(한 줄 안쪽)면 — 그 글 끝으로 커서만 옮긴다.
+//       (블록과 블록 사이 9px 틈을 누른 경우가 이것이다)
+//    ⓑ 그보다 아래면 — 그 자리에 줄이 생기도록 «빈 줄 여러 개»를 채우고 마지막 줄에 커서.
+//    ⓒ 위가 «고칠 수 없는 섬»(표·절 제목·그림)이면 붙어 있어도 빈 줄을 하나 만든다.
+//    아무것도 안 치고 다른 데를 누르면 그 빈 줄들은 조용히 사라진다(SKY: "되돌아 오게").
 //
 // ⚠ 빈 줄을 만들고 지우는 것은 «되돌리기 한 걸음»으로 세지 않는다(setDocQuiet).
-//   누를 때마다 Ctrl+Z 걸음이 쌓이면 되돌리기가 못 쓰게 된다. 글을 치는 순간부터는
-//   여느 편집과 똑같이 한 걸음이 된다.
+//   누를 때마다 Ctrl+Z 걸음이 쌓이면 되돌리기가 못 쓰게 된다.
+// ⛔ 종이 아래로는 안 넘긴다 — 남은 자리만큼만 채운다. 안 그러면 한 번 눌렀는데 새 장이 생긴다.
 // ⛔ 최상위 이름은 attachGapCaret 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합친다.
 
 
 
 
 function attachGapCaret({ pagesEl, getDoc, setDocQuiet, redraw }) {
-  // 방금 만든 «임시 빈 줄» — 글이 안 들어오면 지운다
-  let 임시id = null;
+  // 방금 만든 «임시 빈 줄»들 — 글이 안 들어오면 전부 거둔다
+  let 임시 = [];
 
   const 글블록 = (b) => b && (b.type === 'para' || b.type === 'list');
 
   function 비었나(id) {
     const b = getDoc().blocks.find(x => x.id === id);
-    if (!b) return false;
-    if (b.type !== 'para') return false;
+    if (!b || b.type !== 'para') return false;
     return !(b.runs || []).some(r => (r.t || '').length);
   }
 
-  // 임시 줄을 거둔다 — 커서가 거기 없고 글도 안 들어왔으면.
+  // 임시 줄을 거둔다 — 커서가 «그 무리»를 떠났을 때만.
+  // ⛔ 처음엔 «커서가 든 한 줄만 남기고 나머지를 지운다»로 짰다가, 빈 줄을 17개 채워 놓고
+  //    커서를 마지막 줄에 놓는 순간 selectionchange 가 돌아 16줄을 곧바로 지워 버렸다
+  //    (그래서 커서가 다시 저 위로 올라갔다)[실측 2026-09-02].
+  //    커서가 무리 «안»에 있는 동안은 한 줄도 건드리지 않는다 — 워드도 그렇다.
+  // ⚠ 글을 친 줄은 이미 «진짜 줄»이라 무리를 떠나도 안 지운다.
   function 거두기(지금블록id) {
-    if (!임시id || 임시id === 지금블록id) return;
-    const id = 임시id;
-    임시id = null;
-    if (!비었나(id)) return;                  // 글을 쳤다 — 진짜 줄이 되었으니 둔다
+    if (!임시.length) return;
+    if (지금블록id && 임시.indexOf(지금블록id) >= 0) return;   // 아직 그 무리 안이다
+    const 지울 = 임시.filter(id => 비었나(id));
+    임시 = [];
+    if (!지울.length) return;
     const doc = getDoc();
-    setDocQuiet(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, id) }));
+    let blocks = doc.blocks;
+    for (const id of 지울) blocks = removeBlock(blocks, id);
+    setDocQuiet(Object.assign({}, doc, { blocks }));
     redraw({ keepCaret: true });
+  }
+
+  // 한 줄이 차지하는 높이 — «바로 이웃한 두 문단의 위 사이 거리»로 잰다(줄 사이 여백 포함).
+  // ⚠ 값을 코드에 적어 넣지 않는다 — 글자 크기·줄 간격을 바꾸면 그 순간 틀린 값이 된다.
+  // ⛔ «아무 두 문단»으로 재면 안 된다 (2026-09-02 실측). 사이에 표가 끼어 있으면 그 거리가
+  //    180px 이 나와 «한 줄 = 180px» 로 잘못 잡히고, 411px 아래를 눌렀는데 빈 줄이 2개만
+  //    생겼다. 반드시 «형제로 붙어 있는» 두 문단이어야 한다.
+  function 줄간격(종이) {
+    const ps = 종이.querySelectorAll('.blk-para');
+    let 최소 = 0;
+    for (const p of ps) {
+      const nx = p.nextElementSibling;
+      if (!nx || !nx.classList.contains('blk-para')) continue;
+      const d = nx.getBoundingClientRect().top - p.getBoundingClientRect().top;
+      if (d > 6 && d < 120 && (!최소 || d < 최소)) 최소 = d;
+    }
+    if (최소) return 최소;
+    // 이웃한 문단 짝이 없으면 «가장 낮은 문단»의 높이로 대신한다(여러 줄짜리를 피한다)
+    let 낮은 = 0;
+    for (const p of ps) {
+      const h = p.getBoundingClientRect().height;
+      if (h > 6 && (!낮은 || h < 낮은)) 낮은 = h;
+    }
+    return 낮은 > 6 ? 낮은 : 29;
   }
 
   // 누른 자리 «바로 위»의 블록 — 같은 종이 안에서만 찾는다.
@@ -4074,28 +4108,89 @@ function attachGapCaret({ pagesEl, getDoc, setDocQuiet, redraw }) {
     const doc = getDoc();
     const 위el = 자리.위;
     const 위블 = 위el ? doc.blocks.find(b => b.id === 위el.dataset.id) : null;
+    // ⛔ 남은 자리를 .page-body 로 재면 안 된다 — 그 상자는 «글 높이만큼만» 늘어나서
+    //    바닥이 언제나 마지막 글에 딱 붙어 있다(남은 자리 = 0). 그래서 빈 줄이 한 줄만
+    //    생기고 커서가 저 위에 머물렀다[실측 2026-09-02]. 쓸 수 있는 바닥은
+    //    «종이(.page) 바닥 − 아래 여백» 이다.
+    const 종이r = 자리.종이.getBoundingClientRect();
+    const 장 = 자리.종이.closest('.page');
+    const 장r = 장 ? 장.getBoundingClientRect() : 종이r;
+    const 아래여백 = 장 ? (parseFloat(getComputedStyle(장).paddingBottom) || 0) : 0;
+    const 쓸수있는바닥 = 장r.bottom - 아래여백;
+    const 기준바닥 = 위el ? 위el.getBoundingClientRect().bottom : 종이r.top;
+    const 한줄 = 줄간격(자리.종이);
+    const 빈틈 = e.clientY - 기준바닥;
 
-    // ⓐ 바로 위가 글 블록이면 — 그 글 «끝»에 커서만 놓는다(줄을 만들지 않는다)
-    if (글블록(위블)) {
+    // ⓐ 바로 아래(한 줄 안쪽)를 눌렀고 위가 글 줄이면 — 그 글 끝으로 커서만
+    if (글블록(위블) && 빈틈 < 한줄) {
       거두기(위블.id);
       redraw({ caretId: 위블.id, caretEnd: true });
       return;
     }
 
-    // ⓑ 바로 위가 «고칠 수 없는 섬»(표·절 제목·그림)이거나 맨 위 — 빈 줄을 하나 만든다
+    // ⓑ·ⓒ 누른 «그 줄»까지 빈 줄을 채운다
     거두기(null);
-    const 새 = createBlock('para');
-    // ⚠ 그 블록이 보이는 판을 물려받는다 — 안 그러면 다른 판 서류가 틀어진다
-    if (위블 && 위블.variants) 새.variants = 위블.variants.slice();
-    const blocks = 위블 ? insertAfter(doc.blocks, 위블.id, 새) : [새].concat(doc.blocks);
-    임시id = 새.id;
+    let 몇줄 = 글블록(위블) ? Math.floor(빈틈 / 한줄) : Math.max(1, Math.round(빈틈 / 한줄));
+    // ⛔ 종이 아래로는 안 넘긴다 — 남은 자리만큼만
+    const 남은 = Math.floor((쓸수있는바닥 - 기준바닥) / 한줄);
+    몇줄 = Math.max(1, Math.min(몇줄, 남은, 80));
+
+    // 빈 줄 n 개를 위블 뒤에 잇는다
+    const 만든것 = [];
+    function 잇기(blocks, n) {
+      let 뒤 = 만든것.length ? 만든것[만든것.length - 1] : (위블 ? 위블.id : null);
+      for (let i = 0; i < n; i++) {
+        const 새 = createBlock('para');
+        // ⚠ 그 블록이 보이는 판을 물려받는다 — 안 그러면 다른 판 서류가 틀어진다
+        if (위블 && 위블.variants) 새.variants = 위블.variants.slice();
+        blocks = 뒤 ? insertAfter(blocks, 뒤, 새) : [새].concat(blocks);
+        뒤 = 새.id;
+        만든것.push(새.id);
+      }
+      return blocks;
+    }
+    let blocks = 잇기(doc.blocks, 몇줄);
+    // ⚠ 검사 도구가 «왜 이만큼 넣었나»를 물어볼 수 있게 마지막 셈을 남긴다.
+    //   이 자리는 순전히 자리 계산이라, 틀렸을 때 눈으로는 원인이 안 보인다.
+    window.__gap = { 한줄: Math.round(한줄), 빈틈: Math.round(빈틈), 몇줄, 남은,
+                     위: 위블 ? 위블.type : '(없음)', 기준바닥: Math.round(기준바닥),
+                     쓸수있는바닥: Math.round(쓸수있는바닥) };
+    임시 = 만든것;
     setDocQuiet(Object.assign({}, doc, { blocks }));
-    redraw({ caretId: 새.id });
+    redraw({ caretId: 만든것[만든것.length - 1] });
+
+    // ⭐ 그려 보고 «실제로» 어디에 앉았는지 재서 보정한다. 한 줄 높이는 «이미 있는 문단»으로
+    //    어림잡은 값이라 빈 줄의 실제 높이와 조금 다르다(실측: 어림 23px). 어긋남이 반 줄
+    //    안쪽이 될 때까지 최대 세 번만 손본다 — 그보다 더 하면 눈에 안 보이는 차이를 쫓는 것이다.
+    for (let 회 = 0; 회 < 3; 회++) {
+      const el = pagesEl.querySelector('.blk[data-id="' + 만든것[만든것.length - 1] + '"]');
+      if (!el) break;
+      const r = el.getBoundingClientRect();
+      const 실제한줄 = r.height > 6 ? r.height : 한줄;
+      const 어긋남 = e.clientY - (r.top + r.height / 2);
+      if (Math.abs(어긋남) <= 실제한줄 / 2) break;          // 반 줄 안쪽이면 됐다
+      const 더 = Math.round(어긋남 / 실제한줄);
+      if (더 > 0) {
+        const n = Math.min(더, Math.max(0, 남은 - 만든것.length));
+        if (n <= 0) break;
+        const bs = 잇기(getDoc().blocks, n);
+        임시 = 만든것;
+        setDocQuiet(Object.assign({}, getDoc(), { blocks: bs }));
+      } else {
+        const n = Math.min(-더, 만든것.length - 1);
+        if (n <= 0) break;
+        let bs = getDoc().blocks;
+        for (let k = 0; k < n; k++) bs = removeBlock(bs, 만든것.pop());
+        임시 = 만든것;
+        setDocQuiet(Object.assign({}, getDoc(), { blocks: bs }));
+      }
+      redraw({ caretId: 만든것[만든것.length - 1] });
+    }
   });
 
   // 자판·마우스로 다른 곳에 가면 임시 줄을 거둔다
   document.addEventListener('selectionchange', () => {
-    if (!임시id) return;
+    if (!임시.length) return;
     const s = window.getSelection();
     const n = s && s.anchorNode;
     const el = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
@@ -10593,6 +10688,10 @@ function refreshList() {
 
 // 검사 도구용 창구 — 색인을 손으로 넣고 트리가 제대로 그려지는지 잴 수 있어야 한다
 // (실제 폴더 열기는 브라우저 권한 창이 필요해 자동 검사로 재현할 수 없다).
+// ⚠ 검사 도구가 문서를 «손으로» 얹을 때 블록 번호를 이어받게 한다 — 정식 경로(deserialize)는
+//   이것을 자동으로 하지만, 도구가 state.doc 에 바로 넣으면 번호가 겹쳐 커서가 엉뚱한
+//   블록으로 간다(2026-09-02 실측).
+window.__app.adoptIds = adoptIds;
 window.__app.refreshList = refreshList;
 window.__app.buildIndex = buildIndex;
 
