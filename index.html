@@ -54,6 +54,10 @@
 /* ⛔ 가로로 쓸어도 «뒤로 가기»가 되지 않게 한다 — 태블릿에서 표를 손가락으로 끌면
    브라우저가 그걸 뒤로 가기로 받아 «편집 중인 화면이 통째로 날아간다»(실측 2026-08-30). */
 html, body { overscroll-behavior-x:contain; }
+/* ⭐ 창이 떠 있는 동안은 뒤 문서가 안 굴러간다 (2026-09-02 SKY: "팝업창이 뜬 상태에는
+   본 화면 스크롤은 동작 안되게"). ui/scrolllock.js 가 창을 여닫을 때 이 표를 붙인다.
+   ⚠ 굴린 자리는 그대로 남는다 — 창을 닫으면 보던 자리로 돌아온다. */
+html.locked, body.locked { overflow:hidden; }
 body { margin:0; background:var(--desk); color:var(--ink);
        font-family:'Noto Sans KR','맑은 고딕','Malgun Gothic',sans-serif; }
 #app { display:flex; min-height:100vh; }
@@ -788,8 +792,11 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
      것이 있다. 좁은 화면에서는 화면 폭에 맞춰 줄어든다(max-width). */
   width: 1320px; max-width: calc(100vw - 24px);
   /* ⚠ 창 높이도 화면에 맞춘다 — 부품이 60개를 넘어가면 목록만으로도 화면을 넘는다.
-     제목·머리줄·아래 단추는 늘 보이고 «목록만» 스크롤한다(.pl-body). */
-  max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+     제목·머리줄·아래 단추는 늘 보이고 «목록만» 스크롤한다(.pl-body).
+     ⛔ 100vh − 40px 은 틀렸다 (2026-09-02 SKY: "팝업창이 지금 너무 커서, 하단 항목까지
+        보이지 않아"). 창은 top:76px 에서 시작하므로 «76 + 아래 여백»을 빼야 한다 —
+        40px 만 빼면 창 아래가 화면 밖으로 56px 넘어가 마지막 줄과 단추가 잘렸다. */
+  max-height: calc(100vh - 96px); display: flex; flex-direction: column; }
 #partslist .pl-ttl { display: flex; align-items: center; justify-content: space-between;
   font-weight: 800; padding-bottom: 8px; margin-bottom: 6px; border-bottom: 1px solid var(--u-border-card); }
 #partslist .pl-x { border: 0; background: none; cursor: pointer; color: var(--u-text-faint);
@@ -1052,6 +1059,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
         <symbol id="i-vBot" viewBox="0 0 18 14"><path d="M5 6.5h8M5 9.5h8M2 12.5h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
         <symbol id="i-bullet" viewBox="0 0 18 14"><circle cx="2" cy="2.5" r="1.6" fill="currentColor"/><circle cx="2" cy="7" r="1.6" fill="currentColor"/><circle cx="2" cy="11.5" r="1.6" fill="currentColor"/><path d="M7 2.5h10M7 7h10M7 11.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
         <symbol id="i-number" viewBox="0 0 18 14"><text x="0" y="4.6" font-size="5" font-weight="700" fill="currentColor">1</text><text x="0" y="9.2" font-size="5" font-weight="700" fill="currentColor">2</text><text x="0" y="13.8" font-size="5" font-weight="700" fill="currentColor">3</text><path d="M7 2.5h10M7 7h10M7 11.5h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+        <symbol id="i-sect" viewBox="0 0 18 14"><text x="0" y="6" font-size="6" font-weight="800" fill="currentColor">01</text><path d="M9 3.5h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/><path d="M0 12h18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
         <symbol id="i-table" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1 5h16M1 9h16M6.5 1v12M11.5 1v12" stroke="currentColor" stroke-width="1.2" fill="none"/></symbol>
         <symbol id="i-image" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="5.5" cy="5" r="1.6" fill="currentColor"/><path d="M2 12l4.5-5 3.5 3.5L13 7l3 5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></symbol>
         <symbol id="i-rowAdd" viewBox="0 0 18 14"><rect x="1" y="1" width="16" height="7" rx="1.2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M1 4.5h16" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M9 9.5v4M7 11.5h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
@@ -1133,6 +1141,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
       <!-- 넣기는 «지금 무엇을 골랐든» 쓰므로 항상 보인다 -->
       <span class="tbg tbg-table" data-label="넣기">
       <button class="tb tb-ic" data-table="insert" title="표 넣기 (3×3)"><svg class="ic" viewBox="0 0 18 14"><use href="#i-table"/></svg><span class="lb">표</span></button>
+      <button class="tb tb-ic" data-sect="toggle" title="이 글 줄을 «절 제목»으로 바꾼다 — 번호와 빨간 표시·밑줄이 붙는다. 절 제목에서 누르면 다시 보통 글 줄로 돌아간다"><svg class="ic" viewBox="0 0 18 14"><use href="#i-sect"/></svg><span class="lb">절 제목</span></button>
       <button class="tb tb-ic" data-image="auto" title="그림 넣기 — 커서가 어디 있는지 보고 알아서 넣는다. 표 칸 안이면 칸 폭에 맞춰 칸 안에, 글자 사이면 글자 크기로, 그 밖에는 한 줄짜리 그림으로"><svg class="ic" viewBox="0 0 18 14"><use href="#i-image"/></svg><span class="lb">그림</span></button>
       </span>
       <!-- ⭐ 여기부터는 «상황 묶음»이다 — 지금 고른 것에 따라서만 나타난다(설계 §5-4 S3).
@@ -1199,7 +1208,7 @@ td.vown::after { border-top-color: var(--vc); border-right-color: var(--vc); }
 <!-- 그림 고르기 창 — 버튼이 이걸 대신 누른다(브라우저는 «사람이 누른 순간»에만 창을 연다) -->
 <input type="file" id="imgfile" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple hidden>
 <script>
-window.__BUILD = "2026-09-02 09:48";
+window.__BUILD = "2026-09-02 10:24";
 (function(){
 /* runs.js */
 // 토막(run) = 서식이 같은 글자들이 이어지는 구간. { t:'글자', b:1, i:1, u:1, s:1, sz:12.5, c:'#e5231b', mono:1 }
@@ -3527,6 +3536,17 @@ function activeCapEl(blkEl) {
   return cap && blkEl.contains(cap) ? cap : null;
 }
 
+// 절 제목 안의 «고칠 수 있는 칸» — 번호(.n) 또는 제목(.t). 밑줄(.rule)은 글이 아니다.
+function activeSectEl(blkEl) {
+  const s = window.getSelection();
+  const n = s && s.anchorNode;
+  if (!n || !blkEl) return null;
+  const e = n.nodeType === 1 ? n : n.parentElement;
+  if (!e || !e.closest) return null;
+  const sp = e.closest('.blk-section .n, .blk-section .t');
+  return sp && blkEl.contains(sp) ? sp : null;
+}
+
 // 화면 배율 — «눈에 보이는 폭 ÷ 자리 폭». 좁은 화면에서 종이를 줄여 보여 줄 때
 // (main.js 의 자동 축소) 1 보다 작아진다.
 // ⭐ 마우스·손가락 좌표(clientX)는 «눈에 보이는» 눈금이고, 모델에 적는 크기는 «자리» 눈금이다.
@@ -3888,6 +3908,71 @@ function attachNewline({ pagesEl, barEl, getDoc, setDoc, redraw, onDone }) {
     넣기(btn.dataset.newline);
   });
 
+  // ── ⭐ 화살표로도 빈 줄이 생긴다 — 워드와 같은 손버릇 (2026-09-02 SKY) ──────
+  // SKY: "그냥 표 칸에서 마지막 행에서 키보드 화살표 아래를 누른 경우 빈 줄이 생기게끔
+  //       (워드랑 동일), 절 제목 위에서 키보드 화살표 위를 누른 겨우 빈 줄이 생기게끔"
+  //
+  // ⛔ 워드에서는 표 뒤에 «늘» 문단 표시가 하나 있어서 ↓ 로 그리로 내려간다. 우리 모델에는
+  //    그런 것이 없어 표가 문서 끝이거나 뒤가 표·절 제목이면 내려갈 자리가 아예 없다.
+  //    그때만 빈 줄을 만든다 — 뒤에 이미 글 줄이 있으면 브라우저가 알아서 내려가게 둔다.
+  // ⚠ 표 칸 «안»에서 여러 줄일 수 있으니, 마지막 «표줄»이면서 칸 안에서도 마지막 줄일 때만.
+  function 글줄인가(b) { return b && (b.type === 'para' || b.type === 'list'); }
+
+  // 칸 «안»에서 아직 아래로 갈 줄이 남아 있나 — 남아 있으면 브라우저에 맡긴다.
+  // ⚠ 접힌(collapsed) 범위는 getBoundingClientRect 가 0 을 주는 경우가 있다[실측 2026-09-02].
+  //   그때는 «잰 것이 없다»는 뜻이므로 막지 않는다(빗장을 열어 둔다) — 바깥 조건
+  //   (마지막 표줄 · 뒤에 갈 글 줄이 없음)이 이미 좁혀 놓았다.
+  function 칸에서마지막줄인가(sel) {
+    const n = sel && sel.anchorNode;
+    const el = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
+    const td = el && el.closest ? el.closest('td[data-r]') : null;
+    if (!td) return false;
+    let 커서 = null;
+    try {
+      const rg = sel.getRangeAt(0).cloneRange();
+      const rs = rg.getClientRects();
+      커서 = (rs && rs.length) ? rs[rs.length - 1] : rg.getBoundingClientRect();
+    } catch (e) { 커서 = null; }
+    if (!커서 || (!커서.height && !커서.bottom)) return true;   // 못 쟀다 — 막지 않는다
+    const 칸 = td.getBoundingClientRect();
+    // 커서 아래로 한 줄 넘게 남았으면 아직 칸 안에 갈 데가 있다
+    return (칸.bottom - 커서.bottom) < (커서.height || 16) * 0.8;
+  }
+
+  pagesEl.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    const el = activeBlockEl(pagesEl);
+    if (!el) return;
+    const doc = getDoc();
+    const i = doc.blocks.findIndex(b => b.id === el.dataset.id);
+    if (i < 0) return;
+    const 이것 = doc.blocks[i];
+    const sel = window.getSelection();
+
+    if (e.key === 'ArrowDown') {
+      // 표의 «마지막 표줄»에서만
+      if (이것.type !== 'table') return;
+      const n = sel && sel.anchorNode;
+      const t = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
+      const td = t && t.closest ? t.closest('td[data-r]') : null;
+      if (!td || td.dataset.r === 'h') return;
+      const 마지막 = (이것.rows || []).length - 1;
+      if (Number(td.dataset.r) !== 마지막) return;
+      if (!칸에서마지막줄인가(sel)) return;
+      if (글줄인가(doc.blocks[i + 1])) return;      // 이미 내려갈 글 줄이 있다
+      e.preventDefault();
+      넣기('after');
+      return;
+    }
+
+    // ArrowUp — 절 제목에서, 위에 갈 글 줄이 없을 때
+    if (이것.type !== 'section') return;
+    if (글줄인가(doc.blocks[i - 1])) return;
+    e.preventDefault();
+    넣기('before');
+  });
+
   // ── 표 안에서 Ctrl+Enter → 표 바로 «아래»에 새 줄 ────────────
   // ⚠ 표 안의 그냥 Enter 는 종전대로 둔다(칸 안 줄바꿈·아래 칸 이동) — 손버릇을 안 바꾼다.
   // ⛔ e.key 로만 보면 한글 자판에서 놓칠 수 있어 e.code 도 함께 본다.
@@ -3901,6 +3986,264 @@ function attachNewline({ pagesEl, barEl, getDoc, setDoc, redraw, onDone }) {
   }, true);
 
   return { 넣기 };
+}
+
+/* gapcaret.js */
+// 빈 곳을 누르면 커서가 간다 — 워드와 같은 손버릇 (2026-09-02 SKY).
+//
+// SKY 원문: "워드파일처럼 아무런 문구가 없던 곳도, 마우스로 클릭하면 커서가 표시 되게 해줘.
+//   이거 때문에 표 아래 내용을 추가 하거나 하는게 헷갈려. 만약 표와 내용 사이에 커서를 대면
+//   그 사이에 새로운 행이 추가 되고, 만약 아무 값도 추가 하지 않고 다른 부분을 다시 클릭 하면
+//   되돌아 오게. 보통 워드와 같아."
+//
+// ⛔ 무엇이 문제였나: 표·절 제목·그림은 «고칠 수 없는 섬»이라 그 사이 9px 틈을 눌러도
+//    커서가 이웃 블록으로 튄다. 마지막 글 아래 빈 자리(44px)를 누르면 커서가 문서 «밖»으로
+//    나간다[실측 2026-09-02]. 그래서 표 아래에 글을 덧붙일 길이 아예 없었다.
+//
+// ⭐ 규칙 두 줄 — 워드와 같게 갈래를 나눈다:
+//    ⓐ 누른 자리 «바로 위»가 글 블록(문단·목록)이면 → 그 글 «끝»으로 커서만 옮긴다.
+//       (워드도 마지막 줄 아래를 누르면 그 줄 끝에 커서를 놓지, 줄을 만들지 않는다)
+//    ⓑ 바로 위가 «고칠 수 없는 섬»(표·절 제목·그림)이면 → 그 아래에 빈 줄을 하나 만든다.
+//       아무것도 안 치고 다른 데를 누르면 그 빈 줄은 조용히 사라진다(SKY: "되돌아 오게").
+//
+// ⚠ 빈 줄을 만들고 지우는 것은 «되돌리기 한 걸음»으로 세지 않는다(setDocQuiet).
+//   누를 때마다 Ctrl+Z 걸음이 쌓이면 되돌리기가 못 쓰게 된다. 글을 치는 순간부터는
+//   여느 편집과 똑같이 한 걸음이 된다.
+// ⛔ 최상위 이름은 attachGapCaret 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합친다.
+
+
+
+
+function attachGapCaret({ pagesEl, getDoc, setDocQuiet, redraw }) {
+  // 방금 만든 «임시 빈 줄» — 글이 안 들어오면 지운다
+  let 임시id = null;
+
+  const 글블록 = (b) => b && (b.type === 'para' || b.type === 'list');
+
+  function 비었나(id) {
+    const b = getDoc().blocks.find(x => x.id === id);
+    if (!b) return false;
+    if (b.type !== 'para') return false;
+    return !(b.runs || []).some(r => (r.t || '').length);
+  }
+
+  // 임시 줄을 거둔다 — 커서가 거기 없고 글도 안 들어왔으면.
+  function 거두기(지금블록id) {
+    if (!임시id || 임시id === 지금블록id) return;
+    const id = 임시id;
+    임시id = null;
+    if (!비었나(id)) return;                  // 글을 쳤다 — 진짜 줄이 되었으니 둔다
+    const doc = getDoc();
+    setDocQuiet(Object.assign({}, doc, { blocks: removeBlock(doc.blocks, id) }));
+    redraw({ keepCaret: true });
+  }
+
+  // 누른 자리 «바로 위»의 블록 — 같은 종이 안에서만 찾는다.
+  // ⚠ 아래 여백(26px)은 «글 자리(.page-body) 밖»이다 — 거기를 눌러도 워드처럼 커서가
+  //   가야 하므로 종이(.page)까지 받아 그 안의 글 자리를 쓴다[실측 2026-09-02].
+  function 위블록(x, y) {
+    const 겹친것 = document.elementsFromPoint(x, y);
+    let 종이 = 겹친것.find(e => e.classList && e.classList.contains('page-body'));
+    if (!종이) {
+      const 장 = 겹친것.find(e => e.classList && e.classList.contains('page'));
+      종이 = 장 ? 장.querySelector('.page-body') : null;
+    }
+    if (!종이) return null;
+    let 답 = null;
+    for (const el of 종이.querySelectorAll('.blk')) {
+      const r = el.getBoundingClientRect();
+      if (r.bottom <= y) 답 = el;             // 위에 있는 것 중 가장 아래
+    }
+    return { 종이, 위: 답 };
+  }
+
+  // ⛔ pointerdown 에서 preventDefault 하면 안 된다 (2026-09-02 실측). 크롬이 뒤따르는
+  //    mousedown·click 을 통째로 안 보내서, «바깥을 누르면 떠 있는 창이 닫힌다»가 죽었다
+  //    (판 검사가 이걸로 빨개졌다). 그래서 «click» 에서 한다 — 그때는 창 닫기·초점 옮기기가
+  //    이미 다 끝나 있고, 우리는 마지막에 커서만 옮기면 된다.
+  pagesEl.addEventListener('click', (e) => {
+    if (e.button !== 0) return;
+    const t = e.target;
+    // 블록 «안»을 눌렀으면 브라우저가 알아서 한다 — 우리가 낄 자리가 아니다
+    if (t && t.closest && t.closest('.blk')) { 거두기(t.closest('.blk').dataset.id); return; }
+    // 손잡이·떠 있는 창 위는 건드리지 않는다
+    if (t && t.closest && t.closest('.colgrip, #ctxmenu, #minibar, #minibar2, #vvals, #vmgr, #vpick')) return;
+    const 자리 = 위블록(e.clientX, e.clientY);
+    if (!자리) return;
+
+    const doc = getDoc();
+    const 위el = 자리.위;
+    const 위블 = 위el ? doc.blocks.find(b => b.id === 위el.dataset.id) : null;
+
+    // ⓐ 바로 위가 글 블록이면 — 그 글 «끝»에 커서만 놓는다(줄을 만들지 않는다)
+    if (글블록(위블)) {
+      거두기(위블.id);
+      redraw({ caretId: 위블.id, caretEnd: true });
+      return;
+    }
+
+    // ⓑ 바로 위가 «고칠 수 없는 섬»(표·절 제목·그림)이거나 맨 위 — 빈 줄을 하나 만든다
+    거두기(null);
+    const 새 = createBlock('para');
+    // ⚠ 그 블록이 보이는 판을 물려받는다 — 안 그러면 다른 판 서류가 틀어진다
+    if (위블 && 위블.variants) 새.variants = 위블.variants.slice();
+    const blocks = 위블 ? insertAfter(doc.blocks, 위블.id, 새) : [새].concat(doc.blocks);
+    임시id = 새.id;
+    setDocQuiet(Object.assign({}, doc, { blocks }));
+    redraw({ caretId: 새.id });
+  });
+
+  // 자판·마우스로 다른 곳에 가면 임시 줄을 거둔다
+  document.addEventListener('selectionchange', () => {
+    if (!임시id) return;
+    const s = window.getSelection();
+    const n = s && s.anchorNode;
+    const el = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
+    const blk = el && el.closest ? el.closest('.blk') : null;
+    거두기(blk ? blk.dataset.id : null);
+  });
+
+  return { 거두기 };
+}
+
+/* scrolllock.js */
+// 창이 떠 있는 동안 «뒤 화면»은 안 굴러간다 (2026-09-02 SKY).
+//
+// SKY 원문: "팝업창이 뜬 상태에서, 팝업창 말고 뒤 본화면이 스크롤 되는 경우가 있어.
+//   팝업창이 뜬 상태에는 본 화면 스크롤은 동작 안되게."
+//
+// ⛔ 왜 생기나: 문서는 «창(window) 자체»가 굴러간다(#main 에 overflow 가 없다).
+//    떠 있는 창 «안»의 목록을 끝까지 굴리면 그다음 휠은 뒤 문서로 넘어간다(스크롤 체이닝).
+//    창 안에 손을 두고 굴렸는데 뒤 서류가 움직이니 «어디를 보고 있었는지»를 잃는다.
+//
+// ⭐ 창을 여닫는 자리가 여섯 곳(부품 목록·머리글·세부 목록 관리·서류마다 다른 값·
+//    나오는 곳 고르기·부품 값 넣기)이라 각각에 붙이지 않는다 — body 에 무엇이 붙고
+//    떨어지는지 한 곳에서 지켜보고 잠근다. 창이 하나라도 있으면 잠그고, 다 닫히면 푼다.
+// ⚠ overflow:hidden 은 굴린 자리를 잃지 않는다 — 그 자리에 그대로 멈춘다.
+// ⛔ 최상위 이름은 attachScrollLock · LOCK_IDS 둘뿐이다 — 빌드가 모듈을 한 덩어리로 합친다.
+
+const LOCK_IDS = ['partslist', 'docinfo', 'vmgr', 'vvals', 'vpick', 'prefpick'];
+
+function attachScrollLock() {
+  let 잠금 = false;
+
+  function 있나() {
+    for (const id of LOCK_IDS) if (document.getElementById(id)) return true;
+    return false;
+  }
+
+  function 맞추기() {
+    const 필요 = 있나();
+    if (필요 === 잠금) return;
+    잠금 = 필요;
+    document.documentElement.classList.toggle('locked', 필요);
+    document.body.classList.toggle('locked', 필요);
+  }
+
+  new MutationObserver(맞추기).observe(document.body, { childList: true });
+  맞추기();
+  return { 맞추기, 잠겼나: () => 잠금 };
+}
+
+/* section.js */
+// 절 제목 만들기·되돌리기 (2026-09-02 SKY).
+//
+// SKY 원문: "예를들어 지금 01 인쇄회로 기판과 같은 서식 부분을 내가 실제 만들려면
+//   어떻게 하면 가능한지?"
+//
+// ⛔ 무엇이 문제였나: 절 제목(「01 인쇄회로기판 …」 + 빨간 번호 + 밑줄)은 «옮길 때
+//    프로그램이 만들어 넣은 것»이라, SKY 가 화면에서 새로 만들 길이 아예 없었다.
+//
+// ⭐ 들어가는 길을 둘 다 만든다(ⓒ):
+//    ⓐ 리본 「넣기」 묶음의 「절 제목」 단추
+//    ⓑ 우클릭 메뉴 「절 제목으로 / 절 제목 풀기」
+//    둘은 같은 단추를 누른다(M4 — 메뉴는 리본 대행).
+//
+// ⭐ 하는 일은 «갈아 끼우기»다 — 글 줄에 커서를 두고 누르면 그 줄이 절 제목이 되고,
+//    절 제목에서 누르면 다시 보통 글 줄로 돌아간다. 글자는 사라지지 않는다.
+// ⚠ 번호는 «그 앞의 절 제목 + 1» 로 매긴다. 첫 절이면 01.
+//   번호와 제목은 만든 뒤 화면에서 그대로 고칠 수 있다(render.js 가 두 칸을 열어 둔다).
+// ⛔ 최상위 이름은 attachSection 하나뿐이다 — 빌드가 모듈을 한 덩어리로 합친다.
+
+
+
+
+
+
+function attachSection({ pagesEl, barEl, getDoc, setDoc, redraw, onDone }) {
+  function 대상() {
+    const el = activeBlockEl(pagesEl);
+    return el ? el.dataset.id : null;
+  }
+
+  // 이 자리 «앞»의 절 제목 번호 + 1 — 문서를 훑어 매긴다
+  function 다음번호(blocks, i) {
+    let n = 0;
+    for (let k = 0; k < i; k++) {
+      if (blocks[k].type !== 'section') continue;
+      const v = parseInt(blocks[k].no, 10);
+      if (!isNaN(v)) n = Math.max(n, v);
+      else n += 1;
+    }
+    return String(n + 1).padStart(2, '0');
+  }
+
+  function 바꾸기() {
+    const id = 대상();
+    if (!id) {
+      window.alert('절 제목으로 바꿀 «글 줄»을 먼저 누르세요.');
+      return;
+    }
+    const doc = getDoc();
+    const i = doc.blocks.findIndex(b => b.id === id);
+    if (i < 0) return;
+    const b = doc.blocks[i];
+
+    if (b.type === 'section') {
+      // 되돌리기 — 번호와 제목을 한 줄 글로 합친다(글자를 잃지 않는다)
+      const 글 = ((b.no || '') + ' ' + (b.title || '')).trim();
+      const 새 = createBlock('para');
+      새.runs = runsFromText(글);
+      if (b.variants) 새.variants = b.variants.slice();
+      새.id = b.id;                       // 같은 자리·같은 번호 — 커서가 그대로 남는다
+      setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, id, 새) }));
+      redraw({ caretId: id, caretEnd: true });
+      if (onDone) onDone('보통 글 줄로 되돌렸습니다');
+      return;
+    }
+
+    if (b.type !== 'para' && b.type !== 'list') {
+      window.alert('절 제목으로 바꿀 수 있는 것은 «글 줄»뿐입니다 — 표·그림에서는 쓸 수 없습니다.');
+      return;
+    }
+
+    // 글 줄 → 절 제목. 「01 이름」 처럼 앞에 번호가 붙어 있으면 그것을 번호로 쓴다.
+    const 글 = (b.type === 'list'
+      ? runsText((b.items || [[]])[0] || [])
+      : runsText(b.runs || [])).trim();
+    const m = /^(\d{1,3})[.\s]+(.*)$/.exec(글);
+    const 새 = {
+      id: b.id, type: 'section',
+      no: m ? m[1].padStart(2, '0') : 다음번호(doc.blocks, i),
+      title: m ? m[2] : 글,
+      variants: b.variants ? b.variants.slice() : null,
+    };
+    setDoc(Object.assign({}, doc, { blocks: replaceBlock(doc.blocks, id, 새) }));
+    redraw({ caretId: b.id });
+    if (onDone) onDone('절 제목으로 바꿨습니다 — 번호와 글자를 바로 고칠 수 있습니다');
+  }
+
+  // ⛔ 누르는 «순간» 선택이 풀리면 대상 블록을 잃는다 — 다른 리본 단추와 같은 수법이다.
+  if (barEl) barEl.addEventListener('mousedown', (e) => {
+    if (e.target.closest && e.target.closest('[data-sect]')) e.preventDefault();
+  });
+  if (barEl) barEl.addEventListener('click', (e) => {
+    const btn = e.target.closest && e.target.closest('[data-sect]');
+    if (!btn) return;
+    바꾸기();
+  });
+
+  return { 바꾸기 };
 }
 
 /* imgfmt.js */
@@ -4359,9 +4702,17 @@ function blockEl(block, page, view) {
   if (block.type === 'table') return tableEl(block, null, view);
   if (block.type === 'image') return imageEl(block, page);
   if (block.type === 'section') {
+    // ⭐ 절 제목도 «글»이다 — 번호와 제목을 고칠 수 있어야 한다 (2026-09-02 SKY:
+    //    "절 제목? 부분은 드래그는 되는데 마우스 클릭 했을때 커서 표시가 뜨지 않아.
+    //     일반 텍스트처럼 문구도 수정 하고 싶은데 판 떄문인가?" → 판과 무관했다.
+    //     만들 때부터 블록 전체를 contenteditable=false 로 막아 둔 것이 원인이다).
+    // ⛔ 블록 전체를 열면 안 된다 — 밑줄(.rule)은 «글이 아니라 그림»이라 그 안에 커서가
+    //    들어가면 지워지거나 글이 그 안에 들어간다. 그래서 «섬 안의 두 칸»만 연다.
     el.setAttribute('contenteditable', 'false');
     const n = document.createElement('span'); n.className = 'n'; n.textContent = block.no || '';
+    n.setAttribute('contenteditable', 'true');
     const t = document.createElement('span'); t.className = 't'; t.textContent = block.title || '';
+    t.setAttribute('contenteditable', 'true');
     const r = document.createElement('span'); r.className = 'rule';
     el.append(n, t, r);
   } else if (block.type === 'list') {
@@ -4914,7 +5265,7 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
     const doc = getDoc();
     // 되읽은 토막에 밖에서 온 그림(src$)이 있으면 보관함에 담는다(중복이면 기존 번호)
     const got = Array.isArray(p.runs) ? adoptImages(p.runs, doc.assets) : null;
-    if (got) p = Object.assign({}, p, { runs: got.runs });
+    if (got && !p.sect) p = Object.assign({}, p, { runs: got.runs });
     const assets = got && got.changed ? got.assets : doc.assets;
     let patch;
     if (p.cell) {
@@ -4933,6 +5284,10 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
         rows[p.cell[0]] = row;
         patch = { rows };
       }
+    } else if (p.sect) {
+      // ⭐ 절 제목은 «runs» 가 아니라 번호(no)와 제목(title) 두 글자다 — 서식이 없다.
+      //    그래서 domToRuns 를 거치지 않고 글자만 그대로 싣는다.
+      patch = p.sect === 'n' ? { no: p.text } : { title: p.text };
     } else if (p.cap) {
       patch = { caption: p.runs };
     } else if (p.itemIndex === undefined) {
@@ -4955,6 +5310,13 @@ function attachEditor({ pagesEl, getDoc, setDoc, redraw, getView }) {
     const blk = activeBlockEl(pagesEl);
     if (!blk) return;
     const view = getView();
+    // ⭐ 절 제목(번호·제목)은 서식 없는 «맨 글자»다 — 먼저 본다(2026-09-02).
+    const sect = activeSectEl(blk);
+    if (sect) {
+      pending = { id: blk.dataset.id, sect: (sect.className === 'n' ? 'n' : 't'),
+                  text: sect.textContent, view };
+      return;
+    }
     const cap = activeCapEl(blk);
     if (cap) { pending = { id: blk.dataset.id, cap: 1, runs: domToRuns(cap), view }; return; }
     const td = activeCellEl(blk);
@@ -7976,6 +8338,7 @@ const MENU_ITEMS = {
     { label: '붙여넣기', run: 'paste' },
     // 판(版) — 표 칸에서는 «줄»과 «칸»까지 다룬다. 「이 줄이 나오는 곳…」 은 표 블록 전체에 붙는다.
     // ⚠ 화면에 «판» 이라는 말은 안 쓴다(2026-09-02) — 사이드바에서는 «세부»다.
+    { label: '절 제목으로', press: '[data-sect="toggle"]', when: 'sect' },
     { label: '이 줄이 나오는 곳…', press: '[data-vars="block"]', when: 'vars' },
     { label: '이 표줄이 나오는 곳…', press: '[data-vars="row"]', when: 'vars' },
     // ⭐ 「판별 값…」 이 판마다의 값을 한 창에 모아 보여 준다(2026-09-01 SKY). 아래 두 항목은
@@ -7993,6 +8356,7 @@ const MENU_ITEMS = {
   text: [
     { label: '복사', run: 'copy' }, { label: '잘라내기', run: 'cut' },
     { label: '붙여넣기', run: 'paste' },
+    { label: '절 제목으로', press: '[data-sect="toggle"]', when: 'sect' },
     { label: '이 줄이 나오는 곳…', press: '[data-vars="block"]', when: 'vars' },
     { label: '세부 목록 관리…', press: '[data-vars="mgr"]' },
     { label: '⬆ 위에 새 줄', press: '[data-newline="before"]' },
@@ -8002,6 +8366,7 @@ const MENU_ITEMS = {
     { label: '붙여넣기', run: 'paste' },
     { label: '표 넣기', press: '[data-table="insert"]' },
     { label: '그림 넣기', press: '[data-image="auto"]' },
+    { label: '절 제목으로', press: '[data-sect="toggle"]', when: 'sect' },
     { label: '이 줄이 나오는 곳…', press: '[data-vars="block"]', when: 'vars' },
     { label: '⬆ 위에 새 줄', press: '[data-newline="before"]' },
     { label: '⬇ 아래에 새 줄', press: '[data-newline="after"]' },
@@ -8202,6 +8567,17 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsRects, ge
   //    숨기자(판을 사이드바로 옮겼다) 판 관련 메뉴 항목이 «전부» 사라졌다 — 화면에서 안
   //    보이는 것과 «문서에 판이 있나»는 다른 이야기인데 한 값으로 겸해 쓴 것이 원인이다.
   //    이제 문서를 직접 본다.
+  // 커서가 있는 블록의 «종류» — 메뉴 항목을 켜고 끄는 데 쓴다
+  function 지금블록종류() {
+    const s = window.getSelection();
+    const n = s && s.anchorNode;
+    const e = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
+    const blk = e && e.closest ? e.closest('#pages .blk') : null;
+    if (!blk) return null;
+    const m = /blk-(\w+)/.exec(blk.className);
+    return m ? m[1] : null;
+  }
+
   function 판있나() {
     const d = getDoc ? getDoc() : null;
     return !!d && !!(d.variants || []).length;
@@ -8218,9 +8594,17 @@ function attachMenu({ pagesEl, barEl, ctxApi, imageApi, formatApi, varsRects, ge
     list.className = 'mlist';
     for (const it of (MENU_ITEMS[ctx.kind] || MENU_ITEMS.caret)) {   // 그림은 여기 안 온다
       if (it.when === 'vars' && !판있나()) continue;
+      let b0 = it.label;
+      // ⭐ 「절 제목으로」는 «글 줄»과 «절 제목»에서만 뜬다 — 표·그림에서는 할 수 없는 일이다.
+      //    절 제목에 커서가 있으면 되돌리는 말로 바꿔 단다(같은 단추가 둘 다 한다).
+      if (it.when === 'sect') {
+        const k = 지금블록종류();
+        if (k !== 'para' && k !== 'list' && k !== 'section') continue;
+        if (k === 'section') b0 = '절 제목 풀기';
+      }
       const b = document.createElement('button');
       b.type = 'button';
-      b.textContent = it.label;
+      b.textContent = b0;
       if (it.press) b.dataset.press = it.press;
       else b.dataset.run = it.run;
       list.appendChild(b);
@@ -9591,6 +9975,9 @@ function attachVbar({ pagesEl, barEl, getDoc, setDoc, redraw, getView, setView, 
 
 
 
+
+
+
 // ⛔ 머리글 높이는 «한 곳»에서만 정한다 — 쪽 나눔을 재는 JS(measure.js HDR_H)와 그리는
 //    CSS 가 어긋나면 본문이 머리글 위로 올라타거나 아래가 잘린다. JS 값을 CSS 에 넣어 준다.
 document.documentElement.style.setProperty('--hdr-h', HDR_H + 'px');
@@ -9792,6 +10179,11 @@ const applyDoc = (d) => {
   markDirty();
   if (r.unref.length) toast('부품 값을 직접 고치셨습니다 — 이제 목록과 따로 갑니다');
 };
+
+// ⭐ 되돌리기 «걸음을 안 쌓는» 조용한 반영 (2026-09-02). 빈 곳을 누를 때 잠깐 만들었다
+//    지우는 임시 빈 줄에 쓴다 — 누를 때마다 Ctrl+Z 걸음이 쌓이면 되돌리기를 못 쓴다.
+// ⚠ 글을 치는 순간부터는 여느 편집과 똑같이 applyDoc 을 타 한 걸음이 된다.
+const setDocQuiet = (d) => { state.doc = d; markDirty(); };
 
 // 되돌린 편집의 선택을 되살린다. 그 블록이 이 상태에 없으면(문단 가르기 되돌림 등)
 // 조용히 선택 없이 그린다 — 못 찾으면 커서를 안 놓을 뿐, 글은 정상이다.
@@ -10004,6 +10396,29 @@ const newlineApi = attachNewline({
   setDoc: applyDoc,
   redraw: draw,
   onDone: toast,
+});
+
+// 빈 곳을 누르면 커서가 간다 — 워드와 같게(2026-09-02 SKY). 표·절 제목·그림 아래 틈과
+// 마지막 글 아래 빈 자리를 누를 수 있게 한다.
+const gapApi = attachGapCaret({
+  pagesEl: document.getElementById('pages'),
+  getDoc: () => state.doc,
+  setDocQuiet,
+  redraw: draw,
+});
+window.__app.gapApi = gapApi;
+
+// 창이 떠 있는 동안 뒤 문서는 안 굴러간다(2026-09-02 SKY). 창 여섯 곳을 한 자리에서 지킨다.
+window.__app.lockApi = attachScrollLock();
+
+// 절 제목 만들기·풀기 (2026-09-02 SKY) — 리본 「절 제목」 단추와 우클릭 메뉴가 같은 일을 한다.
+window.__app.sectionApi = attachSection({
+  pagesEl: document.getElementById('pages'),
+  barEl: document.getElementById('bar'),
+  getDoc: () => state.doc,
+  setDoc: applyDoc,
+  redraw: draw,
+  onDone: (t) => toast(t),
 });
 window.__app.newlineApi = newlineApi;
 
